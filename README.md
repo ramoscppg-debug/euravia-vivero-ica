@@ -34,7 +34,7 @@ vivero-360/
 ├── playwright.config.ts
 ├── .env.example            # Credenciales Supabase + SUNAT / AFPnet
 ├── tests/
-│   └── vivero-e2e.spec.ts  # Suite E2E (19 flujos de negocio)
+│   └── vivero-e2e.spec.ts  # Suite E2E (24 flujos de negocio)
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx             # Solo arma el layout y elige la pantalla activa
@@ -74,7 +74,8 @@ vivero-360/
 El menú sigue el camino del dinero: **Vender → Servicios → Clientes → Inventario → Administración**.
 Cada evento de negocio es una sola acción del store que actualiza todo a la vez:
 
-- **Venta POS** → descuenta stock → movimiento en Kardex → comprobante SUNAT → caja por medio de pago → (opcional) GRE
+- **Venta POS** (carrito, descuento por línea y global, pago mixto con vuelto) → comprobante SUNAT + Kardex + caja por medio de pago + (opcional) GRE, **en una sola transacción** del servidor (`registrar_comprobante`)
+- **Devolución** → nota de crédito (BC01/FC01) que devuelve stock y registra el reembolso; nunca supera lo vendido
 - **Compra** → suma stock → Kardex → Registro de Compras (SIRE RCE)
 - **Merma / desmedro** → descuenta stock → Kardex → baja valorizada (la cuarentena no mueve stock)
 - **Servicio de jardinería** → descarga de insumos al Kardex → factura/boleta (una sola vez) → detracción SPOT con vencimiento calculado
@@ -117,7 +118,7 @@ Parámetros y fórmulas centralizados según normativa **vigente 2025** (revisar
 ### ✅ Pruebas
 
 ```bash
-npx playwright test        # 19 pruebas E2E de extremo a extremo
+npx playwright test        # 24 pruebas E2E de extremo a extremo
 ```
 
 ---

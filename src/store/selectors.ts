@@ -31,9 +31,11 @@ export function calcularFinanzas(estado: ErpState, periodo = periodoActual()) {
     invoices: estado.invoices.filter(i => i.fechaEmision.startsWith(periodo)),
     purchases: estado.purchases.filter(p => p.fecha.startsWith(periodo))
   };
-  const totalVentas = s.invoices.reduce((acc, inv) => acc + inv.montoTotal, 0);
-  const totalVentasGravadas = s.invoices.reduce((acc, inv) => acc + inv.opGravadas, 0);
-  const totalIgvVentas = s.invoices.reduce((acc, inv) => acc + inv.totalIgv, 0);
+  // Las notas de crédito (07) restan del periodo
+  const signo = (inv: { tipoComprobante: string }) => (inv.tipoComprobante === '07' ? -1 : 1);
+  const totalVentas = s.invoices.reduce((acc, inv) => acc + signo(inv) * inv.montoTotal, 0);
+  const totalVentasGravadas = s.invoices.reduce((acc, inv) => acc + signo(inv) * inv.opGravadas, 0);
+  const totalIgvVentas = s.invoices.reduce((acc, inv) => acc + signo(inv) * inv.totalIgv, 0);
   const totalCompras = s.purchases.reduce((acc, pur) => acc + pur.total, 0);
   const totalIgvCompras = s.purchases.reduce((acc, pur) => acc + pur.igv, 0);
 

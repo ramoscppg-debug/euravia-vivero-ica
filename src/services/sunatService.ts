@@ -29,7 +29,7 @@ export const SunatBillingService = {
 
   // Generar Boleta o Factura Electrónica SUNAT
   createInvoice(params: {
-    tipoComprobante: '01' | '03' | 'NV'; // 01 Factura, 03 Boleta
+    tipoComprobante: '01' | '03' | '07' | 'NV'; // 01 Factura, 03 Boleta, 07 Nota de crédito
     serie: string; // 'F001' o 'B001'
     correlativo: number;
     cliente: {

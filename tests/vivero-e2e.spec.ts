@@ -88,7 +88,10 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.click('button:has-text("Nueva Venta (POS & CPE)")');
     await expect(page.getByText('Emitir Venta & CPE SUNAT (POS)')).toBeVisible();
 
-    await page.selectOption('select >> nth=1', '03');
+    // Escáner: escribir el SKU y Enter lo agrega al carrito
+    await page.getByLabel('Buscar o escanear producto').fill('AUR-001');
+    await page.keyboard.press('Enter');
+    await page.getByLabel('Tipo de comprobante').selectOption('03');
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
 
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
@@ -246,6 +249,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('17. Una venta POS descuenta stock y queda registrada en el Kardex', async ({ page }) => {
     await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
@@ -286,6 +290,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('21. La Clave SOL no se guarda en el navegador ni en los comprobantes', async ({ page }) => {
     await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
     await page.check('input[type=checkbox]'); // con guía de remisión
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
@@ -307,6 +312,78 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.reload();
     await expect(page.getByText('Control Físico de Kardex & Almacén')).toBeVisible();
     await expect(page.locator('tr', { hasText: 'FC01-0009981' })).toHaveCount(1);
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('22. Carrito con varios productos, descuento global y pago mixto', async ({ page }) => {
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Monstera Deliciosa")').click();
+    await pos.getByLabel('Más AUR-001').click(); // 2 × 85 = 170
+    await pos.locator('button:has-text("Sansevieria Laurentii")').click(); // + 48 = 218
+    await pos.getByLabel('Valor del descuento').fill('10'); // 10% → 196.20
+    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 196.20');
+
+    await pos.locator('button:has-text("+ Pago")').click();
+    await pos.getByLabel('Monto 1').fill('100');
+    await pos.locator('button:has-text("completar")').click(); // Yape 96.20
+    await expect(pos.getByText('Cobro completo ✓')).toBeVisible();
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+
+    await expect(page.getByText('Total: S/ 196.20')).toBeVisible();
+    await expect(page.getByText('Pago Yape: 96.20')).toBeVisible();
+    await expect(page.getByText('Descuento aplicado: -21.80')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-001' }).locator('td').nth(5)).toHaveText('26');
+    await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-002' }).locator('td').nth(5)).toHaveText('34');
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('23. Pago con billete calcula el vuelto y no permite pagar de menos', async ({ page }) => {
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Monstera Deliciosa")').click();
+    await pos.getByLabel('Monto 1').fill('50');
+    await expect(pos.getByText('Falta cobrar S/ 35.00.')).toBeVisible();
+    await expect(page.locator('button:has-text("Emitir Comprobante SUNAT")')).toBeDisabled();
+
+    await pos.locator('button:has-text("S/ 200")').click();
+    await expect(pos.getByText('Vuelto: S/ 115.00')).toBeVisible();
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('Vuelto: S/ 115.00')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('24. Devolución parcial emite nota de crédito y devuelve stock', async ({ page }) => {
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Monstera Deliciosa")').click();
+    await pos.getByLabel('Más AUR-001').click();
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    await page.click('button:has-text("Facturación SUNAT SEE")');
+    await page.locator('button:has-text("Devolución")').first().click();
+    const modal = page.locator('.fixed');
+    await modal.getByLabel('Devolver AUR-001').fill('1');
+    await modal.getByLabel('Motivo de la devolución').fill('Hoja dañada');
+    await modal.locator('button:has-text("Emitir Nota de Crédito")').click();
+    await expect(page.getByText('NOTA DE CRÉDITO ELECTRÓNICA')).toBeVisible();
+    await expect(page.getByText(/Modifica a: B001-/)).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    // Queda 1 por devolver: el campo no deja pasar de 1
+    await page.locator('button:has-text("Devolución")').nth(1).click();
+    await page.locator('.fixed').getByLabel('Devolver AUR-001').fill('5');
+    await expect(page.locator('.fixed').getByLabel('Devolver AUR-001')).toHaveValue('1');
+    await page.locator('.fixed button:has(svg.lucide-x)').first().click();
+
+    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-001' }).locator('td').nth(5)).toHaveText('27'); // 28 - 2 + 1
+    await expect(page.locator('table').nth(1).locator('tr', { hasText: 'Devolucion Cliente' })).toHaveCount(1);
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 });

@@ -13,7 +13,8 @@ export type Modal =
   | { type: 'qr'; sku: string }
   | { type: 'gre' }
   | { type: 'proyecto' }
-  | { type: 'ticket'; invoice: ComprobanteSunat };
+  | { type: 'ticket'; invoice: ComprobanteSunat; vuelto?: number }
+  | { type: 'devolucion'; invoice: ComprobanteSunat };
 
 interface UiValue {
   tab: TabId;

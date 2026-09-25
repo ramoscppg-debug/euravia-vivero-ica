@@ -179,7 +179,11 @@ function comprobanteDesdeFila(r: Row, company: EmpresaConfig): ComprobanteSunat 
     estadoSunat: r.estado_sunat ?? 'PENDIENTE',
     codigoRespuestaSunat: r.codigo_respuesta ?? undefined,
     descripcionRespuestaSunat: r.descripcion_respuesta ?? undefined,
-    hashCpe: r.hash_cpe ?? undefined
+    hashCpe: r.hash_cpe ?? undefined,
+    descuentoTotal: num(r.descuento_total),
+    pagos: r.pagos ?? [],
+    referencia: r.comprobante_referencia ?? undefined,
+    motivo: r.motivo ?? undefined
   };
 }
 
@@ -232,6 +236,7 @@ function clienteDesdeFila(r: Row): CrmClient {
   return {
     id: String(r.id),
     name: r.nombre,
+    doc: r.num_doc ?? undefined,
     phone: r.telefono ?? '',
     district: r.distrito ?? '',
     plantsOwned: r.plantas ?? [],
@@ -271,20 +276,22 @@ function proyectoDesdeFila(r: Row, nombres: Map<string, string>): GardeningProje
 
 function cajaDesdeFilas(rows: Row[]): CashRegisterState {
   const suma = (f: (r: Row) => boolean) => rows.filter(f).reduce((a, r) => a + num(r.monto), 0);
-  const ingreso = (medios: string[]) => suma(r => r.tipo === 'INGRESO' && medios.includes(r.medio_pago));
+  // Medios digitales: ingresos menos devoluciones pagadas por ese mismo medio
+  const neto = (medios: string[]) =>
+    suma(r => r.tipo === 'INGRESO' && medios.includes(r.medio_pago)) - suma(r => r.tipo === 'EGRESO' && medios.includes(r.medio_pago));
   const apertura = suma(r => r.tipo === 'APERTURA');
-  const ventasEfectivo = ingreso(['Efectivo']);
+  const ventasEfectivo = suma(r => r.tipo === 'INGRESO' && r.medio_pago === 'Efectivo');
   const egresos = rows
-    .filter(r => r.tipo === 'EGRESO')
+    .filter(r => r.tipo === 'EGRESO' && (!r.medio_pago || r.medio_pago === 'Efectivo'))
     .map(r => ({ id: `EG-${r.id}`, motivo: r.concepto ?? '', monto: num(r.monto), hora: horaLocal(r.fecha), responsable: r.responsable }));
   const cierres = rows.filter(r => r.tipo === 'CIERRE');
   const teorico = apertura + ventasEfectivo - egresos.reduce((a, e) => a + e.monto, 0);
   return {
     aperturaEfectivo: apertura,
     ventasEfectivo,
-    ventasBilleteras: ingreso(['Yape', 'Plin']),
-    ventasTarjetas: ingreso(['Tarjeta']),
-    ventasTransferencias: ingreso(['Transferencia']),
+    ventasBilleteras: neto(['Yape', 'Plin']),
+    ventasTarjetas: neto(['Tarjeta']),
+    ventasTransferencias: neto(['Transferencia']),
     egresos,
     conteoRealEfectivo: cierres.length ? num(cierres[cierres.length - 1].monto) : teorico,
     estadoCaja: cierres.length ? 'CUADRADA' : 'ABIERTA'
@@ -323,6 +330,62 @@ export async function insertarKardex(movs: MovimientoNuevo[], nombres: Map<strin
       .select('*')
   );
   return rows.sort((a, b) => b.id - a.id).map(r => kardexDesdeFila(r, nombres));
+}
+
+export interface ComprobanteAtomico {
+  invoice: ComprobanteSunat;
+  medioPago?: string;
+  movimientos: MovimientoNuevo[];
+  caja: { tipo: 'INGRESO' | 'EGRESO'; medioPago: string; monto: number; concepto: string }[];
+  guia?: GuiaRemisionSunat | null;
+  cliente?: { nombre: string; tipoDoc: string; numDoc: string } | null;
+  responsable: string;
+}
+
+/** Venta o nota de crédito en una sola transacción del servidor (función registrar_comprobante). */
+export async function registrarComprobanteAtomico(c: ComprobanteAtomico, nombres: Map<string, string>): Promise<KardexMovement[]> {
+  const sb = await db();
+  const inv = c.invoice;
+  const filas = ok<Row[]>(await sb.rpc('registrar_comprobante', {
+    p: {
+      comprobante: {
+        id: inv.id,
+        tipo_comprobante: inv.tipoComprobante,
+        serie: inv.serie,
+        correlativo: inv.correlativo,
+        fecha_emision: inv.fechaEmision,
+        hora_emision: inv.horaEmision,
+        cliente: inv.cliente.nombreRazonSocial,
+        cliente_tipo_doc: inv.cliente.tipoDoc,
+        cliente_num_doc: inv.cliente.numDoc,
+        op_gravadas: inv.opGravadas,
+        total_igv: inv.totalIgv,
+        monto_total: inv.montoTotal,
+        items: inv.items,
+        estado_sunat: inv.estadoSunat,
+        codigo_respuesta: inv.codigoRespuestaSunat ?? null,
+        descripcion_respuesta: inv.descripcionRespuestaSunat ?? null,
+        hash_cpe: inv.hashCpe ?? null,
+        medio_pago: c.medioPago ?? null,
+        descuento_total: inv.descuentoTotal ?? 0,
+        pagos: inv.pagos ?? [],
+        comprobante_referencia: inv.referencia ?? null,
+        motivo: inv.motivo ?? null
+      },
+      movimientos: c.movimientos.map(m => ({
+        producto_sku: m.sku,
+        tipo_movimiento: m.type,
+        cantidad_entrada: m.qtyIn,
+        cantidad_salida: m.qtyOut,
+        costo_unitario: m.unitCost
+      })),
+      caja: c.caja.map(x => ({ tipo: x.tipo, medio_pago: x.medioPago, monto: x.monto, concepto: x.concepto })),
+      guia: c.guia ? { id: c.guia.id, fecha_emision: c.guia.fechaEmision, datos: c.guia } : null,
+      cliente: c.cliente ? { nombre: c.cliente.nombre, tipo_doc: c.cliente.tipoDoc, num_doc: c.cliente.numDoc } : null,
+      responsable: c.responsable
+    }
+  }));
+  return filas.sort((a, b) => b.id - a.id).map(r => kardexDesdeFila(r, nombres));
 }
 
 export async function siguienteCorrelativo(serie: string): Promise<number> {

@@ -1,3 +1,4 @@
+import { DevolucionModal } from '../modules/admin/Comprobantes';
 import { GreModal } from '../modules/admin/Guias';
 import { BajaModal, CompraModal } from '../modules/inventario/InventarioModals';
 import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
@@ -14,7 +15,7 @@ export default function ModalHost() {
     case 'qr':
       return <QrModal key={`qr-${modal.sku}`} presetSku={modal.sku} />;
     case 'ticket':
-      return <TicketModal invoice={modal.invoice} />;
+      return <TicketModal invoice={modal.invoice} vuelto={modal.vuelto} />;
     case 'compra':
       return <CompraModal />;
     case 'baja':
@@ -25,5 +26,7 @@ export default function ModalHost() {
       return <GreModal />;
     case 'proyecto':
       return <NuevaCotizacionModal />;
+    case 'devolucion':
+      return <DevolucionModal key={modal.invoice.id} invoice={modal.invoice} />;
   }
 }

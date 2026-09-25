@@ -31,12 +31,16 @@ import type {
   CrmClient,
   DetraccionRecord,
   EmpresaConfig,
+  DescuentoGlobal,
   GardeningMaterialItem,
   GardeningProject,
   GuiaRemisionSunat,
   InternalConsumption,
   KardexMovement,
+  LineaCarrito,
+  MedioPago,
   MovementType,
+  Pago,
   ProjectStatus,
   Purchase,
   RegimenTributario,
@@ -44,6 +48,7 @@ import type {
 } from '../domain/types';
 import { emisorDe } from '../domain/types';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
+import { calcularCarrito, resumirPagos } from '../lib/pos';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
@@ -68,13 +73,28 @@ export interface ErpState {
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 export interface VentaInput {
-  sku: string;
-  qty: number;
-  tipoComprobante: '01' | '03' | 'NV';
+  lineas: LineaCarrito[];
+  descuentoGlobal: DescuentoGlobal;
+  tipoComprobante: '01' | '03';
   docIdentidad: string;
   clientName: string;
-  payment: string;
+  pagos: Pago[];
   generarGre: boolean;
+  direccionEntrega?: string;
+}
+
+export interface DevolucionInput {
+  invoiceId: string;
+  items: { sku: string; qty: number }[];
+  motivo: string;
+  medioReembolso: MedioPago;
+}
+
+interface MovimientoCaja {
+  tipo: 'INGRESO' | 'EGRESO';
+  medioPago: string;
+  monto: number;
+  concepto: string;
 }
 
 export interface CompraInput {
@@ -208,6 +228,22 @@ function moverStock(s: ErpState, m: repo.MovimientoNuevo): ErpState {
   };
 }
 
+/** Refleja cobros y reembolsos en la caja del día. */
+function aplicarCaja(caja: CashRegisterState, movs: MovimientoCaja[], responsable: string): CashRegisterState {
+  const c = { ...caja, egresos: [...caja.egresos] };
+  for (const m of movs) {
+    const signo = m.tipo === 'INGRESO' ? 1 : -1;
+    if (m.medioPago === 'Efectivo') {
+      c.conteoRealEfectivo = round2(c.conteoRealEfectivo + signo * m.monto);
+      if (m.tipo === 'INGRESO') c.ventasEfectivo = round2(c.ventasEfectivo + m.monto);
+      else c.egresos.push({ id: `EG-${String(c.egresos.length + 1).padStart(2, '0')}`, motivo: m.concepto, monto: m.monto, hora: new Date().toTimeString().slice(0, 5), responsable });
+    } else if (m.medioPago === 'Yape' || m.medioPago === 'Plin') c.ventasBilleteras = round2(c.ventasBilleteras + signo * m.monto);
+    else if (m.medioPago === 'Tarjeta') c.ventasTarjetas = round2(c.ventasTarjetas + signo * m.monto);
+    else c.ventasTransferencias = round2(c.ventasTransferencias + signo * m.monto);
+  }
+  return c;
+}
+
 /** Traduce los errores de Supabase a algo que entienda quien está en caja. */
 function errorNube(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
@@ -221,7 +257,7 @@ function errorNube(e: unknown): string {
 /** Emite el CPE en SUNAT y sella la CDR de respuesta. */
 async function emitirCpe(
   company: EmpresaConfig,
-  tipo: '01' | '03' | 'NV',
+  tipo: '01' | '03' | '07' | 'NV',
   serie: string,
   correlativo: number,
   cliente: { numDoc: string; nombre: string; direccion: string },
@@ -231,7 +267,7 @@ async function emitirCpe(
     tipoComprobante: tipo,
     serie,
     correlativo,
-    cliente: { tipoDoc: tipo === '01' ? '6' : '1', numDoc: cliente.numDoc, nombre: cliente.nombre, direccion: cliente.direccion },
+    cliente: { tipoDoc: tipo === '01' ? '6' : validarDni(cliente.numDoc) ? '1' : '0', numDoc: cliente.numDoc, nombre: cliente.nombre, direccion: cliente.direccion },
     items
   });
   inv.emisor = emisorDe(company);
@@ -298,6 +334,21 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       };
     }
 
+    /** Guarda un comprobante con su stock, caja, guía y cliente. En la nube es una sola transacción. */
+    async function persistirComprobante(c: repo.ComprobanteAtomico): Promise<ErpState> {
+      if (!nube) return c.movimientos.reduce(moverStock, get());
+      const nombres = new Map(get().products.map(p => [p.sku, p.name]));
+      const filas = await repo.registrarComprobanteAtomico(c, nombres);
+      const saldos = new Map<string, number>();
+      filas.forEach(f => { if (!saldos.has(f.productSku)) saldos.set(f.productSku, f.balance); });
+      const cur = get();
+      return {
+        ...cur,
+        products: cur.products.map(p => (saldos.has(p.sku) ? { ...p, stock: saldos.get(p.sku)! } : p)),
+        kardex: [...filas, ...cur.kardex]
+      };
+    }
+
     async function correlativo(serie: string): Promise<number> {
       if (nube) return repo.siguienteCorrelativo(serie);
       return get().invoices.filter(i => i.serie === serie).length + 101;
@@ -309,6 +360,15 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       const tipoDoc = validarRuc(c.numDoc) ? '6' : validarDni(c.numDoc) ? '1' : null;
       if (!tipoDoc) return;
       void repo.guardarCliente({ ...c, tipoDoc }).catch(() => {});
+    }
+
+    /** Cantidades ya devueltas de un comprobante (sumando sus notas de crédito). */
+    function devueltoDe(invoiceId: string): Map<string, number> {
+      const dev = new Map<string, number>();
+      get().invoices
+        .filter(i => i.tipoComprobante === '07' && i.referencia === invoiceId)
+        .forEach(n => n.items.forEach(it => dev.set(it.sku, (dev.get(it.sku) ?? 0) + it.cantidad)));
+      return dev;
     }
 
     return {
@@ -324,71 +384,158 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       },
 
       // ---------------- VENDER ----------------
-      async registrarVenta(v: VentaInput): Promise<Result<{ invoice: ComprobanteSunat }>> {
+      async registrarVenta(v: VentaInput): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number }>> {
         const s = get();
-        const prod = s.products.find(p => p.sku === v.sku);
-        if (!prod) return { ok: false, error: 'Producto no encontrado.' };
-        if (prod.stock < v.qty) {
-          return { ok: false, error: `¡Stock insuficiente! Disponible: ${prod.stock} unidades de ${prod.name}` };
+        const carrito = calcularCarrito(v.lineas, s.products, v.descuentoGlobal);
+        if (!carrito.lineas.length) return { ok: false, error: 'Agrega al menos un producto al carrito.' };
+
+        // Stock por producto (un mismo SKU puede estar en varias líneas)
+        const pedido = new Map<string, number>();
+        carrito.lineas.forEach(l => pedido.set(l.sku, (pedido.get(l.sku) ?? 0) + l.qty));
+        for (const [sku, qty] of pedido) {
+          const prod = s.products.find(p => p.sku === sku)!;
+          if (prod.stock < qty) return { ok: false, error: `¡Stock insuficiente! Disponible: ${prod.stock} unidades de ${prod.name}` };
         }
         // Validación del documento del adquirente según tipo de comprobante (SUNAT)
         if (v.tipoComprobante === '01' && !validarRuc(v.docIdentidad)) {
           return { ok: false, error: '⚠️ La Factura Electrónica requiere un RUC válido de 11 dígitos (módulo 11). Verifique el documento del cliente.' };
         }
-        if (v.tipoComprobante === '03' && prod.price * v.qty > 700 && !validarDni(v.docIdentidad)) {
+        if (v.tipoComprobante === '03' && carrito.total > 700 && !validarDni(v.docIdentidad)) {
           return { ok: false, error: '⚠️ En Boletas por importes mayores a S/ 700 es obligatorio identificar al cliente con DNI (8 dígitos).' };
         }
+        const pagos = resumirPagos(carrito.total, v.pagos);
+        if (pagos.error) return { ok: false, error: pagos.error };
 
-        try {
-          const serie = v.tipoComprobante === '01' ? s.company.serieFactura : v.tipoComprobante === '03' ? s.company.serieBoleta : 'NV01';
+        const serie = v.tipoComprobante === '01' ? s.company.serieFactura : s.company.serieBoleta;
+        const emitir = async () => {
           const invoice = await emitirCpe(
             s.company,
             v.tipoComprobante,
             serie,
             await correlativo(serie),
-            { numDoc: v.docIdentidad, nombre: v.clientName, direccion: 'Lima, Perú' },
-            [{ sku: prod.sku, name: prod.name, quantity: v.qty, priceWithIgv: prod.price }]
+            { numDoc: v.docIdentidad, nombre: v.clientName, direccion: v.direccionEntrega || 'Lima, Perú' },
+            carrito.lineas.map(l => ({ sku: l.sku, name: l.name, quantity: l.qty, priceWithIgv: l.precioUnitNeto }))
           );
+          invoice.descuentoTotal = carrito.descuentoTotal;
+          invoice.pagos = pagos.ingresos;
+          return invoice;
+        };
 
+        try {
+          let invoice = await emitir();
           const gre = v.generarGre
             ? await emitirGre(s.company, s.guiasRemision, {
                 tipoDoc: v.tipoComprobante === '01' ? '6' : '1',
                 numDoc: v.docIdentidad,
                 nombre: v.clientName,
-                direccionLlegada: 'Dirección de Entrega Lima',
+                direccionLlegada: v.direccionEntrega || 'Dirección de Entrega Lima',
                 placa: 'BZF-412',
                 motivo: `Despacho Venta ${invoice.id}`,
-                items: [{ sku: prod.sku, descripcion: prod.name, cantidad: v.qty }]
+                items: carrito.lineas.map(l => ({ sku: l.sku, descripcion: l.name, cantidad: l.qty }))
               })
             : null;
 
-          // El Kardex va primero: si el servidor no tiene stock, no se registra nada más
-          let next = await moverInventario([
-            { sku: prod.sku, qtyIn: 0, qtyOut: v.qty, type: 'Venta Cliente', doc: invoice.id, user: responsable('POS Aurevia'), unitCost: prod.cost }
-          ]);
-          if (nube) {
-            await repo.guardarComprobante(invoice, { medioPago: v.payment });
-            await repo.guardarCaja({ tipo: 'INGRESO', monto: invoice.montoTotal, medioPago: v.payment, concepto: `Venta ${invoice.id}`, comprobanteId: invoice.id, responsable: usuario });
-            if (gre) await repo.guardarGuia(gre, invoice.id);
-            registrarClienteEnNube({ nombre: v.clientName, numDoc: v.docIdentidad });
+          const movimientos = (id: string): repo.MovimientoNuevo[] =>
+            [...pedido].map(([sku, qty]) => ({
+              sku, qtyIn: 0, qtyOut: qty, type: 'Venta Cliente', doc: id, user: responsable('POS Aurevia'),
+              unitCost: s.products.find(p => p.sku === sku)!.cost
+            }));
+          const caja = (id: string): MovimientoCaja[] =>
+            pagos.ingresos.map(p => ({ tipo: 'INGRESO', medioPago: p.medio, monto: p.monto, concepto: `Venta ${id}` }));
+          const tipoDoc = validarRuc(v.docIdentidad) ? '6' : validarDni(v.docIdentidad) ? '1' : null;
+
+          // Si otra caja tomó el mismo correlativo, se vuelve a numerar una vez
+          let next: ErpState | null = null;
+          for (let intento = 0; !next; intento++) {
+            try {
+              next = await persistirComprobante({
+                invoice,
+                medioPago: pagos.ingresos.map(p => p.medio).join(' + '),
+                movimientos: movimientos(invoice.id),
+                caja: caja(invoice.id),
+                guia: gre,
+                cliente: tipoDoc ? { nombre: v.clientName, tipoDoc, numDoc: v.docIdentidad } : null,
+                responsable: usuario
+              });
+            } catch (e) {
+              if (intento === 0 && nube && String(e instanceof Error ? e.message : e).includes('duplicate key')) invoice = await emitir();
+              else throw e;
+            }
           }
 
-          const caja = { ...next.cashRegister };
-          const monto = invoice.montoTotal;
-          if (v.payment === 'Efectivo') {
-            caja.ventasEfectivo += monto;
-            caja.conteoRealEfectivo += monto;
-          } else if (['Yape', 'Plin'].includes(v.payment)) caja.ventasBilleteras += monto;
-          else if (v.payment === 'Tarjeta') caja.ventasTarjetas += monto;
-          else caja.ventasTransferencias += monto;
-          next = {
+          commit({
             ...next,
-            cashRegister: caja,
+            cashRegister: aplicarCaja(next.cashRegister, caja(invoice.id), responsable('POS Aurevia')),
             invoices: [invoice, ...next.invoices],
             guiasRemision: gre ? [gre, ...next.guiasRemision] : next.guiasRemision
-          };
-          commit(next);
-          return { ok: true, invoice };
+          });
+          return { ok: true, invoice, vuelto: pagos.vuelto };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      devueltoDe,
+
+      async registrarDevolucion(d: DevolucionInput): Promise<Result<{ invoice: ComprobanteSunat }>> {
+        const s = get();
+        const original = s.invoices.find(i => i.id === d.invoiceId);
+        if (!original || (original.tipoComprobante !== '01' && original.tipoComprobante !== '03')) {
+          return { ok: false, error: 'Sólo se puede devolver sobre una factura o boleta.' };
+        }
+        if (!d.motivo.trim()) return { ok: false, error: 'Indica el motivo de la devolución.' };
+        const items = d.items.filter(i => i.qty > 0);
+        if (!items.length) return { ok: false, error: 'Indica al menos una cantidad a devolver.' };
+
+        const yaDevuelto = devueltoDe(original.id);
+        for (const it of items) {
+          const vendido = original.items.filter(x => x.sku === it.sku).reduce((a, x) => a + x.cantidad, 0);
+          const disponible = vendido - (yaDevuelto.get(it.sku) ?? 0);
+          if (it.qty > disponible) return { ok: false, error: `⚠️ Sólo quedan ${disponible} u. de ${it.sku} por devolver en ${original.id}.` };
+        }
+
+        const lineas = items.map(it => {
+          const orig = original.items.find(x => x.sku === it.sku)!;
+          return { sku: it.sku, name: orig.descripcion, quantity: it.qty, priceWithIgv: orig.precioUnitario };
+        });
+        const montoReembolso = round2(lineas.reduce((a, l) => a + l.quantity * l.priceWithIgv, 0));
+        if (d.medioReembolso === 'Efectivo' && montoReembolso > s.cashRegister.conteoRealEfectivo) {
+          return { ok: false, error: `⚠️ No hay suficiente efectivo en gaveta (S/ ${s.cashRegister.conteoRealEfectivo.toFixed(2)}) para reembolsar S/ ${montoReembolso.toFixed(2)}.` };
+        }
+
+        // Serie de nota de crédito: BC01 para boletas, FC01 para facturas
+        const serie = `${original.serie.charAt(0)}C01`;
+        try {
+          const nota = await emitirCpe(
+            s.company,
+            '07',
+            serie,
+            await correlativo(serie),
+            { numDoc: original.cliente.numDoc, nombre: original.cliente.nombreRazonSocial, direccion: original.cliente.direccion ?? 'Lima, Perú' },
+            lineas
+          );
+          nota.cliente.tipoDoc = original.cliente.tipoDoc;
+          nota.referencia = original.id;
+          nota.motivo = d.motivo.trim();
+          nota.pagos = [{ medio: d.medioReembolso, monto: nota.montoTotal }];
+
+          const caja: MovimientoCaja[] = [{ tipo: 'EGRESO', medioPago: d.medioReembolso, monto: nota.montoTotal, concepto: `Devolución ${nota.id} (${original.id})` }];
+          const next = await persistirComprobante({
+            invoice: nota,
+            medioPago: d.medioReembolso,
+            movimientos: items.map(it => ({
+              sku: it.sku, qtyIn: it.qty, qtyOut: 0, type: 'Devolucion Cliente', doc: nota.id, user: responsable('POS Aurevia'),
+              unitCost: s.products.find(p => p.sku === it.sku)?.cost ?? 0
+            })),
+            caja,
+            responsable: usuario
+          });
+          commit({
+            ...next,
+            cashRegister: aplicarCaja(next.cashRegister, caja, responsable('POS Aurevia')),
+            invoices: [nota, ...next.invoices]
+          });
+          return { ok: true, invoice: nota };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

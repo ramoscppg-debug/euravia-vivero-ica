@@ -20,7 +20,7 @@ export default function Clientes() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {crmClients.map(client => {
           const compras = invoices.filter(i => i.cliente.nombreRazonSocial === client.name);
-          const totalCompras = compras.reduce((a, i) => a + i.montoTotal, 0);
+          const totalCompras = compras.reduce((a, i) => a + (i.tipoComprobante === '07' ? -1 : 1) * i.montoTotal, 0);
           const servicios = projects.filter(p => p.client === client.name);
           return (
             <div key={client.id} className="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-4 flex flex-col justify-between">

@@ -85,6 +85,12 @@ export interface ComprobanteSunat {
   descripcionRespuestaSunat?: string;
   hashCpe?: string; // Código Hash de la firma digital
   qrUrl?: string;
+
+  // Datos comerciales del POS
+  descuentoTotal?: number; // descuento aplicado (inc. IGV), ya prorrateado en los ítems
+  pagos?: { medio: string; monto: number }[]; // pago mixto
+  referencia?: string; // nota de crédito: comprobante que modifica
+  motivo?: string; // nota de crédito: motivo de la devolución
 }
 
 // GUÍA DE REMISIÓN REMITENTE ELECTRÓNICA (GRE - SUNAT)

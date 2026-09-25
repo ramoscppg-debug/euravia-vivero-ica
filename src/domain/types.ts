@@ -189,6 +189,7 @@ export interface DetraccionRecord {
 export interface CrmClient {
   id: string;
   name: string;
+  doc?: string; // DNI o RUC (clientes registrados en la nube)
   phone: string;
   district: string;
   plantsOwned: string[];
@@ -205,4 +206,24 @@ export type Rol = 'dueno' | 'vendedor' | 'jardinero';
 export function emisorDe(c: EmisorSunat): EmisorSunat {
   const { ruc, razonSocial, nombreComercial, direccion, ubigeo, distrito, provincia, departamento } = c;
   return { ruc, razonSocial, nombreComercial, direccion, ubigeo, distrito, provincia, departamento };
+}
+
+// ---------- POS ----------
+export const MEDIOS_PAGO = ['Efectivo', 'Yape', 'Plin', 'Tarjeta', 'Transferencia'] as const;
+export type MedioPago = (typeof MEDIOS_PAGO)[number];
+
+export interface Pago {
+  medio: MedioPago;
+  monto: number;
+}
+
+export interface LineaCarrito {
+  sku: string;
+  qty: number;
+  descuentoPct: number; // 0-100, descuento de la línea
+}
+
+export interface DescuentoGlobal {
+  tipo: 'PCT' | 'MONTO';
+  valor: number;
 }
