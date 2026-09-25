@@ -29,7 +29,7 @@ export function useDocLookup() {
 
   const consultar = async (doc: string, onNombre: (nombre: string) => void) => {
     const value = (doc || '').trim();
-    const sinToken = sunatClient.tieneApiToken ? '' : ' (configura VITE_SUNAT_API_TOKEN para la consulta en línea)';
+    const sinToken = sunatClient.tieneApiToken ? '' : ' (la consulta en línea requiere el servicio de consulta del servidor)';
 
     if (value.length === 11) {
       if (!validarRuc(value)) {

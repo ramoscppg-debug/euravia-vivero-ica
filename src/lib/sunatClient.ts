@@ -84,10 +84,12 @@ export class SunatApiClient {
     this.config = {
       ruc: import.meta.env.VITE_SUNAT_RUC || '20609876541',
       razonSocial: import.meta.env.VITE_SUNAT_RAZON_SOCIAL || 'AUREVIA BOTANICAL S.A.C.',
-      usuarioSol: import.meta.env.VITE_SUNAT_USUARIO_SOL || 'MODDATOS', // Usuario de prueba SUNAT
-      claveSol: import.meta.env.VITE_SUNAT_CLAVE_SOL || 'moddatos',
+      // Credenciales públicas de prueba de SUNAT BETA. Las reales (Clave SOL, token de consulta)
+      // nunca se leen de variables VITE_: Vite las publicaría dentro de la página.
+      usuarioSol: 'MODDATOS',
+      claveSol: 'moddatos',
       modo: (import.meta.env.VITE_SUNAT_MODO as 'BETA' | 'PRODUCCION') || 'BETA',
-      apiToken: import.meta.env.VITE_SUNAT_API_TOKEN || ''
+      apiToken: ''
     };
   }
 
@@ -121,7 +123,7 @@ export class SunatApiClient {
 
   /**
    * Consulta el padrón RUC a través del puente REST (apis.net.pe).
-   * SUNAT no expone una API pública gratuita: se requiere `VITE_SUNAT_API_TOKEN`.
+   * SUNAT no expone una API pública gratuita: se requiere un token que debe vivir en un servidor (Edge Function), no en la página.
    * Sin token o sin conectividad devuelve `fuente: 'local'` con `razonSocial` vacío
    * (la validación de módulo 11 la realiza el llamador con `validarRuc`).
    */
