@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AUREVIA | ERP Vivero 360° • SUNAT • AFPNET • SIRE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,400;1,600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-serif { font-family: 'Playfair Display', serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #d4af3740; border-radius: 9999px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background-color: transparent; }
+  </style>
+</head>
+<body class="bg-[#faf8f5] text-[#1c2e24] antialiased flex h-screen overflow-hidden">
+
+  <!-- ============================================================ -->
+  <!-- SIDEBAR AUREVIA LUXURY BOTANICAL -->
+  <!-- ============================================================ -->
+  <aside class="w-72 bg-[#082017] text-white flex flex-col justify-between shrink-0 p-5 border-r border-[#123829] shadow-2xl z-30">
+    <div class="space-y-6">
+      <div class="flex items-center gap-3.5 pb-5 border-b border-[#164432]">
+        <img src="public/logo.jpg" onerror="this.src='https://images.unsplash.com/photo-1545239351-ef35f43d514b?w=100&auto=format&fit=crop&q=60'" alt="Aurevia Logo" class="w-12 h-12 rounded-2xl object-cover border border-[#d4af37]/40 shadow-xl bg-white p-0.5" />
+        <div>
+          <h1 class="font-serif text-xl tracking-wide text-[#fdfbf7] flex items-center gap-1.5 font-bold" id="sidebar-company-title">Aurevia</h1>
+          <p class="text-[9px] text-[#d4af37] font-semibold tracking-[0.2em] uppercase">ERP • SUNAT • AFPNET</p>
+          <p class="text-[9px] text-[#8fa89b] italic font-serif">Naturaleza que inspira</p>
+        </div>
+      </div>
+
+      <!-- Menú de Navegación Segmentado por Áreas -->
+      <nav class="space-y-3.5 text-xs overflow-y-auto max-h-[calc(100vh-215px)] pr-1 custom-scrollbar">
+        
+        <!-- 0. PANEL GENERAL -->
+        <div>
+          <button onclick="navigate('dashboard')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="dashboard">
+            <div class="flex items-center gap-3">
+              <i data-lucide="layout-dashboard" class="w-4 h-4 text-[#d4af37]"></i>
+              <span>Inicio Aurevia</span>
+            </div>
+            <span class="text-[10px] text-[#8fa89b] bg-[#123829] px-2 py-0.5 rounded-full">360°</span>
+          </button>
+        </div>
+
+        <!-- SECCIÓN 1: ÁREA COMERCIAL & VENTAS -->
+        <div class="space-y-1">
+          <div class="px-2.5 py-1 text-[10px] font-bold tracking-wider text-[#d4af37] uppercase flex items-center justify-between border-b border-[#164432]/70">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="store" class="w-3 h-3 text-[#d4af37]"></i> Área Comercial
+            </span>
+            <span class="text-[8px] text-[#8fa89b] tracking-normal lowercase bg-[#103324] px-1.5 py-0.5 rounded">ventas</span>
+          </div>
+          
+          <div class="space-y-1 pt-1">
+            <button onclick="navigate('catalogo')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="catalogo">
+              <div class="flex items-center gap-3">
+                <i data-lucide="store" class="w-4 h-4 text-[#8fa89b]"></i>
+                <span>Tienda & Catálogo POS</span>
+              </div>
+              <span class="bg-[#134e2e] text-[#d4af37] text-[9px] px-2 py-0.5 rounded-full font-bold" id="catalog-count-badge">4</span>
+            </button>
+
+            <button onclick="navigate('jardineria')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="jardineria">
+              <div class="flex items-center gap-3">
+                <i data-lucide="flower-2" class="w-4 h-4 text-[#8fa89b]"></i>
+                <span>Jardines & Paisajismo</span>
+              </div>
+              <span class="bg-[#134e2e] text-[#d4af37] text-[9px] px-2 py-0.5 rounded-full font-bold">VIP</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: ÁREA LOGÍSTICA & ALMACÉN -->
+        <div class="space-y-1">
+          <div class="px-2.5 py-1 text-[10px] font-bold tracking-wider text-[#d4af37] uppercase flex items-center justify-between border-b border-[#164432]/70">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="boxes" class="w-3 h-3 text-[#d4af37]"></i> Área Logística
+            </span>
+            <span class="text-[8px] text-[#8fa89b] tracking-normal lowercase bg-[#103324] px-1.5 py-0.5 rounded">stock & ruta</span>
+          </div>
+          
+          <div class="space-y-1 pt-1">
+            <button onclick="navigate('kardex')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="kardex">
+              <div class="flex items-center gap-3">
+                <i data-lucide="boxes" class="w-4 h-4 text-[#8fa89b]"></i>
+                <span>Kardex & Almacén</span>
+              </div>
+              <span class="bg-[#134e2e] text-[#d4af37] text-[9px] px-2 py-0.5 rounded-full font-bold">Físico</span>
+            </button>
+
+            <button onclick="navigate('guias')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="guias">
+              <div class="flex items-center gap-3">
+                <i data-lucide="truck" class="w-4 h-4 text-[#8fa89b]"></i>
+                <span>Guías de Remisión</span>
+              </div>
+              <span class="bg-[#134e2e] text-[#d4af37] font-bold text-[9px] px-2 py-0.5 rounded-full border border-[#d4af37]/30">GRE T001</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 3: ÁREA CONTABLE & TRIBUTARIA -->
+        <div class="space-y-1">
+          <div class="px-2.5 py-1 text-[10px] font-bold tracking-wider text-[#d4af37] uppercase flex items-center justify-between border-b border-[#164432]/70">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="calculator" class="w-3 h-3 text-[#d4af37]"></i> Área Contable & SUNAT
+            </span>
+            <span class="text-[8px] text-[#8fa89b] tracking-normal lowercase bg-[#103324] px-1.5 py-0.5 rounded">impuestos</span>
+          </div>
+          
+          <div class="space-y-1 pt-1">
+            <button onclick="navigate('sunat')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="sunat">
+              <div class="flex items-center gap-3">
+                <i data-lucide="receipt" class="w-4 h-4 text-[#8fa89b]"></i>
+                <span>Facturación SUNAT</span>
+              </div>
+              <span class="bg-[#134e2e] text-[#d4af37] font-bold text-[9px] px-2 py-0.5 rounded-full border border-[#d4af37]/30">UBL 2.1</span>
+            </button>
+
+            <button onclick="navigate('contabilidad')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="contabilidad">
+              <div class="flex items-center gap-3">
+                <i data-lucide="calculator" class="w-4 h-4 text-[#d4af37]"></i>
+                <span>Contabilidad & SIRE</span>
+              </div>
+              <span class="bg-[#d4af37] text-[#082017] font-bold text-[9px] px-2 py-0.5 rounded-full">F29</span>
+            </button>
+
+            <button onclick="navigate('planilla')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="planilla">
+              <div class="flex items-center gap-3">
+                <i data-lucide="users" class="w-4 h-4 text-[#e05780]"></i>
+                <span>Planilla & AFPnet</span>
+              </div>
+              <span class="bg-[#e05780] text-white font-bold text-[9px] px-2 py-0.5 rounded-full">AFP</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 4: SISTEMA & CONFIGURACIÓN -->
+        <div class="space-y-1">
+          <div class="px-2.5 py-1 text-[10px] font-bold tracking-wider text-[#8fa89b] uppercase flex items-center justify-between border-b border-[#164432]/70">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="settings" class="w-3 h-3 text-[#8fa89b]"></i> Configuración
+            </span>
+            <span class="text-[8px] text-[#8fa89b] tracking-normal lowercase bg-[#103324] px-1.5 py-0.5 rounded">empresa</span>
+          </div>
+          
+          <div class="space-y-1 pt-1">
+            <button onclick="navigate('configuracion')" class="nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white" data-target="configuracion">
+              <div class="flex items-center gap-3">
+                <i data-lucide="settings" class="w-4 h-4 text-[#d4af37]"></i>
+                <span>Ajustes & RUC Empresa</span>
+              </div>
+              <span class="bg-[#134e2e] text-[#d4af37] text-[9px] px-2 py-0.5 rounded-full font-bold">RUC</span>
+            </button>
+          </div>
+        </div>
+
+      </nav>
+    </div>
+
+    <div class="pt-3 border-t border-[#164432] text-xs flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#8c6239] text-[#082017] font-bold flex items-center justify-center shadow-md" id="sidebar-logo-letter">A</div>
+        <div>
+          <p class="font-semibold text-white truncate max-w-[130px]" id="sidebar-company-name">Aurevia Botanical</p>
+          <p class="text-[10px] text-[#d4af37] font-mono" id="sidebar-company-ruc">RUC 20609876541</p>
+        </div>
+      </div>
+      <button onclick="navigate('configuracion')" class="p-1.5 hover:bg-[#123e2c] rounded-xl text-[#8fa89b]">
+        <i data-lucide="settings" class="w-4 h-4 text-[#d4af37]"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============================================================ -->
+  <!-- CONTENEDOR PRINCIPAL -->
+  <!-- ============================================================ -->
+  <main class="flex-1 flex flex-col h-full overflow-hidden">
+    <header class="h-20 bg-white/90 backdrop-blur-md border-b border-[#e8e2d8] px-8 flex items-center justify-between shrink-0 z-20">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-serif text-lg font-bold tracking-tight text-[#082017] uppercase" id="header-company-title">AUREVIA BOTANICAL S.A.C.</span>
+          <span class="text-[11px] font-semibold text-[#8fa89b] uppercase tracking-widest" id="header-company-ruc">• RUC 20609876541</span>
+        </div>
+        <p class="text-xs text-[#5c7367]" id="header-company-desc">Av. Primavera 1280, Chacarilla — Santiago de Surco, Lima</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="openPurchaseModal()" class="flex items-center gap-2 bg-[#f4ede4] hover:bg-[#eae1d5] text-[#082017] text-xs font-bold px-4 py-2.5 rounded-2xl border border-[#d5c7b5] transition shadow-sm">
+          <i data-lucide="package-plus" class="w-4 h-4 text-[#134e2e]"></i>
+          <span>Ingreso Almacén (+)</span>
+        </button>
+        <button onclick="openPosModal()" class="flex items-center gap-2 bg-[#082017] hover:bg-[#123e2c] text-[#fdfbf7] text-xs font-bold px-5 py-2.5 rounded-2xl shadow-lg border border-[#d4af37]/40 transition">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-[#d4af37]"></i>
+          <span>Nueva Venta (POS & CPE)</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- BARRA SUPERIOR DE SELECTOR DE ÁREAS (COMERCIAL • LOGÍSTICA • CONTABLE) -->
+    <div class="bg-white border-b border-[#e8e2d8] px-8 py-2.5 flex items-center justify-between gap-3 overflow-x-auto shrink-0 shadow-sm">
+      <div class="flex items-center gap-2 text-xs">
+        <span class="text-[10px] font-bold text-[#8fa89b] uppercase tracking-wider mr-1 hidden sm:inline">Áreas:</span>
+        
+        <button onclick="navigate('dashboard')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb] area-tab-btn" data-area="ALL">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#d4af37]"></i>
+          <span>Visión 360°</span>
+        </button>
+
+        <button onclick="navigate('catalogo')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb] area-tab-btn" data-area="COMERCIAL">
+          <i data-lucide="store" class="w-3.5 h-3.5 text-[#8fa89b]"></i>
+          <span>🛍️ Área Comercial (2)</span>
+        </button>
+
+        <button onclick="navigate('kardex')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb] area-tab-btn" data-area="LOGISTICA">
+          <i data-lucide="boxes" class="w-3.5 h-3.5 text-[#8fa89b]"></i>
+          <span>📦 Área Logística (2)</span>
+        </button>
+
+        <button onclick="navigate('sunat')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb] area-tab-btn" data-area="CONTABLE">
+          <i data-lucide="calculator" class="w-3.5 h-3.5 text-[#d4af37]"></i>
+          <span>📑 Área Contable & SUNAT (3)</span>
+        </button>
+
+        <button onclick="navigate('configuracion')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb] area-tab-btn" data-area="SISTEMA">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-[#d4af37]"></i>
+          <span>⚙️ Ajustes Empresa</span>
+        </button>
+      </div>
+
+      <div class="text-[11px] font-bold text-[#134e2e] flex items-center gap-1.5 bg-[#e7f5ed] px-3 py-1 rounded-xl shrink-0">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>UBL 2.1 • SIRE OK</span>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-8 space-y-8 bg-[#fbf9f6] custom-scrollbar" id="content-area">
+      <!-- Dynamic Content rendered by JS -->
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- MODALES -->
+  <!-- ============================================================ -->
+  <div id="modal-container"></div>
+
+  <script>
+    // ESTADO GLOBAL INTEGRADO DE AUREVIA
+    const state = {
+      view: 'configuracion',
+      regimen: 'RMT', // RMT = MYPE Tributario
+      company: {
+        ruc: '20609876541',
+        razonSocial: 'AUREVIA BOTANICAL S.A.C.',
+        nombreComercial: 'AUREVIA - Plantas, Jardines & Vida Natural',
+        direccion: 'Av. Primavera 1280, Chacarilla',
+        ubigeo: '150140',
+        distrito: 'Santiago de Surco',
+        provincia: 'Lima',
+        departamento: 'Lima',
+        telefono: '+51 987 654 321',
+        email: 'contacto@aurevia.pe',
+        actividadCiiu: '0130 - Propagación de plantas y viveros',
+        sunatAmbiente: 'PRODUCCION',
+        usuarioSol: 'AUREVIASOL',
+        claveSol: '••••••••••••',
+        certificadoCdtNombre: 'CDT_AUREVIA_2026_2029.pfx',
+        certificadoVencimiento: '2029-08-15',
+        serieBoleta: 'B001',
+        serieFactura: 'F001',
+        serieGre: 'T001',
+        formatoTicket: '80mm',
+        pieDePaginaTicket: '¡Gracias por cultivar vida con Aurevia! Garantía botánica de 15 días con asesoría personalizada.',
+        afpnetUsuario: '20609876541_ADMIN',
+        afpnetCodigoEmpresa: 'AFP-AUR-9921'
+      },
+      products: [
+        {
+          sku: 'AUR-001',
+          name: 'Monstera Deliciosa',
+          scientificName: 'Monstera deliciosa Liebm.',
+          categoryName: 'Planta de Interior',
+          price: 85.00,
+          cost: 35.00,
+          stock: 28,
+          minStock: 6,
+          location: 'Zona Tropical B-03',
+          careLight: 'Luz Indirecta Brillante',
+          careWater: 'Riego semanal moderado',
+          fullImage: 'https://images.unsplash.com/photo-1614594975525-e45190c55d0b?w=600&auto=format&fit=crop&q=80',
+          description: 'Hojas esculturales con fenestraciones naturales que purifican y transforman cualquier espacio.'
+        },
+        {
+          sku: 'AUR-002',
+          name: 'Sansevieria Laurentii',
+          scientificName: 'Dracaena trifasciata',
+          categoryName: 'Planta Purificadora',
+          price: 48.00,
+          cost: 18.00,
+          stock: 35,
+          minStock: 8,
+          location: 'Zona Purificadora B-01',
+          careLight: 'Tolera baja a alta luz',
+          careWater: 'Cada 15 a 20 días',
+          fullImage: 'https://images.unsplash.com/photo-1593482892290-f54927ae1bf6?w=600&auto=format&fit=crop&q=80',
+          description: 'Líneas arquitectónicas verticales con bordes dorados, campeona certificada en purificación.'
+        },
+        {
+          sku: 'AUR-003',
+          name: 'Ficus Lyrata Pandurata',
+          scientificName: 'Ficus lyrata',
+          categoryName: 'Árbol Ornamental Interior',
+          price: 120.00,
+          cost: 45.00,
+          stock: 14,
+          minStock: 4,
+          location: 'Pabellón Central C-02',
+          careLight: 'Luz filtrada abundante',
+          careWater: '2 veces por semana',
+          fullImage: 'https://images.unsplash.com/photo-1597055181300-e3633a917c9c?w=600&auto=format&fit=crop&q=80',
+          description: 'La reina indiscutible del diseño de interiores. Hojas lustrosas en forma de lira.'
+        },
+        {
+          sku: 'MAC-001',
+          name: 'Maceta Cerámica Arena Mate 28cm',
+          scientificName: 'Artesanía en Terracota',
+          categoryName: 'Maceta Artesanal',
+          price: 55.00,
+          cost: 22.00,
+          stock: 24,
+          minStock: 8,
+          location: 'Boutique Macetas D-01',
+          careLight: 'Interior y terraza',
+          careWater: 'Con plato drenaje',
+          fullImage: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=600&auto=format&fit=crop&q=80',
+          description: 'Cerámica cocida a alta temperatura con textura suave al tacto y drenaje óptimo.'
+        }
+      ],
+      employees: [
+        { id: 'EMP-01', dni: '45678912', nombres: 'José', apellidos: 'Paredes Quispe', cargo: 'Jardinero Paisajista', sueldoBasico: 1450.00, asignacion: true, pension: 'INTEGRA', cuspp: '567891JPQU01' },
+        { id: 'EMP-02', dni: '71234567', nombres: 'Raúl', apellidos: 'Morales Alva', cargo: 'Chofer Reparto & Logística', sueldoBasico: 1250.00, asignacion: false, pension: 'PRIMA', cuspp: '712345RMAL02' },
+        { id: 'EMP-03', dni: '74561238', nombres: 'Sofía', apellidos: 'Castillo Vega', cargo: 'Asesora Botánica & Vendedora', sueldoBasico: 1200.00, asignacion: false, pension: 'ONP', cuspp: '' }
+      ],
+      invoices: [
+        { id: 'B001-00000342', tipo: '03', fecha: '2026-09-06', cliente: 'Valeria Benavides', doc: '47891234', gravada: 72.03, igv: 12.97, total: 85.00, item: '1x Monstera Deliciosa', hash: 'Qk8xMjN4OTkxMmE=' },
+        { id: 'F001-00000089', tipo: '01', fecha: '2026-09-06', cliente: 'Arquitectura & Paisajes SAC', doc: '20601234567', gravada: 245.76, igv: 44.24, total: 290.00, item: '2x Ficus Lyrata, 1x Maceta', hash: 'RmFjdC0yMDI2LTAwODk=' }
+      ],
+      purchases: [
+        { id: 'FC01-0004512', proveedor: 'Viveros Mayoristas del Sur SAC', ruc: '20556677881', fecha: '2026-09-01', gravada: 1250.00, igv: 225.00, total: 1475.00, items: '30 Monsteras, 15 Ficus' },
+        { id: 'FC01-0008921', proveedor: 'Artesanías & Macetas Perú EIRL', ruc: '20443322119', fecha: '2026-09-03', gravada: 680.00, igv: 122.40, total: 802.40, items: '30 Macetas Cerámica' }
+      ],
+      guias: [
+        { id: 'T001-00000014', fecha: '2026-09-06', cliente: 'Valeria Benavides', doc: '47891234', direccion: 'Calle Las Orquídeas 340, Miraflores', chofer: 'Raúl Morales (DNI 71234567)', placa: 'BZF-412', items: '1x Monstera Deliciosa Mediana' }
+      ],
+      projects: [
+        { id: 'JAR-2026-001', cliente: 'Residencia Familia Ugarte', direccion: 'Av. Las Casuarinas 450, Surco', tipo: 'Diseño Paisajista', total: 3450.00, detalle: '6 Ficus Lyrata, 12 Monsteras, Césped Paspalum' },
+        { id: 'JAR-2026-002', cliente: 'Boutique Hotel Miraflores SAC', direccion: 'Calle Alcanfores 280, Miraflores', tipo: 'Jardín Vertical', total: 5800.00, detalle: '40 Helechos, 30 Filodendros, Sistema Goteo' }
+      ]
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateCompanyHeaders();
+      navigate(state.view);
+    });
+
+    function updateCompanyHeaders() {
+      document.getElementById('sidebar-company-title').innerText = state.company.nombreComercial.split(' - ')[0] || 'Aurevia';
+      document.getElementById('sidebar-company-name').innerText = state.company.nombreComercial.split(' - ')[0];
+      document.getElementById('sidebar-company-ruc').innerText = `RUC ${state.company.ruc}`;
+      document.getElementById('sidebar-logo-letter').innerText = state.company.razonSocial.charAt(0);
+      document.getElementById('header-company-title').innerText = state.company.razonSocial;
+      document.getElementById('header-company-ruc').innerText = `• RUC ${state.company.ruc}`;
+      document.getElementById('header-company-desc').innerText = `${state.company.direccion}, ${state.company.distrito} — ${state.company.telefono}`;
+    }
+
+    function navigate(viewName) {
+      state.view = viewName;
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.target === viewName) {
+          btn.className = 'nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-semibold bg-gradient-to-r from-[#123e2c] to-[#1c553d] text-white border border-[#d4af37]/30 shadow-lg';
+        } else {
+          btn.className = 'nav-btn w-full flex items-center justify-between px-3.5 py-2 rounded-2xl font-medium text-[#c2d4cb] hover:bg-[#0f3325] hover:text-white';
+        }
+      });
+
+      // Actualizar estilo del selector de áreas superior
+      const isComercial = ['catalogo', 'jardineria'].includes(viewName);
+      const isLogistica = ['kardex', 'guias'].includes(viewName);
+      const isContable = ['sunat', 'contabilidad', 'planilla'].includes(viewName);
+      const isSistema = viewName === 'configuracion';
+      const isAll = viewName === 'dashboard';
+
+      document.querySelectorAll('.area-tab-btn').forEach(btn => {
+        const area = btn.dataset.area;
+        if ((area === 'ALL' && isAll) || (area === 'COMERCIAL' && isComercial) || (area === 'LOGISTICA' && isLogistica) || (area === 'CONTABLE' && isContable) || (area === 'SISTEMA' && isSistema)) {
+          btn.className = 'px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#123e2c] text-[#fdfbf7] shadow-sm border border-[#d4af37]/40 area-tab-btn';
+        } else {
+          btn.className = 'px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb] area-tab-btn';
+        }
+      });
+
+      render();
+      lucide.createIcons();
+    }
+
+    function setRegimen(reg) {
+      state.regimen = reg;
+      render();
+      lucide.createIcons();
+    }
+
+    // CÁLCULOS TRIBUTARIOS Y DE PLANILLA
+    function getTotals() {
+      const vGravadas = state.invoices.reduce((a, b) => a + b.gravada, 0);
+      const vIgv = state.invoices.reduce((a, b) => a + b.igv, 0);
+      const vTotal = state.invoices.reduce((a, b) => a + b.total, 0);
+
+      const cGravadas = state.purchases.reduce((a, b) => a + b.gravada, 0);
+      const cIgv = state.purchases.reduce((a, b) => a + b.igv, 0);
+      const cTotal = state.purchases.reduce((a, b) => a + b.total, 0);
+
+      const igvPagar = Math.max(0, vIgv - cIgv);
+      const tasaRenta = state.regimen === 'RER' ? 0.015 : state.regimen === 'RMT' ? 0.01 : 0.015;
+      const rentaPagar = vGravadas * tasaRenta;
+
+      // Planilla
+      let pBruto = 0, pEssalud = 0, pAfp = 0, pNeto = 0;
+      const empDetails = state.employees.map(e => {
+        const bruto = e.sueldoBasico + (e.asignacion ? 102.50 : 0);
+        pBruto += bruto;
+        const essalud = bruto * 0.09;
+        pEssalud += essalud;
+        let desc = e.pension === 'ONP' ? bruto * 0.13 : bruto * 0.128;
+        if (e.pension !== 'ONP') pAfp += desc;
+        const neto = bruto - desc;
+        pNeto += neto;
+        return { ...e, bruto, essalud, desc, neto };
+      });
+
+      return { vGravadas, vIgv, vTotal, cGravadas, cIgv, cTotal, igvPagar, rentaPagar, pBruto, pEssalud, pAfp, pNeto, empDetails };
+    }
+
+    function saveCompanyForm(e) {
+      e.preventDefault();
+      state.company.ruc = document.getElementById('cfg-ruc').value;
+      state.company.razonSocial = document.getElementById('cfg-razon').value;
+      state.company.nombreComercial = document.getElementById('cfg-comercial').value;
+      state.company.actividadCiiu = document.getElementById('cfg-ciiu').value;
+      state.company.telefono = document.getElementById('cfg-tel').value;
+      state.company.email = document.getElementById('cfg-email').value;
+      state.company.direccion = document.getElementById('cfg-dir').value;
+      state.company.ubigeo = document.getElementById('cfg-ubigeo').value;
+      state.company.distrito = document.getElementById('cfg-dist').value;
+      state.company.sunatAmbiente = document.getElementById('cfg-env').value;
+      state.company.usuarioSol = document.getElementById('cfg-usol').value;
+      state.company.serieBoleta = document.getElementById('cfg-sbol').value;
+      state.company.serieFactura = document.getElementById('cfg-sfac').value;
+      state.company.serieGre = document.getElementById('cfg-sgre').value;
+      state.company.formatoTicket = document.getElementById('cfg-ticket').value;
+      state.company.pieDePaginaTicket = document.getElementById('cfg-pie').value;
+
+      updateCompanyHeaders();
+      alert('✅ ¡Datos de la empresa, RUC y credenciales SUNAT/AFPnet guardados exitosamente!');
+      render();
+      lucide.createIcons();
+    }
+
+    function render() {
+      const c = document.getElementById('content-area');
+      const t = getTotals();
+
+      if (state.view === 'configuracion') {
+        c.innerHTML = `
+          <div class="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-[#d4af37]/30">
+            <div>
+              <span class="bg-[#134e2e] text-[#d4af37] px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
+                <i data-lucide="building-2" class="w-4 h-4"></i> Configuración Oficial de la Empresa
+              </span>
+              <h3 class="font-serif text-2xl font-bold text-[#fdfbf7] mt-1">Datos Fiscales, SUNAT SOL & Certificado Digital</h3>
+              <p class="text-xs text-[#c2d4cb]">Actualiza tu RUC, Razón Social, Domicilio Fiscal, Series de Emisión y Credenciales Tributarias.</p>
+            </div>
+            <div class="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-right">
+              <span class="text-[10px] text-[#d4af37] uppercase font-bold block">Entorno Activo</span>
+              <span class="text-sm font-bold text-white flex items-center gap-1 justify-end">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> ${state.company.sunatAmbiente}
+              </span>
+            </div>
+          </div>
+
+          <form onsubmit="saveCompanyForm(event)" class="space-y-6">
+            <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-4">
+              <div class="flex items-center gap-2 pb-2 border-b border-[#f0eae1]">
+                <i data-lucide="building-2" class="w-5 h-5 text-[#134e2e]"></i>
+                <h4 class="font-serif font-bold text-base text-[#082017]">1. Identidad Fiscal & Razón Social (SUNAT)</h4>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Número de RUC (11 dígitos) *</label>
+                  <input type="text" id="cfg-ruc" maxlength="11" value="${state.company.ruc}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold text-sm text-[#082017]" required />
+                  <span class="text-[10px] text-gray-400">Persona Natural (10) o Jurídica (20)</span>
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Razón Social Completa *</label>
+                  <input type="text" id="cfg-razon" value="${state.company.razonSocial}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold text-xs text-[#082017]" required />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Nombre Comercial *</label>
+                  <input type="text" id="cfg-comercial" value="${state.company.nombreComercial}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold text-xs text-[#082017]" required />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2">
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Actividad Económica (CIIU)</label>
+                  <input type="text" id="cfg-ciiu" value="${state.company.actividadCiiu}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl" />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Teléfono / WhatsApp</label>
+                  <input type="text" id="cfg-tel" value="${state.company.telefono}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-semibold" />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Correo de Facturación</label>
+                  <input type="email" id="cfg-email" value="${state.company.email}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-semibold" />
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-4">
+              <div class="flex items-center gap-2 pb-2 border-b border-[#f0eae1]">
+                <i data-lucide="map-pin" class="w-5 h-5 text-[#d4af37]"></i>
+                <h4 class="font-serif font-bold text-base text-[#082017]">2. Domicilio Fiscal & Establecimiento</h4>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                <div class="md:col-span-2">
+                  <label class="font-bold block mb-1 text-[#082017]">Dirección Fiscal Completa *</label>
+                  <input type="text" id="cfg-dir" value="${state.company.direccion}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" required />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Código Ubigeo (6 dígitos) *</label>
+                  <input type="text" id="cfg-ubigeo" maxlength="6" value="${state.company.ubigeo}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" required />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Distrito</label>
+                  <input type="text" id="cfg-dist" value="${state.company.distrito}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl" />
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-[#f0eae1]">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="key-round" class="w-5 h-5 text-[#e05780]"></i>
+                  <h4 class="font-serif font-bold text-base text-[#082017]">3. Credenciales SUNAT SOL & Certificado CDT</h4>
+                </div>
+                <span class="bg-[#dcfce7] text-[#134e2e] font-bold text-[10px] px-2.5 py-1 rounded-full">CDT Activo</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Entorno SUNAT</label>
+                  <select id="cfg-env" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold">
+                    <option value="PRODUCCION" ${state.company.sunatAmbiente === 'PRODUCCION' ? 'selected' : ''}>🟢 Producción (Validez Legal Real SUNAT)</option>
+                    <option value="BETA" ${state.company.sunatAmbiente === 'BETA' ? 'selected' : ''}>🟡 BETA / Homologación (Pruebas)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Usuario Secundario Clave SOL *</label>
+                  <input type="text" id="cfg-usol" value="${state.company.usuarioSol}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" required />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Clave SOL *</label>
+                  <input type="password" value="••••••••••••" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" required />
+                </div>
+              </div>
+
+              <div class="p-4 bg-[#faf8f5] rounded-2xl border flex justify-between items-center text-xs">
+                <div>
+                  <p class="font-bold text-[#082017]">Certificado Digital Tributario SUNAT (.PFX / .P12)</p>
+                  <p class="text-[11px] text-[#5c7367]">Archivo: <span class="font-mono text-[#082017] font-semibold">${state.company.certificadoCdtNombre}</span> (Vigente hasta ${state.company.certificadoVencimiento})</p>
+                </div>
+                <button type="button" onclick="alert('Selecciona tu archivo de Certificado CDT (.pfx o .p12)')" class="px-4 py-2 bg-white border text-[#082017] rounded-xl font-bold text-xs">Renovar Archivo CDT</button>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-4">
+              <div class="flex items-center gap-2 pb-2 border-b border-[#f0eae1]">
+                <i data-lucide="receipt" class="w-5 h-5 text-[#8fa89b]"></i>
+                <h4 class="font-serif font-bold text-base text-[#082017]">4. Series de Emisión & Configuración de Tickets</h4>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Serie Boletas</label>
+                  <input type="text" id="cfg-sbol" maxlength="4" value="${state.company.serieBoleta}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Serie Facturas</label>
+                  <input type="text" id="cfg-sfac" maxlength="4" value="${state.company.serieFactura}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Serie Guías GRE</label>
+                  <input type="text" id="cfg-sgre" maxlength="4" value="${state.company.serieGre}" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
+                </div>
+                <div>
+                  <label class="font-bold block mb-1 text-[#082017]">Formato Impresión</label>
+                  <select id="cfg-ticket" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold">
+                    <option value="80mm" ${state.company.formatoTicket === '80mm' ? 'selected' : ''}>🧾 Ticket Térmico 80mm</option>
+                    <option value="A4" ${state.company.formatoTicket === 'A4' ? 'selected' : ''}>📄 Hoja A4 Comercial</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="font-bold block mb-1 text-[#082017]">Mensaje de Pie de Página en Tickets</label>
+                <textarea id="cfg-pie" rows="2" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl text-xs font-serif">${state.company.pieDePaginaTicket}</textarea>
+              </div>
+            </div>
+
+            <div class="flex justify-end">
+              <button type="submit" class="px-8 py-3.5 bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] font-bold text-sm rounded-2xl shadow-xl flex items-center gap-2">
+                <i data-lucide="save" class="w-4 h-4"></i> Guardar Todos los Cambios de la Empresa
+              </button>
+            </div>
+          </form>
+        `;
+      } else if (state.view === 'dashboard') {
+        c.innerHTML = `
+          <div class="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-[#d4af37]/30">
+            <div class="space-y-2 max-w-xl">
+              <span class="bg-[#134e2e] text-[#d4af37] px-3.5 py-1 rounded-full text-xs font-bold border border-[#d4af37]/30 inline-flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Ecosistema ${state.company.nombreComercial.split(' - ')[0]} 100% Sincronizado
+              </span>
+              <h2 class="font-serif text-3xl font-bold text-[#fdfbf7]">Panel de Control General</h2>
+              <p class="text-xs text-[#c2d4cb] leading-relaxed">
+                Ventas de mostrador descuentan Kardex, emiten comprobantes UBL 2.1 para SUNAT, acumulan crédito fiscal para SIRE y calculan la planilla laboral con exportador AFPnet.
+              </p>
+            </div>
+            <div class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-right">
+              <span class="text-[10px] text-[#d4af37] uppercase font-bold block">Régimen Activo</span>
+              <span class="text-lg font-serif font-bold text-white">⭐ MYPE Tributario (RMT)</span>
+              <span class="text-[11px] text-[#c2d4cb] block mt-0.5">Tasa Renta: 1.0% | IGV 18%</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Ventas Facturadas</span>
+              <div class="text-2xl font-serif font-bold text-[#082017] mt-2">S/ ${t.vTotal.toFixed(2)}</div>
+              <p class="text-[11px] text-[#134e2e] font-semibold mt-1">IGV: S/ ${t.vIgv.toFixed(2)}</p>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Compras Almacén</span>
+              <div class="text-2xl font-serif font-bold text-[#8c6239] mt-2">S/ ${t.cTotal.toFixed(2)}</div>
+              <p class="text-[11px] text-[#8c6239] font-semibold mt-1">Crédito Fiscal: S/ ${t.cIgv.toFixed(2)}</p>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Stock Físico Vivo</span>
+              <div class="text-2xl font-serif font-bold text-[#134e2e] mt-2">${state.products.reduce((a,b)=>a+b.stock,0)} u.</div>
+              <p class="text-[11px] text-[#5c7367] mt-1">${state.products.length} especies activas</p>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Impuesto a Liquidar</span>
+              <div class="text-2xl font-serif font-bold text-[#082017] mt-2">S/ ${(t.igvPagar + t.rentaPagar).toFixed(2)}</div>
+              <p class="text-[11px] text-[#134e2e] font-semibold mt-1">Renta: S/ ${t.rentaPagar.toFixed(2)}</p>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Planilla + EsSalud</span>
+              <div class="text-2xl font-serif font-bold text-[#e05780] mt-2">S/ ${(t.pBruto + t.pEssalud).toFixed(2)}</div>
+              <p class="text-[11px] text-[#5c7367] mt-1">${state.employees.length} trabajadores</p>
+            </div>
+          </div>
+
+          <!-- 3 HUBS DE ACCESO DIRECTO POR ÁREA (COMERCIAL, LOGÍSTICA, CONTABLE) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- 1. HUB ÁREA COMERCIAL -->
+            <div class="bg-gradient-to-br from-white to-[#fcfbf9] rounded-3xl p-6 border border-[#e8e2d8] shadow-sm hover:shadow-md transition space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-[#f0eae1]">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-[#134e2e]/10 text-[#134e2e] flex items-center justify-center font-bold">
+                    <i data-lucide="store" class="w-5 h-5 text-[#134e2e]"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-serif font-bold text-base text-[#082017]">Área Comercial</h4>
+                    <p class="text-[10px] text-[#8fa89b] uppercase tracking-wider font-semibold">Ventas • Catálogo • Paisajismo</p>
+                  </div>
+                </div>
+                <span class="bg-[#134e2e] text-[#d4af37] text-[10px] px-2.5 py-0.5 rounded-full font-bold">2 Módulos</span>
+              </div>
+
+              <div class="space-y-2 text-xs text-[#5c7367]">
+                <div class="flex justify-between items-center">
+                  <span>• Catálogo Activo:</span>
+                  <strong class="text-[#082017]">${state.products.length} productos en exhibición</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>• Proyectos VIP:</span>
+                  <strong class="text-[#082017]">${state.projects.length} cotizaciones y jardines</strong>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button onclick="navigate('catalogo')" class="w-full py-2.5 px-3 bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+                  <i data-lucide="store" class="w-3.5 h-3.5"></i> Tienda POS
+                </button>
+                <button onclick="navigate('jardineria')" class="w-full py-2.5 px-3 bg-[#f4ede4] hover:bg-[#eae1d5] text-[#082017] text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+                  <i data-lucide="flower-2" class="w-3.5 h-3.5 text-[#134e2e]"></i> Proyectos VIP
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. HUB ÁREA LOGÍSTICA -->
+            <div class="bg-gradient-to-br from-white to-[#fcfbf9] rounded-3xl p-6 border border-[#e8e2d8] shadow-sm hover:shadow-md transition space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-[#f0eae1]">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-[#8c6239]/10 text-[#8c6239] flex items-center justify-center font-bold">
+                    <i data-lucide="boxes" class="w-5 h-5 text-[#8c6239]"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-serif font-bold text-base text-[#082017]">Área Logística</h4>
+                    <p class="text-[10px] text-[#8fa89b] uppercase tracking-wider font-semibold">Almacén • Stock • Despachos</p>
+                  </div>
+                </div>
+                <span class="bg-[#8c6239] text-white text-[10px] px-2.5 py-0.5 rounded-full font-bold">2 Módulos</span>
+              </div>
+
+              <div class="space-y-2 text-xs text-[#5c7367]">
+                <div class="flex justify-between items-center">
+                  <span>• Ubicaciones Físicas:</span>
+                  <strong class="text-[#082017]">Zonas A, B, C, D y E</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>• Guías GRE Emitidas:</span>
+                  <strong class="text-[#082017]">${state.guias.length} guías remitente</strong>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button onclick="navigate('kardex')" class="w-full py-2.5 px-3 bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+                  <i data-lucide="boxes" class="w-3.5 h-3.5"></i> Kardex Físico
+                </button>
+                <button onclick="navigate('guias')" class="w-full py-2.5 px-3 bg-[#f4ede4] hover:bg-[#eae1d5] text-[#082017] text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition">
+                  <i data-lucide="truck" class="w-3.5 h-3.5 text-[#8c6239]"></i> Guías GRE
+                </button>
+              </div>
+            </div>
+
+            <!-- 3. HUB ÁREA CONTABLE & SUNAT -->
+            <div class="bg-gradient-to-br from-white to-[#fcfbf9] rounded-3xl p-6 border border-[#e8e2d8] shadow-sm hover:shadow-md transition space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-[#f0eae1]">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-2xl bg-[#d4af37]/20 text-[#082017] flex items-center justify-center font-bold">
+                    <i data-lucide="calculator" class="w-5 h-5 text-[#8c6239]"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-serif font-bold text-base text-[#082017]">Área Contable</h4>
+                    <p class="text-[10px] text-[#8fa89b] uppercase tracking-wider font-semibold">SUNAT • SIRE • AFPnet</p>
+                  </div>
+                </div>
+                <span class="bg-[#d4af37] text-[#082017] text-[10px] px-2.5 py-0.5 rounded-full font-bold">3 Módulos</span>
+              </div>
+
+              <div class="space-y-2 text-xs text-[#5c7367]">
+                <div class="flex justify-between items-center">
+                  <span>• Comprobantes SEE:</span>
+                  <strong class="text-[#082017]">${state.invoices.length} CPE Aceptados</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>• Planilla MYPE & AFP:</span>
+                  <strong class="text-[#082017]">${state.employees.length} trabajadores registrados</strong>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-1.5 pt-1">
+                <button onclick="navigate('sunat')" class="py-2.5 px-2 bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 transition text-center">
+                  <i data-lucide="receipt" class="w-3 h-3"></i> Facturas
+                </button>
+                <button onclick="navigate('contabilidad')" class="py-2.5 px-2 bg-[#f4ede4] hover:bg-[#eae1d5] text-[#082017] text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 transition text-center">
+                  <i data-lucide="calculator" class="w-3 h-3 text-[#134e2e]"></i> SIRE 621
+                </button>
+                <button onclick="navigate('planilla')" class="py-2.5 px-2 bg-[#fdf2f4] hover:bg-[#fce7ea] text-[#e05780] text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 transition text-center">
+                  <i data-lucide="users" class="w-3 h-3"></i> AFPnet
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 space-y-4 shadow-sm">
+              <div class="flex items-center justify-between pb-2 border-b border-[#f0eae1]">
+                <h4 class="font-serif font-bold text-base text-[#082017]">Comprobantes Electrónicos Recientes</h4>
+                <button onclick="navigate('sunat')" class="text-xs text-[#134e2e] font-bold">Ver todos</button>
+              </div>
+              <div class="space-y-3">
+                ${state.invoices.map(i => `
+                  <div class="p-4 bg-[#faf8f5] rounded-2xl border border-[#eae4dc] flex items-center justify-between text-xs">
+                    <div>
+                      <span class="font-mono font-bold text-sm text-[#082017]">${i.id}</span>
+                      <p class="text-[#5c7367]">${i.cliente}</p>
+                      <p class="text-[10px] text-[#8fa89b]">${i.item}</p>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-serif font-bold text-base text-[#082017] block">S/ ${i.total.toFixed(2)}</span>
+                      <button onclick="viewTicket('${i.id}')" class="mt-1 px-3 py-1 bg-[#082017] text-[#d4af37] rounded-xl font-bold text-[10px]">Ticket 80mm</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 space-y-4 shadow-sm">
+              <div class="flex items-center justify-between pb-2 border-b border-[#f0eae1]">
+                <h4 class="font-serif font-bold text-base text-[#082017]">Proyectos de Paisajismo</h4>
+                <button onclick="navigate('jardineria')" class="text-xs text-[#134e2e] font-bold">Ver cotizaciones</button>
+              </div>
+              <div class="space-y-3">
+                ${state.projects.map(p => `
+                  <div class="p-4 bg-[#faf8f5] rounded-2xl border border-[#eae4dc] text-xs space-y-1">
+                    <div class="flex justify-between items-center">
+                      <span class="font-serif font-bold text-[#082017]">${p.cliente}</span>
+                      <span class="bg-[#134e2e] text-[#d4af37] font-bold text-[10px] px-2.5 py-0.5 rounded-full">${p.tipo}</span>
+                    </div>
+                    <p class="text-[#5c7367]">${p.direccion}</p>
+                    <div class="flex justify-between items-center pt-1 border-t border-[#eae4dc]">
+                      <span class="text-[10px] text-[#8fa89b]">${p.detalle}</span>
+                      <span class="font-serif font-bold text-sm text-[#134e2e]">S/ ${p.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (state.view === 'catalogo') {
+        c.innerHTML = `
+          <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+              <h3 class="font-serif text-xl font-bold text-[#082017]">Catálogo Botánico ${state.company.nombreComercial.split(' - ')[0]}</h3>
+              <p class="text-xs text-[#5c7367]">Plantas de interior, macetas artesanales y sustratos especiales</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="openQrModal('AUR-001')" class="px-4 py-2.5 rounded-2xl bg-[#f4ede4] hover:bg-[#eae1d5] text-[#082017] font-bold text-xs border flex items-center gap-1.5">
+                <i data-lucide="qr-code" class="w-4 h-4 text-[#134e2e]"></i> Imprimir Etiquetas QR
+              </button>
+              <button onclick="openPosModal()" class="px-4 py-2.5 rounded-2xl bg-[#082017] text-[#d4af37] font-bold text-xs flex items-center gap-1.5">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i> Nueva Venta POS
+              </button>
+            </div>
+          </div>
+
+          <!-- BARRA DE ESCANEO RÁPIDO CON PISTOLA O CÁMARA -->
+          <div class="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-6 text-white shadow-xl border border-[#d4af37]/30 space-y-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-[#d4af37]/20 border border-[#d4af37]/40 flex items-center justify-center text-[#d4af37]">
+                <i data-lucide="scan-line" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="font-serif font-bold text-base text-[#fdfbf7]">Escaneo Rápido de Etiquetas QR / Código de Barras</h4>
+                <p class="text-xs text-[#c2d4cb]">Escanea el código pegado en la maceta con tu lector de pistola para emitir el comprobante al instante.</p>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                id="scan-sku-input"
+                placeholder="📷 Escanea con la pistola o escribe el SKU (ej. AUR-001, AUR-002, MAC-001)..." 
+                class="flex-1 px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white placeholder:text-[#8fa89b] text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#d4af37]"
+                onkeydown="if(event.key === 'Enter') handleHtmlScan()"
+              />
+              <button onclick="handleHtmlScan()" class="px-6 py-3 bg-[#d4af37] text-[#082017] font-bold text-xs rounded-2xl flex items-center gap-1.5 shadow-lg">
+                <i data-lucide="scan-line" class="w-4 h-4"></i> Escanear
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 text-[11px] pt-1 border-t border-white/10">
+              <span class="text-[#8fa89b] font-semibold">⚡ Prueba rápida:</span>
+              ${state.products.map(p => `
+                <button onclick="openPosModal('${p.sku}')" class="px-3 py-1 bg-white/10 hover:bg-white/20 text-[#fdfbf7] rounded-xl font-mono text-[10px] border border-white/15 flex items-center gap-1.5 transition">
+                  <i data-lucide="qr-code" class="w-3 h-3 text-[#d4af37]"></i>
+                  <span>${p.sku} (${p.name.split(' ')[0]})</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            ${state.products.map(p => `
+              <div class="bg-white rounded-3xl border border-[#e8e2d8] overflow-hidden shadow-sm flex flex-col justify-between group">
+                <div class="relative h-48 bg-[#f4ede4]">
+                  <img src="${p.fullImage}" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-300" />
+                  <div class="absolute bottom-2 right-2 bg-white/90 text-[#082017] text-xs font-bold px-2.5 py-1 rounded-lg">Stock: ${p.stock} u.</div>
+                  <button onclick="openQrModal('${p.sku}')" class="absolute top-2 right-2 p-1.5 bg-white/90 rounded-lg text-[#082017] shadow text-[10px] font-bold flex items-center gap-1">
+                    <i data-lucide="qr-code" class="w-3.5 h-3.5 text-[#134e2e]"></i> Tag
+                  </button>
+                </div>
+                <div class="p-5 space-y-2 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h4 class="font-serif font-bold text-[#082017]">${p.name}</h4>
+                    <p class="text-[11px] text-[#8c6239] italic">${p.scientificName}</p>
+                    <p class="text-xs text-[#5c7367] mt-1">${p.description}</p>
+                  </div>
+                  <div class="pt-3 border-t flex justify-between items-center gap-2">
+                    <span class="font-serif font-bold text-xl text-[#082017]">S/ ${p.price.toFixed(2)}</span>
+                    <div class="flex items-center gap-1">
+                      <button onclick="openQrModal('${p.sku}')" class="p-2 bg-[#f4ede4] rounded-xl text-[#082017]"><i data-lucide="qr-code" class="w-3.5 h-3.5 text-[#134e2e]"></i></button>
+                      <button onclick="openPosModal('${p.sku}')" class="px-3 py-1.5 bg-[#082017] text-[#d4af37] rounded-xl font-bold text-xs">Facturar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (state.view === 'contabilidad') {
+        c.innerHTML = `
+          <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex flex-col md:flex-row justify-between gap-4">
+            <div>
+              <h3 class="font-serif text-lg font-bold text-[#082017]">Configuración del Régimen Tributario SUNAT</h3>
+              <p class="text-xs text-[#5c7367]">Adapta los libros electrónicos y las tasas de impuesto automáticamente</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="setRegimen('RER')" class="px-4 py-2 rounded-2xl font-bold text-xs border ${state.regimen === 'RER' ? 'bg-[#082017] text-[#d4af37]' : 'bg-[#faf8f5] text-[#5c7367]'}">RER</button>
+              <button onclick="setRegimen('RMT')" class="px-4 py-2 rounded-2xl font-bold text-xs border ${state.regimen === 'RMT' ? 'bg-[#082017] text-[#d4af37]' : 'bg-[#faf8f5] text-[#5c7367]'}">⭐ MYPE (RMT)</button>
+              <button onclick="setRegimen('RG')" class="px-4 py-2 rounded-2xl font-bold text-xs border ${state.regimen === 'RG' ? 'bg-[#082017] text-[#d4af37]' : 'bg-[#faf8f5] text-[#5c7367]'}">General (RG)</button>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-6 text-white shadow-xl flex justify-between items-center border border-[#d4af37]/30">
+            <div>
+              <span class="bg-[#134e2e] text-[#d4af37] px-3 py-1 rounded-full text-xs font-bold">Pre-Liquidación F29 Declara Fácil 621</span>
+              <h3 class="font-serif text-2xl font-bold text-[#fdfbf7] mt-1">Impuesto a Liquidar: S/ ${(t.igvPagar + t.rentaPagar).toFixed(2)}</h3>
+              <p class="text-xs text-[#c2d4cb]">Débito Fiscal menos Crédito Fiscal más Pago a Cuenta de Renta.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="exportSire('RVIE')" class="px-4 py-2.5 rounded-2xl bg-[#d4af37] text-[#082017] font-bold text-xs">Descargar RVIE</button>
+              <button onclick="exportSire('RCE')" class="px-4 py-2.5 rounded-2xl bg-white/10 text-white font-bold text-xs border border-white/20">Descargar RCE</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-5">
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">IGV Ventas</span>
+              <div class="text-2xl font-serif font-bold text-[#e05780] mt-1">S/ ${t.vIgv.toFixed(2)}</div>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">IGV Compras (Crédito)</span>
+              <div class="text-2xl font-serif font-bold text-[#134e2e] mt-1">- S/ ${t.cIgv.toFixed(2)}</div>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">IGV a Pagar</span>
+              <div class="text-2xl font-serif font-bold text-[#082017] mt-1">S/ ${t.igvPagar.toFixed(2)}</div>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Renta a Cuenta</span>
+              <div class="text-2xl font-serif font-bold text-[#d4af37] mt-1">S/ ${t.rentaPagar.toFixed(2)}</div>
+            </div>
+          </div>
+        `;
+      } else if (state.view === 'planilla') {
+        c.innerHTML = `
+          <div class="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-6 text-white shadow-xl flex justify-between items-center border border-[#d4af37]/30">
+            <div>
+              <span class="bg-[#e05780] text-white px-3 py-1 rounded-full text-xs font-bold">Planilla MYPE & AFPnet</span>
+              <h3 class="font-serif text-2xl font-bold text-[#fdfbf7] mt-1">Nómina Mensual de Colaboradores</h3>
+              <p class="text-xs text-[#c2d4cb]">Retenciones AFP/ONP y Seguro Social EsSalud (9%).</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="exportAfpnet()" class="px-4 py-2.5 rounded-2xl bg-[#d4af37] text-[#082017] font-bold text-xs">Exportar PLAPROTE.TXT</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-5">
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Colaboradores</span>
+              <div class="text-2xl font-serif font-bold text-[#082017] mt-1">${state.employees.length} activos</div>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Sueldo Bruto Total</span>
+              <div class="text-2xl font-serif font-bold text-[#082017] mt-1">S/ ${t.pBruto.toFixed(2)}</div>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Aporte EsSalud (9%)</span>
+              <div class="text-2xl font-serif font-bold text-[#134e2e] mt-1">S/ ${t.pEssalud.toFixed(2)}</div>
+            </div>
+            <div class="bg-white p-5 rounded-3xl border border-[#e8e2d8]">
+              <span class="text-xs font-bold text-[#5c7367] uppercase">Ticket AFPnet</span>
+              <div class="text-2xl font-serif font-bold text-[#e05780] mt-1">S/ ${t.pAfp.toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 space-y-4">
+            <h4 class="font-serif font-bold text-base text-[#082017]">Detalle de Nómina Individual</h4>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-[#faf8f5] text-[#5c7367] font-bold border-b">
+                  <tr>
+                    <th class="p-3">DNI / CUSPP</th>
+                    <th class="p-3">Trabajador</th>
+                    <th class="p-3">Cargo</th>
+                    <th class="p-3">Pensión</th>
+                    <th class="p-3 text-right">Bruto</th>
+                    <th class="p-3 text-right">Descuento</th>
+                    <th class="p-3 text-right">Neto</th>
+                    <th class="p-3 text-right">EsSalud 9%</th>
+                    <th class="p-3 text-center">Boleta</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#f5efe6]">
+                  ${t.empDetails.map(e => `
+                    <tr>
+                      <td class="p-3 font-mono font-bold">${e.dni}<br><span class="text-[10px] text-[#8fa89b] font-normal">${e.cuspp || 'ONP'}</span></td>
+                      <td class="p-3 font-serif font-bold text-[#082017]">${e.apellidos}, ${e.nombres}</td>
+                      <td class="p-3 text-[#5c7367]">${e.cargo}</td>
+                      <td class="p-3"><span class="px-2 py-0.5 rounded-full font-bold text-[10px] ${e.pension === 'ONP' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'}">${e.pension}</span></td>
+                      <td class="p-3 text-right">S/ ${e.bruto.toFixed(2)}</td>
+                      <td class="p-3 text-right text-[#e05780] font-bold">- S/ ${e.desc.toFixed(2)}</td>
+                      <td class="p-3 text-right font-bold text-[#134e2e]">S/ ${e.neto.toFixed(2)}</td>
+                      <td class="p-3 text-right text-[#5c7367]">S/ ${e.essalud.toFixed(2)}</td>
+                      <td class="p-3 text-center"><button onclick="alert('Imprimiendo boleta de ${e.nombres}')" class="px-2.5 py-1 bg-[#082017] text-[#d4af37] rounded-xl font-bold text-[10px]">Boleta</button></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } else if (state.view === 'sunat') {
+        c.innerHTML = `
+          <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex justify-between items-center">
+            <div>
+              <h3 class="font-serif text-xl font-bold text-[#082017]">Facturación Electrónica SUNAT (UBL 2.1)</h3>
+              <p class="text-xs text-[#5c7367]">Registro de Boletas ${state.company.serieBoleta} y Facturas ${state.company.serieFactura}</p>
+            </div>
+            <button onclick="openPosModal()" class="px-4 py-2.5 bg-[#082017] text-[#d4af37] font-bold text-xs rounded-2xl">Emitir Comprobante</button>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 space-y-3">
+            ${state.invoices.map(i => `
+              <div class="p-4 bg-[#faf8f5] rounded-2xl border flex justify-between items-center text-xs">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-sm text-[#082017]">${i.id}</span>
+                    <span class="bg-[#dcfce7] text-[#134e2e] font-bold text-[10px] px-2 py-0.5 rounded-full">Aceptado SUNAT</span>
+                  </div>
+                  <p class="text-[#082017] font-serif font-bold mt-1">${i.cliente} (${i.doc})</p>
+                  <p class="text-[11px] text-[#5c7367]">${i.item}</p>
+                </div>
+                <div class="text-right">
+                  <span class="font-serif font-bold text-base text-[#082017]">S/ ${i.total.toFixed(2)}</span>
+                  <div class="flex gap-2 mt-1">
+                    <button onclick="viewTicket('${i.id}')" class="px-3 py-1 bg-[#082017] text-[#d4af37] rounded-xl font-bold text-[10px]">Ticket 80mm</button>
+                    <button onclick="alert('Descargando XML firmado de ${i.id}')" class="px-3 py-1 bg-white border rounded-xl font-bold text-[10px]">XML UBL</button>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (state.view === 'kardex') {
+        c.innerHTML = `
+          <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex justify-between items-center">
+            <div>
+              <h3 class="font-serif text-xl font-bold text-[#082017]">Kardex & Almacén Físico</h3>
+              <p class="text-xs text-[#5c7367]">Control de entradas, salidas y valuación de inventario botánico</p>
+            </div>
+            <button onclick="openPurchaseModal()" class="px-4 py-2.5 bg-[#082017] text-[#d4af37] font-bold text-xs rounded-2xl">Ingreso Compra (+)</button>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-[#e8e2d8] p-6 space-y-4">
+            <h4 class="font-serif font-bold text-base text-[#082017]">Stock Físico por Especie y Ubicación</h4>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-[#faf8f5] text-[#5c7367] font-bold border-b">
+                  <tr>
+                    <th class="p-3">SKU</th>
+                    <th class="p-3">Especie</th>
+                    <th class="p-3">Ubicación</th>
+                    <th class="p-3 text-right">Costo</th>
+                    <th class="p-3 text-right">Precio</th>
+                    <th class="p-3 text-center">Stock</th>
+                    <th class="p-3 text-right">Valorizado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#f5efe6]">
+                  ${state.products.map(p => `
+                    <tr>
+                      <td class="p-3 font-mono font-bold">${p.sku}</td>
+                      <td class="p-3 font-serif font-bold">${p.name}</td>
+                      <td class="p-3 text-[#5c7367]">${p.location}</td>
+                      <td class="p-3 text-right">S/ ${p.cost.toFixed(2)}</td>
+                      <td class="p-3 text-right font-bold">S/ ${p.price.toFixed(2)}</td>
+                      <td class="p-3 text-center font-bold text-base text-[#082017]">${p.stock}</td>
+                      <td class="p-3 text-right font-serif font-bold text-[#134e2e]">S/ ${(p.stock * p.cost).toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } else if (state.view === 'guias') {
+        c.innerHTML = `
+          <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex justify-between items-center">
+            <div>
+              <h3 class="font-serif text-xl font-bold text-[#082017]">Guías de Remisión Electrónica (${state.company.serieGre})</h3>
+              <p class="text-xs text-[#5c7367]">Sustento de traslado de plantas en camioneta para delivery</p>
+            </div>
+            <button onclick="alert('Generando nueva Guía GRE')" class="px-4 py-2.5 bg-[#082017] text-[#d4af37] font-bold text-xs rounded-2xl">Nueva GRE</button>
+          </div>
+
+          <div class="space-y-4">
+            ${state.guias.map(g => `
+              <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] space-y-3 text-xs">
+                <div class="flex justify-between items-center pb-2 border-b">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-base text-[#082017]">${g.id}</span>
+                    <span class="bg-[#dcfce7] text-[#134e2e] font-bold text-[10px] px-2 py-0.5 rounded-full">QR Activo</span>
+                  </div>
+                  <span class="text-gray-500">${g.fecha}</span>
+                </div>
+                <div class="grid grid-cols-3 gap-4 bg-[#faf8f5] p-4 rounded-2xl border">
+                  <div>
+                    <span class="text-[10px] text-gray-500 uppercase font-bold block">Destinatario</span>
+                    <p class="font-bold text-[#082017]">${g.cliente} (DNI ${g.doc})</p>
+                    <p class="text-gray-500">${g.direccion}</p>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-gray-500 uppercase font-bold block">Chofer & Camioneta</span>
+                    <p class="font-bold text-[#082017]">${g.chofer}</p>
+                    <p class="text-gray-500">Placa: ${g.placa}</p>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-gray-500 uppercase font-bold block">Bultos Trasladados</span>
+                    <p class="font-bold text-[#134e2e]">${g.items}</p>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (state.view === 'jardineria') {
+        c.innerHTML = `
+          <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex justify-between items-center">
+            <div>
+              <h3 class="font-serif text-xl font-bold text-[#082017]">Proyectos de Jardinería & Paisajismo</h3>
+              <p class="text-xs text-[#5c7367]">Diseño de jardines residenciales, mantenimiento botánico y riego</p>
+            </div>
+            <button onclick="alert('Abriendo cotizador')" class="px-4 py-2.5 bg-[#082017] text-[#d4af37] font-bold text-xs rounded-2xl">Nueva Cotización</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6">
+            ${state.projects.map(p => `
+              <div class="bg-white p-6 rounded-3xl border border-[#e8e2d8] space-y-3 text-xs">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <span class="font-mono text-[10px] text-gray-400 font-bold">${p.id}</span>
+                    <h4 class="font-serif text-lg font-bold text-[#082017]">${p.cliente}</h4>
+                    <p class="text-gray-500">${p.direccion}</p>
+                  </div>
+                  <span class="bg-[#134e2e] text-[#d4af37] font-bold px-3 py-1 rounded-full text-xs">${p.tipo}</span>
+                </div>
+                <div class="p-3 bg-[#faf8f5] rounded-xl border text-gray-700">
+                  <span class="text-[10px] uppercase font-bold text-gray-500 block">Plantas Aurevia</span>
+                  ${p.detalle}
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t">
+                  <span class="font-serif font-bold text-xl text-[#134e2e]">S/ ${p.total.toFixed(2)}</span>
+                  <button onclick="alert('Facturando proyecto ${p.id}')" class="px-3 py-1.5 bg-[#082017] text-[#d4af37] rounded-xl font-bold">Generar Factura</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    // ESCANEO CON LECTOR DE PISTOLA O CÁMARA
+    function handleHtmlScan() {
+      const input = document.getElementById('scan-sku-input');
+      if (!input) return;
+      const code = input.value.trim().toUpperCase();
+      if (!code) return;
+      const found = state.products.find(p => p.sku.toUpperCase() === code || p.name.toUpperCase().includes(code));
+      if (found) {
+        input.value = '';
+        openPosModal(found.sku);
+      } else {
+        alert(`⚠️ No se encontró ningún producto con el código "${code}".`);
+      }
+    }
+
+    // MODAL GENERADOR DE ETIQUETAS QR BOTÁNICAS
+    function openQrModal(sku = 'AUR-001') {
+      const prod = state.products.find(p => p.sku === sku) || state.products[0];
+      const mc = document.getElementById('modal-container');
+      const prodOptions = state.products.map(p => `<option value="${p.sku}" ${p.sku === prod.sku ? 'selected' : ''}>${p.name} (${p.sku})</option>`).join('');
+
+      mc.innerHTML = `
+        <div class="fixed inset-0 bg-[#082017]/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-[#e8e2d8] text-xs">
+            <div class="flex justify-between items-center pb-3 border-b">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-[#134e2e]/10 text-[#134e2e] flex items-center justify-center font-bold">
+                  <i data-lucide="qr-code" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="font-serif font-bold text-lg text-[#082017]">Generador de Etiquetas & QR Botánico</h3>
+                  <p class="text-[11px] text-[#5c7367]">Stickers autoadhesivos para macetas y estacas de vivero</p>
+                </div>
+              </div>
+              <button onclick="closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="font-bold block mb-1">Planta</label>
+                <select onchange="openQrModal(this.value)" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-bold">
+                  ${prodOptions}
+                </select>
+              </div>
+              <div>
+                <label class="font-bold block mb-1">Formato</label>
+                <select id="qr-fmt" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-semibold">
+                  <option value="50x30">🏷️ 50x30 mm (Maceta)</option>
+                  <option value="70x40">🌿 70x40 mm (Estaca)</option>
+                  <option value="A4">📄 Pliego A4</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold block mb-1">Cantidad</label>
+                <input type="number" id="qr-qty" min="1" value="1" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-bold" />
+              </div>
+            </div>
+
+            <!-- VISTA PREVIA ETIQUETA BOTÁNICA REAL -->
+            <div class="p-4 bg-[#faf8f5] border-2 border-dashed border-[#d4af37]/60 rounded-3xl flex items-center justify-center">
+              <div class="w-[300px] bg-white border-2 border-[#082017] p-3 rounded-2xl shadow-md space-y-2 text-[#082017]">
+                <div class="flex items-center justify-between border-b border-[#082017] pb-1">
+                  <span class="font-serif font-bold text-[10px] uppercase">${state.company.nombreComercial.split(' - ')[0]}</span>
+                  <span class="font-mono text-[9px] font-bold bg-[#082017] text-[#d4af37] px-1 rounded">${prod.sku}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="p-1 bg-white border border-[#082017] rounded-lg flex flex-col items-center shrink-0">
+                    <i data-lucide="qr-code" class="w-14 h-14 text-[#082017]"></i>
+                    <span class="text-[6px] font-mono font-bold mt-0.5">ESCANEAR POS</span>
+                  </div>
+                  <div class="flex-1 min-w-0 text-left">
+                    <h4 class="font-serif font-bold text-xs text-[#082017] truncate">${prod.name}</h4>
+                    <p class="text-[8px] text-[#8c6239] italic truncate">${prod.scientificName}</p>
+                    <p class="text-[8px] text-[#5c7367] mt-1">☀️ ${prod.careLight}</p>
+                    <p class="text-[8px] text-[#5c7367]">💧 ${prod.careWater}</p>
+                  </div>
+                </div>
+                <div class="pt-1 border-t border-dashed border-[#082017] flex items-center justify-between">
+                  <span class="text-[7px] font-mono text-gray-500 font-bold">${prod.sku} • ${prod.location}</span>
+                  <span class="font-serif font-bold text-sm text-[#082017]">S/ ${prod.price.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t">
+              <button onclick="closeModal(); openPosModal('${prod.sku}')" class="flex-1 py-2.5 rounded-xl bg-[#f4ede4] hover:bg-[#eae1d5] text-[#082017] font-bold text-xs flex items-center justify-center gap-1">
+                <i data-lucide="scan-line" class="w-4 h-4 text-[#134e2e]"></i> Simular Escaneo
+              </button>
+              <button onclick="window.print(); alert('✅ ¡Enviando etiquetas a la impresora térmica!')" class="flex-1 py-2.5 rounded-xl bg-[#082017] text-[#d4af37] font-bold text-xs flex items-center justify-center gap-1 shadow-lg">
+                <i data-lucide="printer" class="w-4 h-4"></i> Imprimir Etiquetas
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    // MODAL POS VENTA
+    function openPosModal(sku = 'AUR-001') {
+      const mc = document.getElementById('modal-container');
+      const prodOptions = state.products.map(p => `<option value="${p.sku}" ${p.sku === sku ? 'selected' : ''}>${p.name} - S/ ${p.price.toFixed(2)} (Stock: ${p.stock} u. | SKU: ${p.sku})</option>`).join('');
+      
+      mc.innerHTML = `
+        <div class="fixed inset-0 bg-[#082017]/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div class="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-4 border text-xs">
+            <div class="flex justify-between items-center pb-2 border-b">
+              <div>
+                <h3 class="font-serif font-bold text-lg text-[#082017]">Emitir Venta & CPE SUNAT (POS)</h3>
+                <p class="text-[11px] text-[#5c7367]">Descuenta stock de Kardex y genera comprobante UBL 2.1</p>
+              </div>
+              <button onclick="closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- Escaneo en POS -->
+            <div class="p-2.5 bg-[#faf8f5] rounded-xl border flex items-center gap-2">
+              <i data-lucide="scan-line" class="w-4 h-4 text-[#134e2e]"></i>
+              <input 
+                type="text" 
+                placeholder="Escanea con la pistola o escribe SKU (ej. AUR-001)..." 
+                class="flex-1 p-1.5 bg-white border rounded-lg text-xs font-mono font-bold"
+                onkeydown="if(event.key === 'Enter') { const f = state.products.find(x => x.sku.toUpperCase() === this.value.trim().toUpperCase()); if (f) openPosModal(f.sku); }"
+              />
+            </div>
+
+            <div>
+              <label class="font-bold block mb-1">Tipo Comprobante</label>
+              <select id="pos-tipo" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold">
+                <option value="03">📄 Boleta Electrónica (Serie ${state.company.serieBoleta} - DNI)</option>
+                <option value="01">🏢 Factura Electrónica (Serie ${state.company.serieFactura} - RUC)</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="font-bold block mb-1">DNI / RUC</label>
+                <input type="text" id="pos-doc" value="72891234" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold font-mono" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1">Cliente</label>
+                <input type="text" id="pos-nom" value="Luciana Rizo Patrón" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" />
+              </div>
+            </div>
+            <div>
+              <label class="font-bold block mb-1">Especie Botánica o Producto</label>
+              <select id="pos-sku" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-semibold">
+                ${prodOptions}
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="font-bold block mb-1">Cantidad</label>
+                <input type="number" id="pos-qty" min="1" value="1" class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1">Medio de Pago</label>
+                <select class="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-semibold">
+                  <option>📱 Yape / Plin</option>
+                  <option>💳 Tarjeta</option>
+                  <option>💵 Efectivo</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-3 border-t">
+              <button onclick="closeModal()" class="flex-1 py-3 rounded-2xl border font-bold text-gray-500">Cancelar</button>
+              <button onclick="executePosSale()" class="flex-1 py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg">Emitir Comprobante SUNAT</button>
+            </div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function executePosSale() {
+      const sku = document.getElementById('pos-sku').value;
+      const qty = Number(document.getElementById('pos-qty').value);
+      const tipo = document.getElementById('pos-tipo').value;
+      const doc = document.getElementById('pos-doc').value;
+      const nom = document.getElementById('pos-nom').value;
+
+      const prod = state.products.find(p => p.sku === sku);
+      if (!prod || prod.stock < qty) {
+        alert('¡Stock insuficiente!');
+        return;
+      }
+
+      prod.stock -= qty;
+      const total = qty * prod.price;
+      const gravada = total / 1.18;
+      const igv = total - gravada;
+      const serie = tipo === '01' ? state.company.serieFactura : state.company.serieBoleta;
+      const id = `${serie}-00000${state.invoices.length + 343}`;
+
+      const newInv = {
+        id,
+        tipo,
+        fecha: new Date().toISOString().split('T')[0],
+        cliente: nom,
+        doc,
+        gravada,
+        igv,
+        total,
+        item: `${qty}x ${prod.name}`,
+        hash: 'Qk8xMjN4OTkxMmE='
+      };
+
+      state.invoices.unshift(newInv);
+      closeModal();
+      viewTicket(newInv.id);
+      render();
+      lucide.createIcons();
+    }
+
+    // MODAL INGRESO COMPRA
+    function openPurchaseModal() {
+      const mc = document.getElementById('modal-container');
+      mc.innerHTML = `
+        <div class="fixed inset-0 bg-[#082017]/75 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div class="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-4 border text-xs">
+            <div class="flex justify-between items-center pb-2 border-b">
+              <h3 class="font-serif font-bold text-lg text-[#082017]">Ingreso de Compra Mayorista (+)</h3>
+              <button onclick="closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="font-bold block mb-1">RUC Proveedor</label>
+                <input type="text" id="pur-ruc" value="20556677881" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1">N° Factura</label>
+                <input type="text" id="pur-id" value="F001-0009841" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
+              </div>
+            </div>
+            <div>
+              <label class="font-bold block mb-1">Proveedor</label>
+              <input type="text" id="pur-prov" value="Viveros Mayoristas del Sur SAC" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-bold" />
+            </div>
+            <div>
+              <label class="font-bold block mb-1">Especie</label>
+              <select id="pur-sku" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-semibold">
+                ${state.products.map(p => `<option value="${p.sku}">${p.name} (Stock: ${p.stock})</option>`).join('')}
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="font-bold block mb-1">Cantidad</label>
+                <input type="number" id="pur-qty" min="1" value="10" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-bold" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1">Costo Unitario (S/)</label>
+                <input type="number" id="pur-cost" value="35.00" class="w-full p-2 bg-[#faf8f5] border rounded-xl font-bold" />
+              </div>
+            </div>
+            <div class="flex gap-2 pt-3 border-t">
+              <button onclick="closeModal()" class="flex-1 py-3 rounded-2xl border font-bold text-gray-500">Cancelar</button>
+              <button onclick="executePurchase()" class="flex-1 py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg">Registrar e Incrementar Stock</button>
+            </div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function executePurchase() {
+      const sku = document.getElementById('pur-sku').value;
+      const qty = Number(document.getElementById('pur-qty').value);
+      const cost = Number(document.getElementById('pur-cost').value);
+      const ruc = document.getElementById('pur-ruc').value;
+      const prov = document.getElementById('pur-prov').value;
+      const id = document.getElementById('pur-id').value;
+
+      const prod = state.products.find(p => p.sku === sku);
+      if (prod) prod.stock += qty;
+
+      const subtotal = qty * cost;
+      const igv = subtotal * 0.18;
+      const total = subtotal + igv;
+
+      state.purchases.unshift({
+        id,
+        proveedor: prov,
+        ruc,
+        fecha: new Date().toISOString().split('T')[0],
+        gravada: subtotal,
+        igv,
+        total,
+        items: `${qty}x ${prod ? prod.name : 'Planta'}`
+      });
+
+      closeModal();
+      alert(`✅ ¡Ingreso registrado!\nStock incrementado en ${qty} u.\nCrédito Fiscal generado para SIRE: S/ ${igv.toFixed(2)}`);
+      render();
+      lucide.createIcons();
+    }
+
+    // VISOR DE TICKET 80MM
+    function viewTicket(invId) {
+      const inv = state.invoices.find(i => i.id === invId) || state.invoices[0];
+      const mc = document.getElementById('modal-container');
+      mc.innerHTML = `
+        <div class="fixed inset-0 bg-[#082017]/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div class="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl space-y-3 text-xs font-mono text-center border">
+            <div class="flex justify-between items-center pb-2 border-b">
+              <span class="text-[10px] font-bold text-gray-400">TICKET ELECTRÓNICO ${state.company.formatoTicket}</span>
+              <button onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="space-y-0.5">
+              <h2 class="font-serif text-lg font-bold text-[#082017]">${state.company.razonSocial}</h2>
+              <p class="text-[10px]">RUC: ${state.company.ruc}</p>
+              <p class="text-[9px] text-gray-500">${state.company.direccion}, ${state.company.distrito}</p>
+              <p class="text-[9px] text-gray-500">${state.company.nombreComercial}</p>
+            </div>
+            <div class="border-t border-b border-dashed py-2 text-left space-y-0.5 text-[11px]">
+              <p class="font-bold text-center">${inv.tipo === '01' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA'}</p>
+              <p class="text-center font-bold">${inv.id}</p>
+              <p>Fecha: ${inv.fecha}</p>
+              <p>Cliente: ${inv.cliente}</p>
+              <p>Doc: ${inv.doc}</p>
+            </div>
+            <div class="text-left text-[11px] py-1">
+              <div class="flex justify-between">
+                <span>${inv.item}</span>
+                <span class="font-bold">S/ ${inv.total.toFixed(2)}</span>
+              </div>
+            </div>
+            <div class="border-t border-dashed pt-2 text-right space-y-0.5 text-[11px]">
+              <div class="flex justify-between"><span>OP. GRAVADA:</span><span>S/ ${inv.gravada.toFixed(2)}</span></div>
+              <div class="flex justify-between"><span>IGV (18%):</span><span>S/ ${inv.igv.toFixed(2)}</span></div>
+              <div class="flex justify-between font-bold text-sm border-t pt-1"><span>TOTAL:</span><span>S/ ${inv.total.toFixed(2)}</span></div>
+            </div>
+            <div class="p-3 bg-gray-50 rounded-xl border flex flex-col items-center">
+              <i data-lucide="qr-code" class="w-16 h-16 text-[#082017]"></i>
+              <span class="text-[8px] text-gray-400 mt-1 font-mono">Hash: ${inv.hash}</span>
+              <span class="text-[8px] text-emerald-800 font-bold">Autorizado por SUNAT</span>
+              <p class="text-[8px] text-gray-400 italic pt-1">${state.company.pieDePaginaTicket}</p>
+            </div>
+            <button onclick="window.print()" class="w-full py-2.5 rounded-xl bg-[#082017] text-[#d4af37] font-bold">Imprimir Ticket</button>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+
+    function closeModal() {
+      document.getElementById('modal-container').innerHTML = '';
+    }
+
+    // EXPORTADORES
+    function exportAfpnet() {
+      const t = getTotals();
+      let txt = '';
+      t.empDetails.forEach((e, idx) => {
+        if (e.pension !== 'ONP') {
+          const correlativo = String(idx + 1).padStart(5, '0');
+          const cuspp = (e.cuspp || '').padEnd(12, ' ');
+          const numDoc = e.dni.padEnd(10, ' ');
+          const ape = `${e.apellidos} ${e.nombres}`.padEnd(40, ' ');
+          const rem = e.bruto.toFixed(2).padStart(9, '0');
+          txt += `${correlativo}|${cuspp}|0|${numDoc}|${ape}|S|S|${rem}|000000.00|000000.00|N|\n`;
+        }
+      });
+      downloadFile(txt, `PLAPROTE_${state.company.ruc}_202609.txt`);
+      alert('✅ Archivo oficial PLAPROTE.TXT generado para afpnet.com.pe');
+    }
+
+    function exportSire(tipo) {
+      let txt = `LE${state.company.ruc}20260900${tipo === 'RVIE' ? '14' : '08'}0400021111\n`;
+      if (tipo === 'RVIE') {
+        state.invoices.forEach(i => {
+          txt += `${state.company.ruc}|${state.company.razonSocial}|202609|${i.fecha}|${i.tipo}|${i.id.split('-')[0]}|${i.id.split('-')[1]}|1|${i.doc}|${i.cliente}|${i.gravada.toFixed(2)}|${i.igv.toFixed(2)}|${i.total.toFixed(2)}|PEN|ACEPTADO|\n`;
+        });
+      } else {
+        state.purchases.forEach(p => {
+          txt += `${state.company.ruc}|${state.company.razonSocial}|202609|${p.fecha}|01|${p.id.split('-')[0]}|${p.id.split('-')[1] || '001'}|6|${p.ruc}|${p.proveedor}|${p.gravada.toFixed(2)}|${p.igv.toFixed(2)}|${p.total.toFixed(2)}|PEN|1|\n`;
+        });
+      }
+      downloadFile(txt, `SIRE_${tipo}_${state.company.ruc}_202609.txt`);
+      alert(`✅ Archivo oficial SIRE ${tipo} descargado.`);
+    }
+
+    function downloadFile(content, fileName) {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
