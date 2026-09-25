@@ -61,11 +61,12 @@ vivero-360/
 │   │   └── sunatClient.ts  # Conector SEE SUNAT (BETA/PRODUCCION) + RUC/RENIEC
 │   ├── services/
 │   │   └── sunatService.ts # Emisión de comprobantes, IGV 18%, GRE, hash/QR
-│   ├── types/
-│   │   ├── sunat.ts        # Tipos Facturación Electrónica UBL 2.1
-│   │   └── payroll.ts      # Tipos Planilla / AFPnet / PLAME
-│   └── db/
-│       └── schema.sql      # Esquema PostgreSQL completo
+│   └── types/
+│       ├── sunat.ts        # Tipos Facturación Electrónica UBL 2.1
+│       └── payroll.ts      # Tipos Planilla / AFPnet / PLAME
+└── supabase/
+    ├── config.toml
+    └── migrations/         # Esquema SQL, roles (dueno/vendedor/jardinero), RLS y datos iniciales
 ```
 
 ### 🔄 Flujo de información
