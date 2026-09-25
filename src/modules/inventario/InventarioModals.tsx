@@ -21,8 +21,12 @@ export function CompraModal() {
   const [qty, setQty] = useState(20);
   const [costoUnitario, setCostoUnitario] = useState(35);
 
-  const registrar = () => {
-    const r = actions.registrarCompra({ ruc, proveedor, numeroFactura, sku, qty, costoUnitario });
+  const [enviando, setEnviando] = useState(false);
+
+  const registrar = async () => {
+    setEnviando(true);
+    const r = await actions.registrarCompra({ ruc, proveedor, numeroFactura, sku, qty, costoUnitario });
+    setEnviando(false);
     if (!r.ok) {
       alert(r.error);
       return;
@@ -76,7 +80,7 @@ export function CompraModal() {
       </div>
       <div className="flex gap-2 pt-3 border-t">
         <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-[#5c7367]">Cancelar</button>
-        <button onClick={registrar} className="flex-1 py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg">Registrar e Incrementar Stock</button>
+        <button onClick={registrar} disabled={enviando} className="flex-1 py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg disabled:opacity-60">Registrar e Incrementar Stock</button>
       </div>
     </ModalShell>
   );
@@ -94,9 +98,12 @@ export function BajaModal() {
   const [type, setType] = useState<BiologicalLoss['type']>('MERMA_NATURAL');
   const [qty, setQty] = useState(1);
   const [reason, setReason] = useState('Deshidratación por calor estacional');
+  const [enviando, setEnviando] = useState(false);
 
-  const registrar = () => {
-    const r = actions.registrarBaja({ sku, type, qty, reason });
+  const registrar = async () => {
+    setEnviando(true);
+    const r = await actions.registrarBaja({ sku, type, qty, reason });
+    setEnviando(false);
     if (!r.ok) {
       alert(r.error);
       return;
@@ -140,7 +147,7 @@ export function BajaModal() {
       </div>
       <div className="flex gap-2 pt-3 border-t">
         <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-[#5c7367]">Cancelar</button>
-        <button onClick={registrar} className="flex-1 py-3 rounded-2xl bg-[#b91c1c] text-white font-bold shadow-lg">Confirmar y Descontar Kardex</button>
+        <button onClick={registrar} disabled={enviando} className="flex-1 py-3 rounded-2xl bg-[#b91c1c] text-white font-bold shadow-lg disabled:opacity-60">Confirmar y Descontar Kardex</button>
       </div>
     </ModalShell>
   );

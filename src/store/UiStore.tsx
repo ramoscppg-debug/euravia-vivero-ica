@@ -2,8 +2,8 @@
 // ESTADO DE INTERFAZ: pestaña activa (sincronizada con la URL #hash) y modal abierto
 // ==========================================
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ALL_TABS, type TabId } from '../layout/navigation';
-import type { ComprobanteSunat } from '../domain/types';
+import { ALL_TABS, puedeVer, tabInicial, type TabId } from '../layout/navigation';
+import type { ComprobanteSunat, Rol } from '../domain/types';
 
 export type Modal =
   | { type: 'pos'; sku?: string }
@@ -12,6 +12,7 @@ export type Modal =
   | { type: 'egreso' }
   | { type: 'qr'; sku: string }
   | { type: 'gre' }
+  | { type: 'proyecto' }
   | { type: 'ticket'; invoice: ComprobanteSunat };
 
 interface UiValue {
@@ -24,25 +25,26 @@ interface UiValue {
 
 const UiContext = createContext<UiValue | null>(null);
 
-function tabFromHash(): TabId {
+function tabFromHash(rol: Rol): TabId {
   const h = window.location.hash.replace('#', '') as TabId;
-  return ALL_TABS.includes(h) ? h : 'dashboard';
+  return ALL_TABS.includes(h) && puedeVer(rol, h) ? h : tabInicial(rol);
 }
 
-export function UiProvider({ children }: { children: ReactNode }) {
-  const [tab, setTabState] = useState<TabId>(tabFromHash);
+export function UiProvider({ children, rol }: { children: ReactNode; rol: Rol }) {
+  const [tab, setTabState] = useState<TabId>(() => tabFromHash(rol));
   const [modal, setModal] = useState<Modal | null>(null);
 
   const setTab = useCallback((next: TabId) => {
-    setTabState(next);
-    if (window.location.hash !== `#${next}`) window.history.replaceState(null, '', `#${next}`);
-  }, []);
+    const permitida = puedeVer(rol, next) ? next : tabInicial(rol);
+    setTabState(permitida);
+    if (window.location.hash !== `#${permitida}`) window.history.replaceState(null, '', `#${permitida}`);
+  }, [rol]);
 
   useEffect(() => {
-    const onHash = () => setTabState(tabFromHash());
+    const onHash = () => setTabState(tabFromHash(rol));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
-  }, []);
+  }, [rol]);
 
   const close = useCallback(() => setModal(null), []);
   const value = useMemo(() => ({ tab, setTab, modal, open: setModal, close }), [tab, setTab, modal, close]);

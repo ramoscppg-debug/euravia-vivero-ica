@@ -51,7 +51,7 @@ export default function Clientes() {
 
                 <div className="p-3 bg-[#faf8f5] rounded-2xl border border-[#eae4dc] text-xs space-y-1">
                   <span className="text-[10px] text-[#8fa89b] uppercase font-bold block">Plantas en su Hogar / Espacio:</span>
-                  <p className="font-semibold text-[#082017]">{client.plantsOwned.join(', ')}</p>
+                  <p className="font-semibold text-[#082017]">{client.plantsOwned.length ? client.plantsOwned.join(', ') : 'Sin registrar'}</p>
                 </div>
 
                 <div className="p-3 bg-[#f0fdf4] border border-[#dcfce7] rounded-2xl text-xs space-y-1">
@@ -63,7 +63,7 @@ export default function Clientes() {
 
               <button
                 onClick={() => {
-                  const msg = encodeURIComponent(`Hola ${client.name}, te saludamos de AUREVIA Botanical 🌿. Queríamos recordarte este consejo de temporada para tus ${client.plantsOwned[0]}: ${client.seasonalAlert}`);
+                  const msg = encodeURIComponent(`Hola ${client.name}, te saludamos de AUREVIA Botanical 🌿. Queríamos recordarte este consejo de temporada para tus ${client.plantsOwned[0] ?? 'plantas'}: ${client.seasonalAlert}`);
                   window.open(`https://api.whatsapp.com/send?phone=${client.phone.replace(/[^0-9]/g, '')}&text=${msg}`, '_blank');
                 }}
                 className="w-full py-2.5 rounded-2xl bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] font-bold text-xs flex items-center justify-center gap-2 shadow-md transition"

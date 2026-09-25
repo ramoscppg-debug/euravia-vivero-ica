@@ -3,17 +3,22 @@ import { Building2, Check, CheckCircle2, KeyRound, Landmark, RotateCcw, Save, Sc
 import { useDocLookup } from '../../components/shared';
 import type { EmpresaConfig } from '../../domain/types';
 import { useErp } from '../../store/ErpStore';
+import Usuarios from './Usuarios';
 
 export default function Ajustes() {
-  const { state, actions } = useErp();
+  const { state, actions, nube } = useErp();
   const { busy, consultar } = useDocLookup();
   const { company } = state;
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const set = (patch: Partial<EmpresaConfig>) => actions.updateCompany(patch);
 
-  const guardar = (e: React.FormEvent) => {
+  const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    actions.guardarEmpresa();
+    const r = await actions.guardarEmpresa();
+    if (!r.ok) {
+      alert(r.error);
+      return;
+    }
     setSaveSuccessMessage('¡Datos de la empresa, RUC y credenciales SUNAT/AFPnet actualizados con éxito!');
     setTimeout(() => setSaveSuccessMessage(null), 4000);
   };
@@ -133,14 +138,18 @@ export default function Ajustes() {
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row justify-between gap-3 pt-2">
+          {nube ? <span /> : (
           <button type="button" onClick={restablecer} className="px-5 py-3 rounded-2xl border border-[#d5c7b5] bg-[#f4ede4] text-[#5c7367] font-bold text-xs flex items-center justify-center gap-2">
             <RotateCcw className="w-4 h-4" /> Restablecer datos demo
           </button>
+          )}
           <button type="submit" className="px-8 py-3.5 bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] font-bold text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 transition">
             <Save className="w-4 h-4" /> Guardar Todos los Cambios de la Empresa
           </button>
         </div>
       </form>
+
+      {nube && <Usuarios />}
     </div>
   );
 }

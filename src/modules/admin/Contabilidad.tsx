@@ -30,7 +30,7 @@ export default function Contabilidad() {
           {REGIMENES.map(r => (
             <button
               key={r}
-              onClick={() => actions.setRegimen(r)}
+              onClick={async () => { const res = await actions.setRegimen(r); if (!res.ok) alert(res.error); }}
               className={`px-3.5 py-2 rounded-2xl font-bold text-xs border transition ${regimenTributario === r ? 'bg-[#082017] text-[#d4af37] border-[#082017]' : 'bg-[#faf8f5] text-[#5c7367]'}`}
             >
               {r === 'RMT' ? '⭐ ' : ''}{REGIMEN_LABELS[r]}

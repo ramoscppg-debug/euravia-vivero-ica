@@ -43,8 +43,12 @@ export default function Detracciones() {
                 </span>
                 {det.estado === 'PENDIENTE' && (
                   <button
-                    onClick={() => {
-                      actions.registrarConstanciaDetraccion(det.id);
+                    onClick={async () => {
+                      const r = await actions.registrarConstanciaDetraccion(det.id);
+                      if (!r.ok) {
+                        alert(r.error);
+                        return;
+                      }
                       alert(`✅ Constancia de depósito de detracción registrada en Banco de la Nación para la factura ${det.facturaId}.`);
                     }}
                     className="block mt-1.5 px-3 py-1 bg-[#082017] text-[#d4af37] rounded-xl font-bold text-[10px] ml-auto"

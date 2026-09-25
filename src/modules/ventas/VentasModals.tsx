@@ -238,8 +238,8 @@ export function EgresoModal() {
   const [motivo, setMotivo] = useState('');
   const [monto, setMonto] = useState(15);
 
-  const registrar = () => {
-    const r = actions.registrarEgreso(motivo, monto);
+  const registrar = async () => {
+    const r = await actions.registrarEgreso(motivo, monto);
     if (!r.ok) {
       alert(r.error);
       return;

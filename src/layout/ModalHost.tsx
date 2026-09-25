@@ -1,5 +1,6 @@
 import { GreModal } from '../modules/admin/Guias';
 import { BajaModal, CompraModal } from '../modules/inventario/InventarioModals';
+import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
 import { EgresoModal, PosModal, QrModal, TicketModal } from '../modules/ventas/VentasModals';
 import { useUi } from '../store/UiStore';
 
@@ -22,5 +23,7 @@ export default function ModalHost() {
       return <EgresoModal />;
     case 'gre':
       return <GreModal />;
+    case 'proyecto':
+      return <NuevaCotizacionModal />;
   }
 }

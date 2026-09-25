@@ -197,3 +197,6 @@ export interface CrmClient {
   recommendedAction: string;
   urgency: 'ALTA' | 'MEDIA' | 'ESTACIONAL';
 }
+
+// ---------- Usuarios ----------
+export type Rol = 'dueno' | 'vendedor' | 'jardinero';

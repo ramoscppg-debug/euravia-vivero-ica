@@ -1,7 +1,8 @@
-import { LayoutDashboard, Settings } from 'lucide-react';
+import { LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import { useAuth } from '../store/AuthStore';
 import { useErp } from '../store/ErpStore';
 import { useUi } from '../store/UiStore';
-import { NAV_BLOCKS } from './navigation';
+import { bloquesPara, puedeVer, ROL_ETIQUETA } from './navigation';
 
 const itemClass = (active: boolean, main = false) =>
   `w-full flex items-center justify-between px-3.5 ${main ? 'py-2.5' : 'py-2'} rounded-2xl font-medium transition-all ${
@@ -13,7 +14,9 @@ const itemClass = (active: boolean, main = false) =>
 export default function Sidebar() {
   const { state } = useErp();
   const { tab, setTab } = useUi();
+  const { modo, perfil, salir } = useAuth();
   const { company } = state;
+  const rol = perfil?.rol ?? 'dueno';
 
   return (
     <aside className="w-72 bg-[#082017] text-white flex flex-col justify-between shrink-0 p-5 border-r border-[#123829] shadow-2xl z-30">
@@ -34,6 +37,7 @@ export default function Sidebar() {
         </div>
 
         <nav className="space-y-3.5 text-xs overflow-y-auto max-h-[calc(100vh-215px)] pr-1 custom-scrollbar">
+          {puedeVer(rol, 'dashboard') && (
           <div>
             <button onClick={() => setTab('dashboard')} className={itemClass(tab === 'dashboard', true)}>
               <div className="flex items-center gap-3">
@@ -43,8 +47,9 @@ export default function Sidebar() {
               <span className="text-[10px] text-[#8fa89b] bg-[#123829] px-2 py-0.5 rounded-full">360°</span>
             </button>
           </div>
+          )}
 
-          {NAV_BLOCKS.map(block => (
+          {bloquesPara(rol).map(block => (
             <div key={block.id} className="space-y-1">
               <div className="px-2.5 py-1 text-[10px] font-bold tracking-wider text-[#d4af37] uppercase flex items-center justify-between border-b border-[#164432]/70">
                 <span className="flex items-center gap-1.5">
@@ -75,16 +80,34 @@ export default function Sidebar() {
       <div className="pt-3 border-t border-[#164432] text-xs flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#8c6239] text-[#082017] font-bold flex items-center justify-center shadow-md">
-            {company.razonSocial.charAt(0)}
+            {(modo === 'nube' && perfil ? perfil.nombre : company.razonSocial).charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-semibold text-white truncate max-w-[130px]">{company.nombreComercial.split(' - ')[0]}</p>
-            <p className="text-[10px] text-[#d4af37] font-mono">RUC {company.ruc}</p>
+            {modo === 'nube' && perfil ? (
+              <>
+                <p className="font-semibold text-white truncate max-w-[130px]">{perfil.nombre}</p>
+                <p className="text-[10px] text-[#d4af37]">{ROL_ETIQUETA[rol]}</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-white truncate max-w-[130px]">{company.nombreComercial.split(' - ')[0]}</p>
+                <p className="text-[10px] text-[#d4af37] font-mono">RUC {company.ruc}</p>
+              </>
+            )}
           </div>
         </div>
-        <button onClick={() => setTab('configuracion')} title="Configuración" className="p-1.5 hover:bg-[#123e2c] rounded-xl text-[#8fa89b]">
-          <Settings className="w-4 h-4 text-[#d4af37]" />
-        </button>
+        <div className="flex items-center gap-1">
+          {puedeVer(rol, 'configuracion') && (
+            <button onClick={() => setTab('configuracion')} title="Configuración" className="p-1.5 hover:bg-[#123e2c] rounded-xl text-[#8fa89b]">
+              <Settings className="w-4 h-4 text-[#d4af37]" />
+            </button>
+          )}
+          {modo === 'nube' && (
+            <button onClick={() => void salir()} title="Cerrar sesión" className="p-1.5 hover:bg-[#123e2c] rounded-xl text-[#8fa89b]">
+              <LogOut className="w-4 h-4 text-[#d4af37]" />
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   );

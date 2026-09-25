@@ -17,6 +17,8 @@ export default defineConfig({
     url: 'http://localhost:5199',
     reuseExistingServer: false,
     timeout: 30000,
+    // Las pruebas corren en modo demo: nunca escriben en la base real de Supabase del .env
+    env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },
   },
   projects: [
     {

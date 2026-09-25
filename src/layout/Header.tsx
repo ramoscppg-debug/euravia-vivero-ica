@@ -1,12 +1,15 @@
 import { PackagePlus, PlusCircle, Sparkles, Wallet } from 'lucide-react';
+import { useAuth } from '../store/AuthStore';
 import { useErp } from '../store/ErpStore';
 import { useUi } from '../store/UiStore';
-import { blockOf, NAV_BLOCKS } from './navigation';
+import { blockOf, bloquesPara, puedeVer } from './navigation';
 
 export default function Header() {
   const { state } = useErp();
   const { tab, setTab, open } = useUi();
   const { company, cashRegister } = state;
+  const rol = useAuth().perfil?.rol ?? 'dueno';
+  const vende = puedeVer(rol, 'caja');
   const activeBlock = blockOf(tab);
 
   return (
@@ -20,6 +23,7 @@ export default function Header() {
           <p className="text-xs text-[#5c7367]">{company.direccion}, {company.distrito} — Cta. Detracciones BN: <strong className="font-mono text-[#082017]">{company.cuentaDetraccionesBn}</strong></p>
         </div>
 
+        {vende && (
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setTab('caja')}
@@ -45,6 +49,7 @@ export default function Header() {
             <span>Nueva Venta (POS & CPE)</span>
           </button>
         </div>
+        )}
       </header>
 
       {/* Selector de flujos */}
@@ -52,6 +57,7 @@ export default function Header() {
         <div className="flex items-center gap-2 text-xs">
           <span className="text-[10px] font-bold text-[#8fa89b] uppercase tracking-wider mr-1 hidden sm:inline">Flujo:</span>
 
+          {puedeVer(rol, 'dashboard') && (
           <button
             onClick={() => setTab('dashboard')}
             className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition ${tab === 'dashboard' ? 'bg-[#082017] text-[#d4af37] shadow-sm' : 'bg-[#f4ede4] text-[#5c7367] hover:bg-[#e8decb]'}`}
@@ -59,8 +65,9 @@ export default function Header() {
             <Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />
             <span>Visión 360°</span>
           </button>
+          )}
 
-          {NAV_BLOCKS.map(block => (
+          {bloquesPara(rol).map(block => (
             <button
               key={block.id}
               onClick={() => { if (activeBlock?.id !== block.id) setTab(block.items[0].id); }}

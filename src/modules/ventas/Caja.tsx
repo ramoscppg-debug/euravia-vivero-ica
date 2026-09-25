@@ -1,11 +1,13 @@
-import { Banknote, CheckCircle2, Landmark, Wallet } from 'lucide-react';
+import { useState } from 'react';
+import { Banknote, CheckCircle2, Landmark, Unlock, Wallet } from 'lucide-react';
 import { CreditCardIcon, MinusCircleIcon, SmartphoneIcon } from '../../components/shared';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { calcularCaja } from '../../store/selectors';
 
 export default function Caja() {
-  const { state, actions } = useErp();
+  const { state, actions, nube } = useErp();
+  const [montoApertura, setMontoApertura] = useState(200);
   const { open } = useUi();
   const { cashRegister, company } = state;
   const { totalEgresosCaja, saldoTeoricoEfectivo, diferenciaCaja } = calcularCaja(cashRegister);
@@ -28,8 +30,12 @@ export default function Caja() {
             <MinusCircleIcon /> Registrar Gasto Menor (-)
           </button>
           <button
-            onClick={() => {
-              actions.cuadrarCaja();
+            onClick={async () => {
+              const r = await actions.cuadrarCaja();
+              if (!r.ok) {
+                alert(r.error);
+                return;
+              }
               alert(`✅ ¡Arqueo de caja realizado!\nSaldo en Efectivo: S/ ${cashRegister.conteoRealEfectivo.toFixed(2)}\nDiferencia: S/ ${diferenciaCaja.toFixed(2)} (${diferenciaCaja === 0 ? 'Exacto' : diferenciaCaja > 0 ? 'Sobrante' : 'Faltante'})`);
             }}
             className="px-4 py-2.5 rounded-2xl bg-[#d4af37] text-[#082017] font-bold text-xs flex items-center gap-1.5 shadow-md"
@@ -38,6 +44,25 @@ export default function Caja() {
           </button>
         </div>
       </div>
+
+      {/* Apertura del día (en la nube la caja arranca en cero cada día) */}
+      {nube && cashRegister.aperturaEfectivo === 0 && cashRegister.estadoCaja === 'ABIERTA' && (
+        <div className="bg-[#fff7ed] border border-[#ffedd5] rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div>
+            <p className="font-bold text-[#9a3412]">La caja de hoy aún no tiene apertura</p>
+            <p className="text-[#9a3412]">Registra el sencillo con que empieza el día para que el cuadre salga exacto.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="number" min={0} step="0.5" value={montoApertura} onChange={e => setMontoApertura(Number(e.target.value))} className="w-28 p-2 bg-white border rounded-xl font-mono font-bold text-right" />
+            <button
+              onClick={async () => { const r = await actions.abrirCaja(montoApertura); if (!r.ok) alert(r.error); }}
+              className="px-4 py-2 rounded-xl bg-[#082017] text-[#d4af37] font-bold flex items-center gap-1.5"
+            >
+              <Unlock className="w-4 h-4" /> Abrir caja
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 4 Tarjetas de Medios de Cobro */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

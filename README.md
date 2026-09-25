@@ -79,7 +79,15 @@ Cada evento de negocio es una sola acción del store que actualiza todo a la vez
 - **Merma / desmedro** → descuenta stock → Kardex → baja valorizada (la cuarentena no mueve stock)
 - **Servicio de jardinería** → descarga de insumos al Kardex → factura/boleta (una sola vez) → detracción SPOT con vencimiento calculado
 
-Los datos se guardan en el navegador (`localStorage`, sin la Clave SOL) hasta conectar Supabase. *Ajustes → Restablecer datos demo* vuelve al estado inicial.
+**Dos modos, según el `.env`:**
+
+- **Modo nube** (con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`): login obligatorio y Supabase como fuente de verdad. El stock lo recalcula el servidor en cada movimiento del Kardex. Cada rol ve sólo lo suyo:
+  - **Dueño**: todo, incluida la asignación de roles (*Ajustes → Usuarios*).
+  - **Vendedor**: caja, tienda/POS, servicios, clientes, inventario, comprobantes y guías.
+  - **Jardinero**: sus servicios (avanzar etapas, descargar insumos), clientes, Kardex y mermas.
+- **Modo demo** (sin Supabase): sin login, datos de ejemplo guardados en el navegador (`localStorage`, sin la Clave SOL). *Ajustes → Restablecer datos demo* vuelve al estado inicial. Las pruebas E2E siempre corren en este modo.
+
+Puesta en marcha de la nube: aplicar `supabase/migrations/*.sql` en orden, crear el primer usuario en *Authentication → Users* y darle el rol con `update public.perfiles set rol = 'dueno' where email = '...';`.
 
 ### 🇵🇪 Motor tributario-laboral (`src/lib/peru.ts`)
 
