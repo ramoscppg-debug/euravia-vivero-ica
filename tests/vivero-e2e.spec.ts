@@ -386,4 +386,72 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.locator('table').nth(1).locator('tr', { hasText: 'Devolucion Cliente' })).toHaveCount(1);
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
+
+  test('25. Pedido completo: crear → cobrar → preparar → en ruta → entregado', async ({ page }) => {
+    page.on('dialog', d => void d.accept(d.type() === 'prompt' ? 'Raúl Morales Alva' : undefined));
+    await page.click('button:has-text("Pedidos & Delivery")');
+    await expect(page.getByRole('heading', { name: 'Pedidos & Delivery' })).toBeVisible();
+
+    await page.click('button:has-text("Nuevo Pedido")');
+    const m = page.locator('.fixed');
+    await m.getByLabel('Canal').selectOption('Instagram Ads');
+    await m.getByLabel('Nombre del cliente').fill('Lucía Torres');
+    await m.getByLabel('Teléfono').fill('+51 955 111 222');
+    await m.getByLabel('Dirección de entrega').fill('Av. Primavera 900');
+    await m.getByLabel('Distrito').fill('Surco');
+    await m.getByLabel('Producto').selectOption('AUR-003');
+    await m.locator('button:has-text("+ Agregar")').click();
+    await expect(m.getByLabel('Total del pedido')).toHaveText('S/ 130.00'); // 120 + 10 delivery
+    await m.locator('button:has-text("Guardar Pedido")').click();
+
+    const tarjeta = page.getByRole('article').filter({ hasText: 'Lucía Torres' });
+    await expect(page.getByRole('region', { name: 'Columna Por cobrar' }).getByText('Lucía Torres')).toBeVisible();
+
+    await tarjeta.locator('button:has-text("Cobrar")').click();
+    await page.locator('.fixed button:has-text("Cobrar y emitir")').click();
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    await expect(page.getByText(/Servicio de delivery/)).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    await expect(page.getByRole('region', { name: 'Columna Pagado' }).getByText('Lucía Torres')).toBeVisible();
+    await tarjeta.locator('button:has-text("Preparar")').click();
+    await tarjeta.locator('button:has-text("Enviar")').click();
+    await expect(page.getByRole('region', { name: 'Columna En ruta' }).getByText('Lucía Torres')).toBeVisible();
+    await tarjeta.locator('button:has-text("Entregado")').click();
+    await page.locator('.fixed button:has-text("Marcar entregado")').click();
+    await expect(page.getByRole('region', { name: 'Columna Entregado' }).getByText('Lucía Torres')).toBeVisible();
+
+    // El stock bajó al cobrar (14 → 13) y quedó la guía de remisión
+    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-003' }).locator('td').nth(5)).toHaveText('13');
+    await page.click('button:has-text("Guías de Remisión GRE")');
+    await expect(page.getByText('Av. Primavera 900, Surco')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('26. Pedidos reservan stock y un pedido pendiente se puede cancelar', async ({ page }) => {
+    const mensajes: string[] = [];
+    page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
+    await page.click('button:has-text("Pedidos & Delivery")');
+
+    // Ficus: 14 en stock → pedir 15 no se permite
+    await page.click('button:has-text("Nuevo Pedido")');
+    const m = page.locator('.fixed');
+    await m.getByLabel('Nombre del cliente').fill('Cliente Grande');
+    await m.getByLabel('Teléfono').fill('999888777');
+    await m.getByLabel('Dirección de entrega').fill('Calle 1');
+    await m.getByLabel('Producto').selectOption('AUR-003');
+    await m.locator('button:has-text("+ Agregar")').click();
+    await m.getByLabel('Cantidad AUR-003').fill('15');
+    await m.locator('button:has-text("Guardar Pedido")').click();
+    await expect.poll(() => mensajes.at(-1) ?? '').toContain('Solo hay 14 u. libres');
+    await m.locator('button[aria-label="Cerrar"]').click();
+
+    // El pedido de ejemplo por cobrar se cancela
+    const pendiente = page.getByRole('article').filter({ hasText: 'Carlos Mendoza Paredes' });
+    await pendiente.locator('button[title="Cancelar pedido"]').click();
+    await expect(page.getByRole('region', { name: 'Columna Por cobrar' }).getByText('Carlos Mendoza Paredes')).toHaveCount(0);
+    await expect(page.getByText(/Ver 1 pedido\(s\) cancelado/)).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
 });

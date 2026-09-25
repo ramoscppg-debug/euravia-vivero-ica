@@ -21,7 +21,8 @@ import {
   INITIAL_LOSSES,
   INITIAL_PRODUCTS,
   INITIAL_PROJECTS,
-  INITIAL_PURCHASES
+  INITIAL_PURCHASES,
+  INITIAL_PEDIDOS
 } from '../data/seed';
 import type {
   BiologicalLoss,
@@ -41,6 +42,10 @@ import type {
   MedioPago,
   MovementType,
   Pago,
+  Pedido,
+  PedidoItem,
+  CanalVenta,
+  EstadoPedido,
   ProjectStatus,
   Purchase,
   RegimenTributario,
@@ -68,6 +73,7 @@ export interface ErpState {
   guiasRemision: GuiaRemisionSunat[];
   purchases: Purchase[];
   kardex: KardexMovement[];
+  pedidos: Pedido[];
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -88,6 +94,41 @@ export interface DevolucionInput {
   items: { sku: string; qty: number }[];
   motivo: string;
   medioReembolso: MedioPago;
+}
+
+export interface PedidoInput {
+  canal: CanalVenta;
+  cliente: { nombre: string; telefono: string; doc?: string };
+  direccion: string;
+  distrito: string;
+  referencia?: string;
+  fechaEntrega: string;
+  franja?: string;
+  items: PedidoItem[];
+  costoDelivery: number;
+  notas?: string;
+}
+
+export interface CobroPedidoInput {
+  pedidoId: string;
+  tipoComprobante: '01' | '03';
+  docIdentidad: string;
+  clientName: string;
+  pagos: Pago[];
+  generarGre: boolean;
+}
+
+interface VentaCore {
+  lineas: { sku: string; name: string; qty: number; precioUnitNeto: number; esProducto: boolean }[];
+  total: number;
+  descuentoTotal: number;
+  tipoComprobante: '01' | '03';
+  docIdentidad: string;
+  clientName: string;
+  pagos: Pago[];
+  generarGre: boolean;
+  direccionEntrega?: string;
+  pedidoId?: string;
 }
 
 interface MovimientoCaja {
@@ -155,7 +196,8 @@ function seedState(): ErpState {
     invoices: INITIAL_INVOICES,
     guiasRemision: INITIAL_GUIAS,
     purchases: INITIAL_PURCHASES,
-    kardex: INITIAL_KARDEX
+    kardex: INITIAL_KARDEX,
+    pedidos: INITIAL_PEDIDOS
   };
 }
 
@@ -173,7 +215,8 @@ function nubeVacia(): ErpState {
     invoices: [],
     guiasRemision: [],
     purchases: [],
-    kardex: []
+    kardex: [],
+    pedidos: []
   };
 }
 
@@ -226,6 +269,15 @@ function moverStock(s: ErpState, m: repo.MovimientoNuevo): ErpState {
     products: s.products.map(p => (p.sku === m.sku ? { ...p, stock: balance } : p)),
     kardex: [movement, ...s.kardex]
   };
+}
+
+const nuevoIdPedido = () => `PED-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+
+/** Unidades comprometidas en pedidos que aún no se cobran (el stock recién baja al cobrar). */
+export function reservadoEnPedidos(pedidos: Pedido[]): Map<string, number> {
+  const r = new Map<string, number>();
+  pedidos.filter(p => p.estado === 'pendiente').forEach(p => p.items.forEach(it => r.set(it.sku, (r.get(it.sku) ?? 0) + it.qty)));
+  return r;
 }
 
 /** Refleja cobros y reembolsos en la caja del día. */
@@ -362,6 +414,107 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       void repo.guardarCliente({ ...c, tipoDoc }).catch(() => {});
     }
 
+    /**
+     * Corazón de toda venta (POS o cobro de pedido): valida stock, documento y pagos,
+     * emite el CPE y lo guarda con Kardex, caja, guía y cliente. No hace commit: devuelve el estado nuevo.
+     */
+    async function venderYGuardar(v: VentaCore): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number; next: ErpState; guia: GuiaRemisionSunat | null }>> {
+      const s = get();
+      const productos = v.lineas.filter(l => l.esProducto);
+
+      // Stock por producto (un mismo SKU puede estar en varias líneas)
+      const pedido = new Map<string, number>();
+      productos.forEach(l => pedido.set(l.sku, (pedido.get(l.sku) ?? 0) + l.qty));
+      for (const [sku, qty] of pedido) {
+        const prod = s.products.find(p => p.sku === sku);
+        if (!prod) return { ok: false, error: `Producto ${sku} no encontrado.` };
+        if (prod.stock < qty) return { ok: false, error: `¡Stock insuficiente! Disponible: ${prod.stock} unidades de ${prod.name}` };
+      }
+      // Validación del documento del adquirente según tipo de comprobante (SUNAT)
+      if (v.tipoComprobante === '01' && !validarRuc(v.docIdentidad)) {
+        return { ok: false, error: '⚠️ La Factura Electrónica requiere un RUC válido de 11 dígitos (módulo 11). Verifique el documento del cliente.' };
+      }
+      if (v.tipoComprobante === '03' && v.total > 700 && !validarDni(v.docIdentidad)) {
+        return { ok: false, error: '⚠️ En Boletas por importes mayores a S/ 700 es obligatorio identificar al cliente con DNI (8 dígitos).' };
+      }
+      const pagos = resumirPagos(v.total, v.pagos);
+      if (pagos.error) return { ok: false, error: pagos.error };
+
+      const serie = v.tipoComprobante === '01' ? s.company.serieFactura : s.company.serieBoleta;
+      const emitir = async () => {
+        const invoice = await emitirCpe(
+          s.company,
+          v.tipoComprobante,
+          serie,
+          await correlativo(serie),
+          { numDoc: v.docIdentidad, nombre: v.clientName, direccion: v.direccionEntrega || 'Lima, Perú' },
+          v.lineas.map(l => ({ sku: l.sku, name: l.name, quantity: l.qty, priceWithIgv: l.precioUnitNeto }))
+        );
+        invoice.descuentoTotal = v.descuentoTotal;
+        invoice.pagos = pagos.ingresos;
+        return invoice;
+      };
+
+      try {
+        let invoice = await emitir();
+        const guia = v.generarGre && productos.length
+          ? await emitirGre(s.company, s.guiasRemision, {
+              tipoDoc: v.tipoComprobante === '01' ? '6' : '1',
+              numDoc: v.docIdentidad,
+              nombre: v.clientName,
+              direccionLlegada: v.direccionEntrega || 'Dirección de Entrega Lima',
+              placa: 'BZF-412',
+              motivo: `Despacho Venta ${invoice.id}`,
+              items: productos.map(l => ({ sku: l.sku, descripcion: l.name, cantidad: l.qty }))
+            })
+          : null;
+
+        const movimientos = (id: string): repo.MovimientoNuevo[] =>
+          [...pedido].map(([sku, qty]) => ({
+            sku, qtyIn: 0, qtyOut: qty, type: 'Venta Cliente', doc: id, user: responsable('POS Aurevia'),
+            unitCost: s.products.find(p => p.sku === sku)!.cost
+          }));
+        const caja = (id: string): MovimientoCaja[] =>
+          pagos.ingresos.map(p => ({ tipo: 'INGRESO', medioPago: p.medio, monto: p.monto, concepto: `Venta ${id}` }));
+        const tipoDoc = validarRuc(v.docIdentidad) ? '6' : validarDni(v.docIdentidad) ? '1' : null;
+
+        // Si otra caja tomó el mismo correlativo, se vuelve a numerar una vez
+        let next: ErpState | null = null;
+        for (let intento = 0; !next; intento++) {
+          try {
+            next = await persistirComprobante({
+              invoice,
+              medioPago: pagos.ingresos.map(p => p.medio).join(' + '),
+              movimientos: movimientos(invoice.id),
+              caja: caja(invoice.id),
+              guia,
+              cliente: tipoDoc ? { nombre: v.clientName, tipoDoc, numDoc: v.docIdentidad } : null,
+              responsable: usuario,
+              pedidoId: v.pedidoId
+            });
+          } catch (e) {
+            if (intento === 0 && nube && String(e instanceof Error ? e.message : e).includes('duplicate key')) invoice = await emitir();
+            else throw e;
+          }
+        }
+
+        return {
+          ok: true,
+          invoice,
+          vuelto: pagos.vuelto,
+          guia,
+          next: {
+            ...next,
+            cashRegister: aplicarCaja(next.cashRegister, caja(invoice.id), responsable('POS Aurevia')),
+            invoices: [invoice, ...next.invoices],
+            guiasRemision: guia ? [guia, ...next.guiasRemision] : next.guiasRemision
+          }
+        };
+      } catch (e) {
+        return { ok: false, error: errorNube(e) };
+      }
+    }
+
     /** Cantidades ya devueltas de un comprobante (sumando sus notas de crédito). */
     function devueltoDe(invoiceId: string): Map<string, number> {
       const dev = new Map<string, number>();
@@ -385,91 +538,133 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
 
       // ---------------- VENDER ----------------
       async registrarVenta(v: VentaInput): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number }>> {
-        const s = get();
-        const carrito = calcularCarrito(v.lineas, s.products, v.descuentoGlobal);
+        const carrito = calcularCarrito(v.lineas, get().products, v.descuentoGlobal);
         if (!carrito.lineas.length) return { ok: false, error: 'Agrega al menos un producto al carrito.' };
+        const r = await venderYGuardar({
+          lineas: carrito.lineas.map(l => ({ sku: l.sku, name: l.name, qty: l.qty, precioUnitNeto: l.precioUnitNeto, esProducto: true })),
+          total: carrito.total,
+          descuentoTotal: carrito.descuentoTotal,
+          tipoComprobante: v.tipoComprobante,
+          docIdentidad: v.docIdentidad,
+          clientName: v.clientName,
+          pagos: v.pagos,
+          generarGre: v.generarGre,
+          direccionEntrega: v.direccionEntrega
+        });
+        if (!r.ok) return r;
+        commit(r.next);
+        return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
+      },
 
-        // Stock por producto (un mismo SKU puede estar en varias líneas)
-        const pedido = new Map<string, number>();
-        carrito.lineas.forEach(l => pedido.set(l.sku, (pedido.get(l.sku) ?? 0) + l.qty));
-        for (const [sku, qty] of pedido) {
-          const prod = s.products.find(p => p.sku === sku)!;
-          if (prod.stock < qty) return { ok: false, error: `¡Stock insuficiente! Disponible: ${prod.stock} unidades de ${prod.name}` };
+      // ---------------- PEDIDOS & DELIVERY ----------------
+      async crearPedido(p: PedidoInput): Promise<Result<{ pedido: Pedido }>> {
+        if (!p.cliente.nombre.trim()) return { ok: false, error: 'Indica el nombre del cliente.' };
+        if (!p.cliente.telefono.trim()) return { ok: false, error: 'Indica el teléfono o WhatsApp del cliente.' };
+        if (!p.direccion.trim()) return { ok: false, error: 'Indica la dirección de entrega.' };
+        if (!p.fechaEntrega) return { ok: false, error: 'Indica la fecha de entrega.' };
+        const s = get();
+        const items = p.items.filter(it => it.qty > 0);
+        if (!items.length) return { ok: false, error: 'Agrega al menos un producto al pedido.' };
+        // Stock disponible = stock actual − lo comprometido en otros pedidos por cobrar
+        const reservado = reservadoEnPedidos(s.pedidos);
+        for (const it of items) {
+          const prod = s.products.find(x => x.sku === it.sku);
+          const libre = (prod?.stock ?? 0) - (reservado.get(it.sku) ?? 0);
+          if (it.qty > libre) return { ok: false, error: `⚠️ Solo hay ${Math.max(0, libre)} u. libres de ${it.name} (el resto está comprometido en otros pedidos).` };
         }
-        // Validación del documento del adquirente según tipo de comprobante (SUNAT)
-        if (v.tipoComprobante === '01' && !validarRuc(v.docIdentidad)) {
-          return { ok: false, error: '⚠️ La Factura Electrónica requiere un RUC válido de 11 dígitos (módulo 11). Verifique el documento del cliente.' };
-        }
-        if (v.tipoComprobante === '03' && carrito.total > 700 && !validarDni(v.docIdentidad)) {
-          return { ok: false, error: '⚠️ En Boletas por importes mayores a S/ 700 es obligatorio identificar al cliente con DNI (8 dígitos).' };
-        }
-        const pagos = resumirPagos(carrito.total, v.pagos);
-        if (pagos.error) return { ok: false, error: pagos.error };
-
-        const serie = v.tipoComprobante === '01' ? s.company.serieFactura : s.company.serieBoleta;
-        const emitir = async () => {
-          const invoice = await emitirCpe(
-            s.company,
-            v.tipoComprobante,
-            serie,
-            await correlativo(serie),
-            { numDoc: v.docIdentidad, nombre: v.clientName, direccion: v.direccionEntrega || 'Lima, Perú' },
-            carrito.lineas.map(l => ({ sku: l.sku, name: l.name, quantity: l.qty, priceWithIgv: l.precioUnitNeto }))
-          );
-          invoice.descuentoTotal = carrito.descuentoTotal;
-          invoice.pagos = pagos.ingresos;
-          return invoice;
+        const costoDelivery = Math.max(0, p.costoDelivery || 0);
+        const pedido: Pedido = {
+          id: nuevoIdPedido(),
+          createdAt: new Date().toISOString(),
+          canal: p.canal,
+          estado: 'pendiente',
+          cliente: { nombre: p.cliente.nombre.trim(), telefono: p.cliente.telefono.trim(), doc: p.cliente.doc?.trim() || undefined },
+          direccion: p.direccion.trim(),
+          distrito: p.distrito.trim(),
+          referencia: p.referencia?.trim() || undefined,
+          fechaEntrega: p.fechaEntrega,
+          franja: p.franja || undefined,
+          items,
+          costoDelivery,
+          total: round2(items.reduce((a, it) => a + it.qty * it.unitPrice, 0) + costoDelivery),
+          notas: p.notas?.trim() || undefined
         };
-
         try {
-          let invoice = await emitir();
-          const gre = v.generarGre
-            ? await emitirGre(s.company, s.guiasRemision, {
-                tipoDoc: v.tipoComprobante === '01' ? '6' : '1',
-                numDoc: v.docIdentidad,
-                nombre: v.clientName,
-                direccionLlegada: v.direccionEntrega || 'Dirección de Entrega Lima',
-                placa: 'BZF-412',
-                motivo: `Despacho Venta ${invoice.id}`,
-                items: carrito.lineas.map(l => ({ sku: l.sku, descripcion: l.name, cantidad: l.qty }))
-              })
-            : null;
+          if (nube) await repo.guardarPedidoNuevo(pedido, usuario);
+          const cur = get();
+          commit({ ...cur, pedidos: [pedido, ...cur.pedidos] });
+          return { ok: true, pedido };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
 
-          const movimientos = (id: string): repo.MovimientoNuevo[] =>
-            [...pedido].map(([sku, qty]) => ({
-              sku, qtyIn: 0, qtyOut: qty, type: 'Venta Cliente', doc: id, user: responsable('POS Aurevia'),
-              unitCost: s.products.find(p => p.sku === sku)!.cost
-            }));
-          const caja = (id: string): MovimientoCaja[] =>
-            pagos.ingresos.map(p => ({ tipo: 'INGRESO', medioPago: p.medio, monto: p.monto, concepto: `Venta ${id}` }));
-          const tipoDoc = validarRuc(v.docIdentidad) ? '6' : validarDni(v.docIdentidad) ? '1' : null;
+      /** Cobra el pedido: emite comprobante, descuenta stock y registra caja en una sola operación. */
+      async cobrarPedido(c: CobroPedidoInput): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number }>> {
+        const s = get();
+        const pedido = s.pedidos.find(p => p.id === c.pedidoId);
+        if (!pedido) return { ok: false, error: 'Pedido no encontrado.' };
+        if (pedido.estado !== 'pendiente') return { ok: false, error: `El pedido ${pedido.id} ya fue cobrado.` };
+        const lineas = pedido.items.map(it => ({ sku: it.sku, name: it.name, qty: it.qty, precioUnitNeto: it.unitPrice, esProducto: true }));
+        if (pedido.costoDelivery > 0) lineas.push({ sku: 'SRV-DELIVERY', name: `Servicio de delivery - ${pedido.distrito || pedido.direccion}`, qty: 1, precioUnitNeto: pedido.costoDelivery, esProducto: false });
+        const r = await venderYGuardar({
+          lineas,
+          total: pedido.total,
+          descuentoTotal: 0,
+          tipoComprobante: c.tipoComprobante,
+          docIdentidad: c.docIdentidad,
+          clientName: c.clientName,
+          pagos: c.pagos,
+          generarGre: c.generarGre,
+          direccionEntrega: [pedido.direccion, pedido.distrito].filter(Boolean).join(', '),
+          pedidoId: pedido.id
+        });
+        if (!r.ok) return r;
+        commit({
+          ...r.next,
+          pedidos: r.next.pedidos.map(p => (p.id === pedido.id
+            ? { ...p, estado: 'pagado', comprobanteId: r.invoice.id, metodoPago: r.invoice.pagos?.map(x => x.medio).join(' + '), guiaId: r.guia?.id ?? p.guiaId }
+            : p))
+        });
+        return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
+      },
 
-          // Si otra caja tomó el mismo correlativo, se vuelve a numerar una vez
-          let next: ErpState | null = null;
-          for (let intento = 0; !next; intento++) {
-            try {
-              next = await persistirComprobante({
-                invoice,
-                medioPago: pagos.ingresos.map(p => p.medio).join(' + '),
-                movimientos: movimientos(invoice.id),
-                caja: caja(invoice.id),
-                guia: gre,
-                cliente: tipoDoc ? { nombre: v.clientName, tipoDoc, numDoc: v.docIdentidad } : null,
-                responsable: usuario
-              });
-            } catch (e) {
-              if (intento === 0 && nube && String(e instanceof Error ? e.message : e).includes('duplicate key')) invoice = await emitir();
-              else throw e;
-            }
+      async moverPedido(id: string, estado: EstadoPedido, extra: { repartidor?: string } = {}): Promise<Result> {
+        const pedido = get().pedidos.find(p => p.id === id);
+        if (!pedido) return { ok: false, error: 'Pedido no encontrado.' };
+        const permitido: Record<string, EstadoPedido[]> = {
+          pendiente: ['cancelado'],
+          pagado: ['preparando'],
+          preparando: ['en-reparto', 'pagado'],
+          'en-reparto': ['preparando']
+        };
+        if (!permitido[pedido.estado]?.includes(estado)) return { ok: false, error: `No se puede pasar de "${pedido.estado}" a "${estado}".` };
+        if (estado === 'en-reparto' && !extra.repartidor?.trim()) return { ok: false, error: 'Indica quién lleva el pedido.' };
+        try {
+          if (nube) await repo.actualizarPedido(id, { estado, repartidor: extra.repartidor?.trim() });
+          const s = get();
+          commit({ ...s, pedidos: s.pedidos.map(p => (p.id === id ? { ...p, estado, repartidor: extra.repartidor?.trim() ?? p.repartidor } : p)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Cierra la entrega; en la nube la foto va a la carpeta privada de evidencias. */
+      async entregarPedido(id: string, foto?: File): Promise<Result> {
+        const pedido = get().pedidos.find(p => p.id === id);
+        if (!pedido || pedido.estado !== 'en-reparto') return { ok: false, error: 'Sólo se entrega un pedido que está en ruta.' };
+        if (foto && foto.size > 5 * 1024 * 1024) return { ok: false, error: 'La foto pesa más de 5 MB.' };
+        const entregadoAt = new Date().toISOString();
+        try {
+          let fotoEvidencia = foto?.name;
+          if (nube) {
+            if (foto) fotoEvidencia = await repo.subirEvidencia(id, foto);
+            await repo.actualizarPedido(id, { estado: 'entregado', fotoEvidencia, entregadoAt });
           }
-
-          commit({
-            ...next,
-            cashRegister: aplicarCaja(next.cashRegister, caja(invoice.id), responsable('POS Aurevia')),
-            invoices: [invoice, ...next.invoices],
-            guiasRemision: gre ? [gre, ...next.guiasRemision] : next.guiasRemision
-          });
-          return { ok: true, invoice, vuelto: pagos.vuelto };
+          const s = get();
+          commit({ ...s, pedidos: s.pedidos.map(p => (p.id === id ? { ...p, estado: 'entregado', fotoEvidencia, entregadoAt } : p)) });
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

@@ -17,6 +17,7 @@ import Kardex from './modules/inventario/Kardex';
 import Proyectos from './modules/servicios/Proyectos';
 import Caja from './modules/ventas/Caja';
 import Catalogo from './modules/ventas/Catalogo';
+import Pedidos from './modules/ventas/Pedidos';
 import { AuthProvider, useAuth } from './store/AuthStore';
 import { ErpProvider, useErp } from './store/ErpStore';
 import { UiProvider, useUi } from './store/UiStore';
@@ -25,6 +26,7 @@ const SCREENS: Record<TabId, ComponentType> = {
   dashboard: Dashboard,
   caja: Caja,
   catalogo: Catalogo,
+  pedidos: Pedidos,
   jardineria: Proyectos,
   crm: Clientes,
   kardex: Kardex,

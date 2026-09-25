@@ -2,6 +2,7 @@ import { DevolucionModal } from '../modules/admin/Comprobantes';
 import { GreModal } from '../modules/admin/Guias';
 import { BajaModal, CompraModal } from '../modules/inventario/InventarioModals';
 import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
+import { CobroPedidoModal, EntregaPedidoModal, NuevoPedidoModal } from '../modules/ventas/Pedidos';
 import { EgresoModal, PosModal, QrModal, TicketModal } from '../modules/ventas/VentasModals';
 import { useUi } from '../store/UiStore';
 
@@ -26,6 +27,12 @@ export default function ModalHost() {
       return <GreModal />;
     case 'proyecto':
       return <NuevaCotizacionModal />;
+    case 'pedido-nuevo':
+      return <NuevoPedidoModal />;
+    case 'pedido-cobro':
+      return <CobroPedidoModal key={modal.pedido.id} pedido={modal.pedido} />;
+    case 'pedido-entrega':
+      return <EntregaPedidoModal key={modal.pedido.id} pedido={modal.pedido} />;
     case 'devolucion':
       return <DevolucionModal key={modal.invoice.id} invoice={modal.invoice} />;
   }

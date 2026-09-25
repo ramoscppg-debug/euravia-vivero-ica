@@ -3,7 +3,7 @@
 // ==========================================
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ALL_TABS, puedeVer, tabInicial, type TabId } from '../layout/navigation';
-import type { ComprobanteSunat, Rol } from '../domain/types';
+import type { ComprobanteSunat, Pedido, Rol } from '../domain/types';
 
 export type Modal =
   | { type: 'pos'; sku?: string }
@@ -14,7 +14,10 @@ export type Modal =
   | { type: 'gre' }
   | { type: 'proyecto' }
   | { type: 'ticket'; invoice: ComprobanteSunat; vuelto?: number }
-  | { type: 'devolucion'; invoice: ComprobanteSunat };
+  | { type: 'devolucion'; invoice: ComprobanteSunat }
+  | { type: 'pedido-nuevo' }
+  | { type: 'pedido-cobro'; pedido: Pedido }
+  | { type: 'pedido-entrega'; pedido: Pedido };
 
 interface UiValue {
   tab: TabId;

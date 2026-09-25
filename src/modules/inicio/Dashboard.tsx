@@ -16,13 +16,14 @@ const HUBS: Hub[] = [
   {
     block: 'vender',
     title: 'Vender',
-    subtitle: 'Caja • Tienda • POS',
+    subtitle: 'Caja • Tienda • Pedidos',
     lines: s => [
       ['Catálogo', `${s.products.length} productos`],
       ['Comprobantes emitidos', `${s.invoices.length} CPE`],
+      ['Pedidos activos', `${s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length}`],
       ['Caja', s.cashRegister.estadoCaja]
     ],
-    actions: [['Tienda POS', 'catalogo'], ['Caja del Día', 'caja']]
+    actions: [['Tienda POS', 'catalogo'], ['Pedidos', 'pedidos']]
   },
   {
     block: 'servicios',
@@ -69,6 +70,8 @@ export default function Dashboard() {
   const pend = calcularPendientes(state);
 
   const tareas: { text: string; tab: TabId; urgente?: boolean }[] = [
+    ...pend.pedidosPorCobrar.map(p => ({ text: `Cobrar pedido ${p.id} de ${p.cliente.nombre} (S/ ${p.total.toFixed(2)})`, tab: 'pedidos' as TabId })),
+    ...pend.pedidosParaEntregar.map(p => ({ text: `Entregar pedido ${p.id} en ${p.distrito || p.direccion}`, tab: 'pedidos' as TabId, urgente: true })),
     ...pend.stockBajo.map(p => ({ text: `Reponer ${p.name}: quedan ${p.stock} u. (mín. ${p.minStock})`, tab: 'kardex' as TabId, urgente: true })),
     ...pend.proyectosPorDescargar.map(p => ({ text: `Descargar insumos del proyecto ${p.id}`, tab: 'jardineria' as TabId })),
     ...pend.proyectosPorFacturar.map(p => ({ text: `Facturar proyecto ${p.id} (S/ ${p.total.toFixed(2)})`, tab: 'jardineria' as TabId })),

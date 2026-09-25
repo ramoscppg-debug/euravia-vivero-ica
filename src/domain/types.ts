@@ -227,3 +227,40 @@ export interface DescuentoGlobal {
   tipo: 'PCT' | 'MONTO';
   valor: number;
 }
+
+// ---------- Pedidos & Delivery ----------
+export const CANALES_VENTA = ['WhatsApp', 'Instagram Ads', 'Facebook Ads', 'TikTok Ads', 'Google', 'Web', 'Directo / Vivero'] as const;
+export type CanalVenta = (typeof CANALES_VENTA)[number];
+
+export const ESTADOS_PEDIDO = ['pendiente', 'pagado', 'preparando', 'en-reparto', 'entregado'] as const;
+export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number] | 'cancelado';
+
+export interface PedidoItem {
+  sku: string;
+  name: string;
+  qty: number;
+  unitPrice: number; // inc. IGV
+}
+
+export interface Pedido {
+  id: string;
+  createdAt: string;
+  canal: CanalVenta;
+  estado: EstadoPedido;
+  cliente: { nombre: string; telefono: string; doc?: string };
+  direccion: string;
+  distrito: string;
+  referencia?: string;
+  fechaEntrega: string; // YYYY-MM-DD
+  franja?: string;
+  items: PedidoItem[];
+  costoDelivery: number;
+  total: number;
+  notas?: string;
+  repartidor?: string;
+  metodoPago?: string;
+  comprobanteId?: string;
+  guiaId?: string;
+  fotoEvidencia?: string; // ruta en Storage (nube) o nombre del archivo (demo)
+  entregadoAt?: string;
+}

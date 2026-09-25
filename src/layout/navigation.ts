@@ -6,6 +6,7 @@ import {
   Boxes,
   Calculator,
   CalendarClock,
+  ClipboardList,
   Flower2,
   Landmark,
   Receipt,
@@ -24,6 +25,7 @@ export type TabId =
   | 'dashboard'
   | 'caja'
   | 'catalogo'
+  | 'pedidos'
   | 'jardineria'
   | 'crm'
   | 'kardex'
@@ -60,11 +62,18 @@ export const NAV_BLOCKS: NavBlock[] = [
     id: 'vender',
     label: 'Vender',
     emoji: '🛍️',
-    hint: 'caja & tienda',
+    hint: 'caja, tienda, pedidos',
     icon: Store,
     items: [
       { id: 'caja', label: 'Caja del Día', icon: Wallet, iconClass: 'text-[#d4af37]', badge: s => s.cashRegister.estadoCaja },
-      { id: 'catalogo', label: 'Tienda & Catálogo POS', icon: Store, badge: s => String(s.products.length) }
+      { id: 'catalogo', label: 'Tienda & Catálogo POS', icon: Store, badge: s => String(s.products.length) },
+      {
+        id: 'pedidos',
+        label: 'Pedidos & Delivery',
+        icon: ClipboardList,
+        iconClass: 'text-[#d4af37]',
+        badge: s => String(s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length)
+      }
     ]
   },
   {
@@ -146,6 +155,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   dashboard: DUENO,
   caja: VENTAS,
   catalogo: VENTAS,
+  pedidos: VENTAS,
   jardineria: TODOS,
   crm: TODOS,
   kardex: TODOS,

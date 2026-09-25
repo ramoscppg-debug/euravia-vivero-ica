@@ -15,6 +15,7 @@ import type {
   GuiaRemisionSunat,
   InternalConsumption,
   KardexMovement,
+  Pedido,
   Purchase,
   TrabajadorAurevia
 } from '../domain/types';
@@ -486,3 +487,41 @@ export const INITIAL_KARDEX: KardexMovement[] = INITIAL_PRODUCTS.map((p, i) => (
   referenceDoc: 'INV-INICIAL',
   responsibleUser: 'Almacén Aurevia'
 }));
+
+// Pedidos de ejemplo: uno por cobrar (WhatsApp) y uno ya facturado en ruta (Instagram)
+export const INITIAL_PEDIDOS: Pedido[] = [
+  {
+    id: 'PED-2026-000101',
+    createdAt: '2026-09-24T15:10:00',
+    canal: 'WhatsApp',
+    estado: 'pendiente',
+    cliente: { nombre: 'Carlos Mendoza Paredes', telefono: '+51 976 543 210' },
+    direccion: 'Av. Javier Prado Oeste 1520',
+    distrito: 'San Isidro',
+    referencia: 'Edificio azul, dpto 502',
+    fechaEntrega: '2026-09-26',
+    franja: '09:00 - 13:00',
+    items: [{ sku: 'AUR-002', name: 'Sansevieria Laurentii', qty: 2, unitPrice: 48 }],
+    costoDelivery: 15,
+    total: 111,
+    notas: 'Quiere macetas de regalo, confirmar por WhatsApp'
+  },
+  {
+    id: 'PED-2026-000100',
+    createdAt: '2026-09-06T17:40:00',
+    canal: 'Instagram Ads',
+    estado: 'en-reparto',
+    cliente: { nombre: 'Valeria Benavides', telefono: '+51 987 654 321', doc: '47891234' },
+    direccion: 'Calle Las Orquídeas 340',
+    distrito: 'Miraflores',
+    fechaEntrega: '2026-09-06',
+    franja: '15:00 - 19:00',
+    items: [{ sku: 'AUR-001', name: 'Monstera Deliciosa', qty: 1, unitPrice: 85 }],
+    costoDelivery: 0,
+    total: 85,
+    repartidor: 'Raúl Morales Alva',
+    metodoPago: 'Efectivo',
+    comprobanteId: 'B001-00000342',
+    guiaId: 'T001-00000014'
+  }
+];

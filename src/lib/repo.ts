@@ -16,6 +16,7 @@ import type {
   GuiaRemisionSunat,
   KardexMovement,
   MovementType,
+  Pedido,
   ProjectStatus,
   Purchase,
   RegimenTributario
@@ -23,6 +24,7 @@ import type {
 import { emisorDe } from '../domain/types';
 import { INITIAL_COMPANY_CONFIG } from '../data/seed';
 import type { Rol } from '../domain/types';
+import { round2 } from './peru';
 import { getSupabase } from './supabase';
 
 type Row = Record<string, any>;
@@ -63,11 +65,12 @@ export interface DatosNube {
   projects: GardeningProject[];
   guiasRemision: GuiaRemisionSunat[];
   cashRegister: CashRegisterState;
+  pedidos: Pedido[];
 }
 
 export async function cargarTodo(): Promise<DatosNube> {
   const sb = await db();
-  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja] = await Promise.all([
+  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos] = await Promise.all([
     sb.from('empresa_config').select('*').limit(1).maybeSingle(),
     sb.from('productos').select('*').eq('activo', true).order('sku'),
     sb.from('kardex_movimientos').select('*').order('id', { ascending: false }).limit(500),
@@ -78,7 +81,8 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('clientes').select('*').order('nombre'),
     sb.from('servicios_jardineria').select('*, servicios_materiales(*)').order('fecha_programada', { ascending: false }),
     sb.from('guias_remision').select('*').order('created_at', { ascending: false }),
-    sb.from('caja_movimientos').select('*').gte('fecha', inicioDelDia()).order('id')
+    sb.from('caja_movimientos').select('*').gte('fecha', inicioDelDia()).order('id'),
+    sb.from('pedidos').select('*, pedidos_detalle(*)').order('created_at', { ascending: false }).limit(300)
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -98,7 +102,8 @@ export async function cargarTodo(): Promise<DatosNube> {
     crmClients: ok<Row[]>(clientes).map(clienteDesdeFila),
     projects: ok<Row[]>(servicios).map(r => proyectoDesdeFila(r, nombres)),
     guiasRemision: ok<Row[]>(guias).map(r => r.datos as GuiaRemisionSunat),
-    cashRegister: cajaDesdeFilas(ok<Row[]>(caja))
+    cashRegister: cajaDesdeFilas(ok<Row[]>(caja)),
+    pedidos: ok<Row[]>(pedidos).map(r => pedidoDesdeFila(r, nombres))
   };
 }
 
@@ -274,6 +279,36 @@ function proyectoDesdeFila(r: Row, nombres: Map<string, string>): GardeningProje
   };
 }
 
+function pedidoDesdeFila(r: Row, nombres: Map<string, string>): Pedido {
+  return {
+    id: r.id,
+    createdAt: r.created_at,
+    canal: r.canal_venta,
+    estado: r.estado,
+    cliente: { nombre: r.cliente_nombre ?? '', telefono: r.cliente_telefono ?? '', doc: r.cliente_doc ?? undefined },
+    direccion: r.direccion ?? '',
+    distrito: r.distrito ?? '',
+    referencia: r.referencia ?? undefined,
+    fechaEntrega: r.fecha_entrega ?? '',
+    franja: r.franja_horaria ?? undefined,
+    items: (r.pedidos_detalle ?? []).map((d: Row) => ({
+      sku: d.producto_sku,
+      name: nombres.get(d.producto_sku) ?? d.producto_sku,
+      qty: d.cantidad,
+      unitPrice: num(d.precio_unitario)
+    })),
+    costoDelivery: num(r.costo_delivery),
+    total: num(r.total),
+    notas: r.notas ?? undefined,
+    repartidor: r.repartidor_asignado ?? undefined,
+    metodoPago: r.metodo_pago ?? undefined,
+    comprobanteId: r.comprobante_id ?? undefined,
+    guiaId: r.guia_id ?? undefined,
+    fotoEvidencia: r.foto_evidencia_url ?? undefined,
+    entregadoAt: r.entregado_at ?? undefined
+  };
+}
+
 function cajaDesdeFilas(rows: Row[]): CashRegisterState {
   const suma = (f: (r: Row) => boolean) => rows.filter(f).reduce((a, r) => a + num(r.monto), 0);
   // Medios digitales: ingresos menos devoluciones pagadas por ese mismo medio
@@ -340,6 +375,7 @@ export interface ComprobanteAtomico {
   guia?: GuiaRemisionSunat | null;
   cliente?: { nombre: string; tipoDoc: string; numDoc: string } | null;
   responsable: string;
+  pedidoId?: string; // cobro de un pedido: pasa a "pagado" en la misma transacción
 }
 
 /** Venta o nota de crédito en una sola transacción del servidor (función registrar_comprobante). */
@@ -370,7 +406,8 @@ export async function registrarComprobanteAtomico(c: ComprobanteAtomico, nombres
         descuento_total: inv.descuentoTotal ?? 0,
         pagos: inv.pagos ?? [],
         comprobante_referencia: inv.referencia ?? null,
-        motivo: inv.motivo ?? null
+        motivo: inv.motivo ?? null,
+        pedido_id: c.pedidoId ?? null
       },
       movimientos: c.movimientos.map(m => ({
         producto_sku: m.sku,
@@ -572,4 +609,59 @@ export async function listarPerfiles(): Promise<PerfilUsuario[]> {
 export async function asignarRol(id: string, rol: Rol | null) {
   const sb = await db();
   ok(await sb.from('perfiles').update({ rol }).eq('id', id));
+}
+
+// ---------------- PEDIDOS ----------------
+
+export async function guardarPedidoNuevo(p: Pedido, creadoPor: string) {
+  const sb = await db();
+  ok(await sb.from('pedidos').insert({
+    id: p.id,
+    canal_venta: p.canal,
+    estado: p.estado,
+    subtotal: round2(p.total - p.costoDelivery),
+    costo_delivery: p.costoDelivery,
+    total: p.total,
+    cliente_nombre: p.cliente.nombre,
+    cliente_telefono: p.cliente.telefono,
+    cliente_doc: p.cliente.doc ?? null,
+    direccion: p.direccion,
+    distrito: p.distrito,
+    referencia: p.referencia ?? null,
+    fecha_entrega: p.fechaEntrega,
+    franja_horaria: p.franja ?? null,
+    notas: p.notas ?? null,
+    creado_por: creadoPor
+  }));
+  ok(await sb.from('pedidos_detalle').insert(
+    p.items.map(it => ({ pedido_id: p.id, producto_sku: it.sku, cantidad: it.qty, precio_unitario: it.unitPrice, subtotal: round2(it.qty * it.unitPrice) }))
+  ));
+}
+
+export async function actualizarPedido(id: string, cambios: { estado?: string; repartidor?: string; fotoEvidencia?: string; entregadoAt?: string }) {
+  const sb = await db();
+  const fila: Row = { updated_at: new Date().toISOString() };
+  if (cambios.estado) fila.estado = cambios.estado;
+  if (cambios.repartidor !== undefined) fila.repartidor_asignado = cambios.repartidor;
+  if (cambios.fotoEvidencia) fila.foto_evidencia_url = cambios.fotoEvidencia;
+  if (cambios.entregadoAt) fila.entregado_at = cambios.entregadoAt;
+  ok(await sb.from('pedidos').update(fila).eq('id', id));
+}
+
+/** Sube la foto de entrega a la carpeta privada "evidencias" y devuelve su ruta. */
+export async function subirEvidencia(pedidoId: string, archivo: File): Promise<string> {
+  const sb = await db();
+  const ext = (archivo.name.split('.').pop() || 'jpg').toLowerCase();
+  const ruta = `${pedidoId}/${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('evidencias').upload(ruta, archivo, { contentType: archivo.type, upsert: false });
+  if (error) throw new Error(error.message);
+  return ruta;
+}
+
+/** Enlace temporal (10 min) para ver una foto de entrega. */
+export async function urlEvidencia(ruta: string): Promise<string> {
+  const sb = await db();
+  const { data, error } = await sb.storage.from('evidencias').createSignedUrl(ruta, 600);
+  if (error || !data) throw new Error(error?.message ?? 'No se pudo abrir la foto');
+  return data.signedUrl;
 }
