@@ -42,6 +42,7 @@ import type {
   RegimenTributario,
   TrabajadorAurevia
 } from '../domain/types';
+import { emisorDe } from '../domain/types';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
@@ -233,7 +234,7 @@ async function emitirCpe(
     cliente: { tipoDoc: tipo === '01' ? '6' : '1', numDoc: cliente.numDoc, nombre: cliente.nombre, direccion: cliente.direccion },
     items
   });
-  inv.emisor = company;
+  inv.emisor = emisorDe(company);
   const cdr = await sunatClient.sendCpeToSunat(inv);
   inv.estadoSunat = cdr.estado;
   inv.codigoRespuestaSunat = cdr.cdrCode;
@@ -255,7 +256,7 @@ async function emitirGre(
     fechaEmision: today(),
     motivoTraslado: '01',
     descripcionMotivo: data.motivo,
-    emisor: company,
+    emisor: emisorDe(company),
     destinatario: { tipoDoc: data.tipoDoc, numDoc: data.numDoc, nombreRazonSocial: data.nombre },
     puntoPartida: { ubigeo: company.ubigeo, direccion: `Vivero ${company.nombreComercial}, ${company.direccion}` },
     puntoLlegada: { ubigeo: '150122', direccion: data.direccionLlegada },
@@ -414,6 +415,9 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
 
       async registrarEgreso(motivo: string, monto: number): Promise<Result> {
         if (!motivo || monto <= 0) return { ok: false, error: 'Indica el motivo y un monto mayor a cero.' };
+        if (monto > get().cashRegister.conteoRealEfectivo) {
+          return { ok: false, error: `⚠️ No hay suficiente efectivo en gaveta (S/ ${get().cashRegister.conteoRealEfectivo.toFixed(2)}) para ese gasto.` };
+        }
         try {
           if (nube) await repo.guardarCaja({ tipo: 'EGRESO', monto, medioPago: 'Efectivo', concepto: motivo, responsable: usuario });
           const s = get();
@@ -461,6 +465,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!validarRuc(c.ruc)) {
           return { ok: false, error: '⚠️ El RUC del proveedor no es válido (11 dígitos, módulo 11). Sin RUC válido la compra no genera crédito fiscal en el RCE.' };
         }
+        if (!(c.qty > 0) || !(c.costoUnitario > 0)) return { ok: false, error: 'La cantidad y el costo unitario deben ser mayores a cero.' };
+        if (s.purchases.some(p => p.id === c.numeroFactura.trim() && p.ruc === c.ruc)) {
+          return { ok: false, error: `⚠️ La factura ${c.numeroFactura} de este proveedor ya está registrada.` };
+        }
         const gravada = c.qty * c.costoUnitario;
         const igv = round2(gravada * 0.18);
         const compra: Purchase = { id: c.numeroFactura, proveedor: c.proveedor, ruc: c.ruc, fecha: today(), gravada, igv, total: gravada + igv, items: `${c.qty}x ${prod.name}` };
@@ -480,6 +488,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         const s = get();
         const prod = s.products.find(p => p.sku === b.sku);
         if (!prod) return { ok: false, error: 'Producto no encontrado.' };
+        if (!(b.qty > 0)) return { ok: false, error: 'La cantidad debe ser mayor a cero.' };
         if (prod.stock < b.qty) {
           return { ok: false, error: `¡No puedes dar de baja más unidades de las disponibles! Stock actual: ${prod.stock}` };
         }
@@ -594,6 +603,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         const s = get();
         const proj = s.projects.find(p => p.id === id);
         if (!proj || proj.stockDeducted) return { ok: false, error: 'Los insumos de este proyecto ya fueron descargados.' };
+        const faltantes = proj.materials.filter(m => (s.products.find(p => p.sku === m.sku)?.stock ?? 0) < m.qty);
+        if (faltantes.length) {
+          return { ok: false, error: `⚠️ Stock insuficiente para: ${faltantes.map(m => `${m.name} (necesita ${m.qty})`).join(', ')}. Registra la compra antes de descargar.` };
+        }
         try {
           const next = await moverInventario(
             proj.materials.map(mat => ({

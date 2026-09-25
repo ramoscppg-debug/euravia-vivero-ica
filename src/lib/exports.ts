@@ -35,18 +35,20 @@ export function generarSire(
   tipo: 'RVIE' | 'RCE',
   company: EmpresaConfig,
   invoices: ComprobanteSunat[],
-  purchases: Purchase[]
+  purchases: Purchase[],
+  periodo: string // YYYY-MM
 ): string {
+  const per = periodo.replace('-', '');
   let content = '';
   if (tipo === 'RVIE') {
-    content = `LE${company.ruc}20260900140400021111\n`;
-    invoices.forEach(inv => {
-      content += `${company.ruc}|${company.razonSocial}|202609|${inv.fechaEmision}|${inv.tipoComprobante}|${inv.serie}|${inv.correlativo}|${inv.cliente.tipoDoc}|${inv.cliente.numDoc}|${inv.cliente.nombreRazonSocial}|${inv.opGravadas.toFixed(2)}|${inv.totalIgv.toFixed(2)}|${inv.montoTotal.toFixed(2)}|PEN|ACEPTADO|\n`;
+    content = `LE${company.ruc}${per}00140400021111\n`;
+    invoices.filter(inv => inv.tipoComprobante === '01' || inv.tipoComprobante === '03').forEach(inv => {
+      content += `${company.ruc}|${company.razonSocial}|${per}|${inv.fechaEmision}|${inv.tipoComprobante}|${inv.serie}|${inv.correlativo}|${inv.cliente.tipoDoc}|${inv.cliente.numDoc}|${inv.cliente.nombreRazonSocial}|${inv.opGravadas.toFixed(2)}|${inv.totalIgv.toFixed(2)}|${inv.montoTotal.toFixed(2)}|PEN|${inv.estadoSunat}|\n`;
     });
   } else {
-    content = `LE${company.ruc}20260900080400021111\n`;
+    content = `LE${company.ruc}${per}00080400021111\n`;
     purchases.forEach(pur => {
-      content += `${company.ruc}|${company.razonSocial}|202609|${pur.fecha}|01|${pur.id.split('-')[0]}|${pur.id.split('-')[1] || '001'}|6|${pur.ruc}|${pur.proveedor}|${pur.gravada.toFixed(2)}|${pur.igv.toFixed(2)}|${pur.total.toFixed(2)}|PEN|1|\n`;
+      content += `${company.ruc}|${company.razonSocial}|${per}|${pur.fecha}|01|${pur.id.split('-')[0]}|${pur.id.split('-')[1] || '001'}|6|${pur.ruc}|${pur.proveedor}|${pur.gravada.toFixed(2)}|${pur.igv.toFixed(2)}|${pur.total.toFixed(2)}|PEN|1|\n`;
     });
   }
   return content;

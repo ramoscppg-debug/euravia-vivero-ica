@@ -20,6 +20,7 @@ import type {
   Purchase,
   RegimenTributario
 } from '../domain/types';
+import { emisorDe } from '../domain/types';
 import { INITIAL_COMPANY_CONFIG } from '../data/seed';
 import type { Rol } from '../domain/types';
 import { getSupabase } from './supabase';
@@ -167,7 +168,7 @@ function comprobanteDesdeFila(r: Row, company: EmpresaConfig): ComprobanteSunat 
     fechaEmision: r.fecha_emision,
     horaEmision: r.hora_emision ?? '',
     moneda: 'PEN',
-    emisor: company,
+    emisor: emisorDe(company),
     cliente: { tipoDoc: r.cliente_tipo_doc ?? '1', numDoc: r.cliente_num_doc ?? '', nombreRazonSocial: r.cliente },
     opGravadas: num(r.op_gravadas),
     opExoneradas: 0,

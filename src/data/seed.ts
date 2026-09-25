@@ -18,6 +18,7 @@ import type {
   Purchase,
   TrabajadorAurevia
 } from '../domain/types';
+import { emisorDe } from '../domain/types';
 
 export const INITIAL_COMPANY_CONFIG: EmpresaConfig = {
   ruc: '20609876541',
@@ -397,7 +398,7 @@ export const INITIAL_INVOICES: ComprobanteSunat[] = [
     fechaEmision: '2026-09-06',
     horaEmision: '18:30:15',
     moneda: 'PEN',
-    emisor: company,
+    emisor: emisorDe(company),
     cliente: { tipoDoc: '1', numDoc: '47891234', nombreRazonSocial: 'Valeria Benavides' },
     opGravadas: 72.03,
     opExoneradas: 0,
@@ -419,7 +420,7 @@ export const INITIAL_INVOICES: ComprobanteSunat[] = [
     fechaEmision: '2026-09-06',
     horaEmision: '16:15:00',
     moneda: 'PEN',
-    emisor: company,
+    emisor: emisorDe(company),
     cliente: { tipoDoc: '6', numDoc: '20601234567', nombreRazonSocial: 'Arquitectura & Paisajes Modernos SAC' },
     opGravadas: 245.76,
     opExoneradas: 0,
@@ -444,7 +445,7 @@ export const INITIAL_GUIAS: GuiaRemisionSunat[] = [
     fechaEmision: '2026-09-06',
     motivoTraslado: '01',
     descripcionMotivo: 'Venta y Entrega Botánica a Domicilio',
-    emisor: company,
+    emisor: emisorDe(company),
     destinatario: { tipoDoc: '1', numDoc: '47891234', nombreRazonSocial: 'Valeria Benavides' },
     puntoPartida: { ubigeo: company.ubigeo, direccion: `Vivero ${company.nombreComercial}, ${company.direccion}` },
     puntoLlegada: { ubigeo: '150122', direccion: 'Calle Las Orquídeas 340, Miraflores' },

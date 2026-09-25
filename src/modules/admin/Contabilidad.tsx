@@ -8,11 +8,11 @@ const REGIMENES: RegimenTributario[] = ['NRUS', 'RER', 'RMT', 'RG'];
 
 export default function Contabilidad() {
   const { state, actions } = useErp();
-  const { company, invoices, purchases, regimenTributario } = state;
+  const { company, regimenTributario } = state;
   const f = calcularFinanzas(state);
 
   const exportar = (tipo: 'RVIE' | 'RCE') => {
-    descargarTxt(`SIRE_${tipo}_${company.ruc}_202609.txt`, generarSire(tipo, company, invoices, purchases));
+    descargarTxt(`SIRE_${tipo}_${company.ruc}_${f.periodo.replace('-', '')}.txt`, generarSire(tipo, company, f.invoicesPeriodo, f.purchasesPeriodo, f.periodo));
     alert(`✅ Archivo oficial ${tipo} para el SIRE SUNAT descargado exitosamente.`);
   };
 
@@ -42,7 +42,7 @@ export default function Contabilidad() {
       {/* Pre-Liquidación Declara Fácil 621 */}
       <div className="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 border border-[#d4af37]/30">
         <div className="space-y-1">
-          <span className="bg-[#134e2e] text-[#d4af37] px-3 py-1 rounded-full text-xs font-bold">Pre-Liquidación Mensual (Formulario Virtual 621 IGV - Renta)</span>
+          <span className="bg-[#134e2e] text-[#d4af37] px-3 py-1 rounded-full text-xs font-bold">Pre-Liquidación Mensual {f.periodo} (Formulario Virtual 621 IGV - Renta)</span>
           <h3 className="font-serif text-2xl font-bold text-[#fdfbf7]">Total Impuesto Mensual a Pagar: S/ {f.totalImpuestosMes.toFixed(2)}</h3>
           <p className="text-xs text-[#c2d4cb]">{f.usaIgv ? 'Débito Fiscal (IGV Ventas) menos Crédito Fiscal (IGV Compras con Factura) más ' : 'Sin IGV en NRUS. '}Pago a Cuenta de Renta: {f.pagoCuentaRentaDetalle.detalle}.</p>
         </div>

@@ -104,7 +104,7 @@ export default function Dashboard() {
       {/* 6 KPIs Clave */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
-          <span className="text-[11px] font-bold text-[#5c7367] uppercase">Ventas Facturadas</span>
+          <span className="text-[11px] font-bold text-[#5c7367] uppercase">Ventas del Mes</span>
           <div className="text-2xl font-serif font-bold text-[#082017] mt-1">S/ {f.totalVentas.toFixed(2)}</div>
           <p className="text-[10px] text-[#134e2e] mt-1 font-semibold">IGV Débito: S/ {f.totalIgvVentas.toFixed(2)}</p>
         </div>
@@ -116,7 +116,7 @@ export default function Dashboard() {
         </div>
 
         <div className="bg-white p-5 rounded-3xl border border-[#e8e2d8] shadow-sm">
-          <span className="text-[11px] font-bold text-[#5c7367] uppercase">Compras Almacén</span>
+          <span className="text-[11px] font-bold text-[#5c7367] uppercase">Compras del Mes</span>
           <div className="text-2xl font-serif font-bold text-[#082017] mt-1">S/ {f.totalCompras.toFixed(2)}</div>
           <p className="text-[10px] text-[#134e2e] mt-1 font-semibold">Crédito Fiscal: S/ {f.totalIgvCompras.toFixed(2)}</p>
         </div>

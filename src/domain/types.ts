@@ -200,3 +200,9 @@ export interface CrmClient {
 
 // ---------- Usuarios ----------
 export type Rol = 'dueno' | 'vendedor' | 'jardinero';
+
+/** Sólo los datos públicos del emisor viajan en comprobantes y guías (nunca la Clave SOL ni cuentas). */
+export function emisorDe(c: EmisorSunat): EmisorSunat {
+  const { ruc, razonSocial, nombreComercial, direccion, ubigeo, distrito, provincia, departamento } = c;
+  return { ruc, razonSocial, nombreComercial, direccion, ubigeo, distrito, provincia, departamento };
+}

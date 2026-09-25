@@ -21,7 +21,16 @@ export const REGIMEN_LABELS: Record<RegimenTributario, string> = {
   RG: 'Régimen General (RG)'
 };
 
-export function calcularFinanzas(s: ErpState) {
+/** Periodo tributario actual en formato YYYY-MM. */
+export const periodoActual = () => new Date().toISOString().slice(0, 7);
+
+/** Pre-liquidación del mes: sólo cuentan los comprobantes y compras del periodo. */
+export function calcularFinanzas(estado: ErpState, periodo = periodoActual()) {
+  const s = {
+    ...estado,
+    invoices: estado.invoices.filter(i => i.fechaEmision.startsWith(periodo)),
+    purchases: estado.purchases.filter(p => p.fecha.startsWith(periodo))
+  };
   const totalVentas = s.invoices.reduce((acc, inv) => acc + inv.montoTotal, 0);
   const totalVentasGravadas = s.invoices.reduce((acc, inv) => acc + inv.opGravadas, 0);
   const totalIgvVentas = s.invoices.reduce((acc, inv) => acc + inv.totalIgv, 0);
@@ -47,6 +56,9 @@ export function calcularFinanzas(s: ErpState) {
     pagoCuentaRentaDetalle,
     pagoCuentaRenta,
     totalImpuestosMes: igvNetoPagar + pagoCuentaRenta,
+    periodo,
+    invoicesPeriodo: s.invoices,
+    purchasesPeriodo: s.purchases,
     regimenLabel: REGIMEN_LABELS[s.regimenTributario]
   };
 }

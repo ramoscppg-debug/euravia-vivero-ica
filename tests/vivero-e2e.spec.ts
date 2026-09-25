@@ -272,6 +272,31 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('20. Una factura de compra no se registra dos veces', async ({ page }) => {
+    const mensajes: string[] = [];
+    page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
+    for (let i = 0; i < 2; i++) {
+      await page.click('button:has-text("Ingreso Almacén (+)")');
+      await page.click('button:has-text("Registrar e Incrementar Stock")');
+    }
+    await expect.poll(() => mensajes.length).toBe(2);
+    expect(mensajes[1]).toContain('ya está registrada');
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('21. La Clave SOL no se guarda en el navegador ni en los comprobantes', async ({ page }) => {
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.check('input[type=checkbox]'); // con guía de remisión
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    const guardado = await page.evaluate(() => localStorage.getItem('aurevia.erp.v1') ?? '');
+    expect(guardado).not.toContain('claveSol');
+    // Los comprobantes y guías sólo llevan los datos públicos del emisor
+    const estado = JSON.parse(guardado);
+    const emisores = [...estado.invoices, ...estado.guiasRemision].map((d: { emisor: object }) => JSON.stringify(d.emisor));
+    for (const e of emisores) expect(e).not.toMatch(/usuarioSol|cuentaBcp|afpnet/);
+  });
+
   test('19. Los datos persisten al recargar y la pestaña queda en la URL', async ({ page }) => {
     await page.click('button:has-text("Ingreso Almacén (+)")');
     page.once('dialog', dialog => dialog.accept());
