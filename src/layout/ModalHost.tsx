@@ -1,5 +1,6 @@
 import { DevolucionModal } from '../modules/admin/Comprobantes';
 import { GreModal } from '../modules/admin/Guias';
+import { FichaClienteModal } from '../modules/clientes/Clientes';
 import { BajaModal, CompraModal } from '../modules/inventario/InventarioModals';
 import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
 import { CobroPedidoModal, EntregaPedidoModal, NuevoPedidoModal } from '../modules/ventas/Pedidos';
@@ -27,6 +28,8 @@ export default function ModalHost() {
       return <GreModal />;
     case 'proyecto':
       return <NuevaCotizacionModal />;
+    case 'cliente':
+      return <FichaClienteModal key={modal.clienteId ?? 'nuevo'} clienteId={modal.clienteId} />;
     case 'pedido-nuevo':
       return <NuevoPedidoModal />;
     case 'pedido-cobro':

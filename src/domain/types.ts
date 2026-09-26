@@ -197,6 +197,27 @@ export interface CrmClient {
   seasonalAlert: string;
   recommendedAction: string;
   urgency: 'ALTA' | 'MEDIA' | 'ESTACIONAL';
+  email?: string;
+  address?: string;
+  canal?: string; // canal de origen (Instagram Ads, WhatsApp, Directo...)
+}
+
+export interface NotaCliente {
+  id: string;
+  clienteId: string;
+  texto: string;
+  autor: string;
+  fecha: string; // ISO
+}
+
+export interface Tarea {
+  id: string;
+  clienteId?: string;
+  titulo: string;
+  vence: string; // YYYY-MM-DD
+  asignadoA?: string;
+  hecha: boolean;
+  creadoPor: string;
 }
 
 // ---------- Usuarios ----------

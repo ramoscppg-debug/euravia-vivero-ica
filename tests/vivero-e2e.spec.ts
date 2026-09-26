@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { test, expect } from '@playwright/test';
 
 test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
@@ -452,6 +453,89 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await pendiente.locator('button[title="Cancelar pedido"]').click();
     await expect(page.getByRole('region', { name: 'Columna Por cobrar' }).getByText('Carlos Mendoza Paredes')).toHaveCount(0);
     await expect(page.getByText(/Ver 1 pedido\(s\) cancelado/)).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('27. CRM: crear cliente, buscarlo y anotar en su ficha', async ({ page }) => {
+    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await page.click('button:has-text("Nuevo cliente")');
+    const m = page.locator('.fixed');
+    await m.getByLabel('Nombre').fill('Rosa Quispe');
+    await m.getByLabel('DNI o RUC').fill('40506070');
+    await m.getByLabel('Teléfono').fill('+51 912 345 678');
+    await m.getByLabel('Distrito').fill('Ica');
+    await m.locator('button:has-text("Crear cliente")').click();
+
+    await page.getByLabel('Buscar cliente').fill('40506070');
+    await expect(page.getByRole('heading', { name: 'Rosa Quispe' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Valeria Benavides' })).toHaveCount(0);
+
+    await page.locator('button:has-text("Ver ficha")').click();
+    await page.getByRole('tab', { name: 'Notas y tareas' }).click();
+    await page.getByLabel('Nueva nota').fill('Busca plantas para oficina con poca luz');
+    await page.locator('button:has-text("Guardar nota")').click();
+    await page.getByRole('tab', { name: 'Historial' }).click();
+    await expect(page.locator('.fixed').getByText('Busca plantas para oficina con poca luz')).toBeVisible();
+
+    // No se permiten dos clientes con el mismo documento
+    await page.locator('.fixed button[aria-label="Cerrar"]').click();
+    const mensajes: string[] = [];
+    page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
+    await page.click('button:has-text("Nuevo cliente")');
+    await page.locator('.fixed').getByLabel('Nombre').fill('Otra Rosa');
+    await page.locator('.fixed').getByLabel('DNI o RUC').fill('40506070');
+    await page.locator('.fixed button:has-text("Crear cliente")').click();
+    await expect.poll(() => mensajes.at(-1) ?? '').toContain('Ya existe un cliente');
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('28. CRM: una venta aparece en el historial y en los cuidados; tareas se completan', async ({ page }) => {
+    // Venta a Valeria por su DNI (el POS completa el nombre)
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Ficus Lyrata Pandurata")').click();
+    await pos.getByLabel('Documento del cliente').fill('47891234');
+    await expect(pos.getByLabel('Nombre del cliente')).toHaveValue('Valeria Benavides');
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    await page.click('button:has-text("CRM Botánico & Alertas")');
+    const tarjeta = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Valeria Benavides' }) }).last();
+    await tarjeta.locator('button:has-text("Ver ficha")').click();
+    const ficha = page.locator('.fixed');
+    await expect(ficha.getByText(/Compra B001-/).first()).toBeVisible();
+    await ficha.getByRole('tab', { name: 'Cuidados' }).click();
+    await expect(ficha.getByText('Ficus Lyrata Pandurata')).toBeVisible();
+    await expect(ficha.getByText(/Próximo cuidado:/).first()).toBeVisible();
+
+    await ficha.getByRole('tab', { name: 'Notas y tareas' }).click();
+    await ficha.getByLabel('Tarea').fill('Enviar foto del ficus instalado');
+    await ficha.locator('button:has-text("Agregar")').click();
+    await page.locator('.fixed button[aria-label="Cerrar"]').click();
+
+    await page.getByLabel('Completar: Enviar foto del ficus instalado').click();
+    await expect(page.getByLabel('Completar: Enviar foto del ficus instalado')).toHaveCount(0);
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('29. CRM: importar y exportar clientes en CSV', async ({ page }) => {
+    const mensajes: string[] = [];
+    page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
+    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await page.getByLabel('Archivo CSV de clientes').setInputFiles({
+      name: 'clientes.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Nombre;DNI;Celular;Distrito\nPedro Huamán;41414141;987111222;Ica\n"Jardines del Sur, SAC";;956000111;Parcona\n')
+    });
+    await expect.poll(() => mensajes.at(-1) ?? '').toContain('2 cliente(s) nuevo(s)');
+    await expect(page.getByRole('heading', { name: 'Jardines del Sur, SAC' })).toBeVisible();
+
+    const [descarga] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Exportar CSV")')]);
+    const contenido = fs.readFileSync(await descarga.path(), 'utf8');
+    expect(contenido.split('\n')[0]).toBe('nombre,documento,telefono,email,direccion,distrito,canal,urgencia,plantas');
+    expect(contenido).toContain('Pedro Huamán,41414141,987111222');
+    expect(contenido).toContain('"Jardines del Sur, SAC"');
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 });

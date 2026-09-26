@@ -22,7 +22,9 @@ import {
   INITIAL_PRODUCTS,
   INITIAL_PROJECTS,
   INITIAL_PURCHASES,
-  INITIAL_PEDIDOS
+  INITIAL_PEDIDOS,
+  INITIAL_NOTAS,
+  INITIAL_TAREAS
 } from '../data/seed';
 import type {
   BiologicalLoss,
@@ -44,6 +46,8 @@ import type {
   Pago,
   Pedido,
   PedidoItem,
+  NotaCliente,
+  Tarea,
   CanalVenta,
   EstadoPedido,
   ProjectStatus,
@@ -53,6 +57,7 @@ import type {
 } from '../domain/types';
 import { emisorDe } from '../domain/types';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
+import { csvAClientes } from '../lib/crm';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
@@ -74,6 +79,8 @@ export interface ErpState {
   purchases: Purchase[];
   kardex: KardexMovement[];
   pedidos: Pedido[];
+  notasClientes: NotaCliente[];
+  tareas: Tarea[];
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -95,6 +102,9 @@ export interface DevolucionInput {
   motivo: string;
   medioReembolso: MedioPago;
 }
+
+export type FichaClienteInput = Pick<CrmClient, 'name' | 'phone' | 'district' | 'plantsOwned' | 'seasonalAlert' | 'recommendedAction' | 'urgency'> &
+  Partial<Pick<CrmClient, 'doc' | 'email' | 'address' | 'canal'>>;
 
 export interface PedidoInput {
   canal: CanalVenta;
@@ -197,7 +207,9 @@ function seedState(): ErpState {
     guiasRemision: INITIAL_GUIAS,
     purchases: INITIAL_PURCHASES,
     kardex: INITIAL_KARDEX,
-    pedidos: INITIAL_PEDIDOS
+    pedidos: INITIAL_PEDIDOS,
+    notasClientes: INITIAL_NOTAS,
+    tareas: INITIAL_TAREAS
   };
 }
 
@@ -216,7 +228,9 @@ function nubeVacia(): ErpState {
     guiasRemision: [],
     purchases: [],
     kardex: [],
-    pedidos: []
+    pedidos: [],
+    notasClientes: [],
+    tareas: []
   };
 }
 
@@ -554,6 +568,102 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!r.ok) return r;
         commit(r.next);
         return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
+      },
+
+      // ---------------- CLIENTES (CRM) ----------------
+      async guardarCliente(f: FichaClienteInput, id?: string): Promise<Result<{ cliente: CrmClient }>> {
+        const name = f.name.trim();
+        if (!name) return { ok: false, error: 'El nombre del cliente es obligatorio.' };
+        const doc = f.doc?.trim() || undefined;
+        if (doc && !validarDni(doc) && !validarRuc(doc)) return { ok: false, error: '⚠️ El documento debe ser un DNI de 8 dígitos o un RUC válido.' };
+        const s = get();
+        if (doc && s.crmClients.some(c => c.doc === doc && c.id !== id)) return { ok: false, error: `⚠️ Ya existe un cliente con el documento ${doc}.` };
+        const datos = { ...f, name, doc, plantsOwned: f.plantsOwned.map(x => x.trim()).filter(Boolean) };
+        try {
+          const previo = id ? s.crmClients.find(c => c.id === id) : undefined;
+          const cliente: CrmClient = nube
+            ? await repo.guardarFichaCliente(datos, id)
+            : { ...(previo ?? { id: `CRM-${Date.now().toString(36).toUpperCase()}`, lastPurchaseDate: '' }), ...datos } as CrmClient;
+          const cur = get();
+          commit({ ...cur, crmClients: id ? cur.crmClients.map(c => (c.id === id ? cliente : c)) : [...cur.crmClients, cliente] });
+          return { ok: true, cliente };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async importarClientes(csv: string): Promise<Result<{ creados: number; actualizados: number }>> {
+        const filas = csvAClientes(csv);
+        if (!filas.length) return { ok: false, error: 'El archivo no tiene filas válidas. Debe tener una columna "nombre" (y opcionales: documento, telefono, email, direccion, distrito, canal).' };
+        const invalidos = filas.filter(r => r.doc && !validarDni(r.doc) && !validarRuc(r.doc));
+        if (invalidos.length) return { ok: false, error: `⚠️ Documentos inválidos en: ${invalidos.slice(0, 5).map(r => r.nombre).join(', ')}${invalidos.length > 5 ? '…' : ''}` };
+        const fichas: Partial<CrmClient>[] = filas.map(r => ({
+          name: r.nombre, doc: r.doc, phone: r.telefono ?? '', email: r.email, address: r.direccion, district: r.distrito ?? '', canal: r.canal
+        }));
+        try {
+          const s = get();
+          const existentes = new Set(s.crmClients.map(c => c.doc).filter(Boolean));
+          const actualizados = fichas.filter(f => f.doc && existentes.has(f.doc)).length;
+          let lista = s.crmClients;
+          if (nube) {
+            const guardados = await repo.importarClientes(fichas);
+            const porId = new Map(guardados.map(c => [c.id, c]));
+            lista = [...lista.map(c => porId.get(c.id) ?? c), ...guardados.filter(g => !lista.some(c => c.id === g.id))];
+          } else {
+            fichas.forEach((f, i) => {
+              const previo = f.doc ? lista.find(c => c.doc === f.doc) : undefined;
+              if (previo) lista = lista.map(c => (c.id === previo.id ? { ...c, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) } : c));
+              else lista = [...lista, {
+                id: `CRM-${Date.now().toString(36).toUpperCase()}-${i}`, name: f.name!, doc: f.doc, phone: f.phone ?? '', email: f.email, address: f.address,
+                district: f.district ?? '', canal: f.canal, plantsOwned: [], lastPurchaseDate: '',
+                seasonalAlert: '🌱 Aún sin alerta de temporada registrada.', recommendedAction: 'Registrar las plantas del cliente para personalizar sus cuidados.', urgency: 'ESTACIONAL'
+              }];
+            });
+          }
+          commit({ ...get(), crmClients: lista });
+          return { ok: true, creados: fichas.length - actualizados, actualizados };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async agregarNota(clienteId: string, texto: string): Promise<Result> {
+        if (!texto.trim()) return { ok: false, error: 'Escribe la nota.' };
+        try {
+          const nota: NotaCliente = nube
+            ? await repo.agregarNota(clienteId, texto.trim(), usuario)
+            : { id: `NOTA-${Date.now().toString(36).toUpperCase()}`, clienteId, texto: texto.trim(), autor: responsable('Administración'), fecha: new Date().toISOString() };
+          const s = get();
+          commit({ ...s, notasClientes: [nota, ...s.notasClientes] });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async crearTarea(t: { clienteId?: string; titulo: string; vence: string; asignadoA?: string }): Promise<Result> {
+        if (!t.titulo.trim()) return { ok: false, error: 'Escribe qué hay que hacer.' };
+        if (!t.vence) return { ok: false, error: 'Indica la fecha.' };
+        const base = { clienteId: t.clienteId, titulo: t.titulo.trim(), vence: t.vence, asignadoA: t.asignadoA?.trim() || undefined, creadoPor: responsable('Administración') };
+        try {
+          const tarea: Tarea = nube ? await repo.crearTarea(base) : { ...base, id: `TAR-${Date.now().toString(36).toUpperCase()}`, hecha: false };
+          const s = get();
+          commit({ ...s, tareas: [...s.tareas, tarea] });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async marcarTarea(id: string, hecha: boolean): Promise<Result> {
+        try {
+          if (nube) await repo.marcarTarea(id, hecha);
+          const s = get();
+          commit({ ...s, tareas: s.tareas.map(t => (t.id === id ? { ...t, hecha } : t)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
       },
 
       // ---------------- PEDIDOS & DELIVERY ----------------

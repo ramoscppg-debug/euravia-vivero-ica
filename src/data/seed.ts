@@ -15,6 +15,8 @@ import type {
   GuiaRemisionSunat,
   InternalConsumption,
   KardexMovement,
+  NotaCliente,
+  Tarea,
   Pedido,
   Purchase,
   TrabajadorAurevia
@@ -524,4 +526,15 @@ export const INITIAL_PEDIDOS: Pedido[] = [
     comprobanteId: 'B001-00000342',
     guiaId: 'T001-00000014'
   }
+];
+
+// CRM: notas y tareas de ejemplo
+export const INITIAL_NOTAS: NotaCliente[] = [
+  { id: 'NOTA-001', clienteId: 'CRM-01', texto: 'Prefiere entregas por la tarde. Interesada en macetas grandes para la terraza.', autor: 'Sofía Castillo', fecha: '2026-09-06T18:40:00' },
+  { id: 'NOTA-002', clienteId: 'CRM-03', texto: 'Contrato verbal de mantenimiento mensual del jardín vertical; enviar cotización formal.', autor: 'José Paredes', fecha: '2026-09-05T11:15:00' }
+];
+
+export const INITIAL_TAREAS: Tarea[] = [
+  { id: 'TAR-001', clienteId: 'CRM-03', titulo: 'Visita técnica: boquillas de riego del jardín vertical', vence: '2026-09-20', asignadoA: 'José Paredes', hecha: false, creadoPor: 'Administración' },
+  { id: 'TAR-002', clienteId: 'CRM-02', titulo: 'Llamar para ofrecer fertilizante de temporada', vence: '2026-10-05', asignadoA: 'Sofía Castillo', hecha: false, creadoPor: 'Administración' }
 ];

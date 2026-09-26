@@ -70,6 +70,7 @@ export default function Dashboard() {
   const pend = calcularPendientes(state);
 
   const tareas: { text: string; tab: TabId; urgente?: boolean }[] = [
+    ...pend.tareasVencidas.map(t => ({ text: `Tarea: ${t.titulo}${t.asignadoA ? ` (${t.asignadoA})` : ''}`, tab: 'crm' as TabId, urgente: t.vence < new Date().toISOString().slice(0, 10) })),
     ...pend.pedidosPorCobrar.map(p => ({ text: `Cobrar pedido ${p.id} de ${p.cliente.nombre} (S/ ${p.total.toFixed(2)})`, tab: 'pedidos' as TabId })),
     ...pend.pedidosParaEntregar.map(p => ({ text: `Entregar pedido ${p.id} en ${p.distrito || p.direccion}`, tab: 'pedidos' as TabId, urgente: true })),
     ...pend.stockBajo.map(p => ({ text: `Reponer ${p.name}: quedan ${p.stock} u. (mín. ${p.minStock})`, tab: 'kardex' as TabId, urgente: true })),

@@ -154,6 +154,7 @@ export function calcularPendientes(s: ErpState) {
     proyectosPorFacturar: s.projects.filter(p => !p.invoiceId && p.status !== 'COTIZADO'),
     detraccionesPendientes: s.detracciones.filter(d => d.estado === 'PENDIENTE'),
     clientesUrgentes: s.crmClients.filter(c => c.urgency === 'ALTA'),
+    tareasVencidas: s.tareas.filter(t => !t.hecha && t.vence <= new Date().toISOString().slice(0, 10)),
     pedidosPorCobrar: s.pedidos.filter(p => p.estado === 'pendiente'),
     pedidosParaEntregar: s.pedidos.filter(p => ['pagado', 'preparando', 'en-reparto'].includes(p.estado) && p.fechaEntrega <= new Date().toISOString().slice(0, 10))
   };

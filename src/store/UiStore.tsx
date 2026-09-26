@@ -16,6 +16,7 @@ export type Modal =
   | { type: 'ticket'; invoice: ComprobanteSunat; vuelto?: number }
   | { type: 'devolucion'; invoice: ComprobanteSunat }
   | { type: 'pedido-nuevo' }
+  | { type: 'cliente'; clienteId?: string }
   | { type: 'pedido-cobro'; pedido: Pedido }
   | { type: 'pedido-entrega'; pedido: Pedido };
 

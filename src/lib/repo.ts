@@ -16,6 +16,8 @@ import type {
   GuiaRemisionSunat,
   KardexMovement,
   MovementType,
+  NotaCliente,
+  Tarea,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -66,11 +68,13 @@ export interface DatosNube {
   guiasRemision: GuiaRemisionSunat[];
   cashRegister: CashRegisterState;
   pedidos: Pedido[];
+  notasClientes: NotaCliente[];
+  tareas: Tarea[];
 }
 
 export async function cargarTodo(): Promise<DatosNube> {
   const sb = await db();
-  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos] = await Promise.all([
+  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas] = await Promise.all([
     sb.from('empresa_config').select('*').limit(1).maybeSingle(),
     sb.from('productos').select('*').eq('activo', true).order('sku'),
     sb.from('kardex_movimientos').select('*').order('id', { ascending: false }).limit(500),
@@ -82,7 +86,9 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('servicios_jardineria').select('*, servicios_materiales(*)').order('fecha_programada', { ascending: false }),
     sb.from('guias_remision').select('*').order('created_at', { ascending: false }),
     sb.from('caja_movimientos').select('*').gte('fecha', inicioDelDia()).order('id'),
-    sb.from('pedidos').select('*, pedidos_detalle(*)').order('created_at', { ascending: false }).limit(300)
+    sb.from('pedidos').select('*, pedidos_detalle(*)').order('created_at', { ascending: false }).limit(300),
+    sb.from('cliente_notas').select('*').order('created_at', { ascending: false }).limit(1000),
+    sb.from('tareas').select('*').order('vence').limit(500)
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -103,7 +109,9 @@ export async function cargarTodo(): Promise<DatosNube> {
     projects: ok<Row[]>(servicios).map(r => proyectoDesdeFila(r, nombres)),
     guiasRemision: ok<Row[]>(guias).map(r => r.datos as GuiaRemisionSunat),
     cashRegister: cajaDesdeFilas(ok<Row[]>(caja)),
-    pedidos: ok<Row[]>(pedidos).map(r => pedidoDesdeFila(r, nombres))
+    pedidos: ok<Row[]>(pedidos).map(r => pedidoDesdeFila(r, nombres)),
+    notasClientes: ok<Row[]>(notas).map(notaDesdeFila),
+    tareas: ok<Row[]>(tareas).map(tareaDesdeFila)
   };
 }
 
@@ -248,7 +256,10 @@ function clienteDesdeFila(r: Row): CrmClient {
     lastPurchaseDate: String(r.created_at ?? '').slice(0, 10),
     seasonalAlert: r.alerta_estacional ?? '🌱 Aún sin alerta de temporada registrada.',
     recommendedAction: r.accion_recomendada ?? 'Registrar las plantas del cliente para personalizar sus cuidados.',
-    urgency: r.urgencia ?? 'ESTACIONAL'
+    urgency: r.urgencia ?? 'ESTACIONAL',
+    email: r.email ?? undefined,
+    address: r.direccion ?? undefined,
+    canal: r.canal_origen ?? undefined
   };
 }
 
@@ -306,6 +317,22 @@ function pedidoDesdeFila(r: Row, nombres: Map<string, string>): Pedido {
     guiaId: r.guia_id ?? undefined,
     fotoEvidencia: r.foto_evidencia_url ?? undefined,
     entregadoAt: r.entregado_at ?? undefined
+  };
+}
+
+function notaDesdeFila(r: Row): NotaCliente {
+  return { id: String(r.id), clienteId: String(r.cliente_id), texto: r.texto, autor: r.autor, fecha: r.created_at };
+}
+
+function tareaDesdeFila(r: Row): Tarea {
+  return {
+    id: String(r.id),
+    clienteId: r.cliente_id != null ? String(r.cliente_id) : undefined,
+    titulo: r.titulo,
+    vence: r.vence,
+    asignadoA: r.asignado_a ?? undefined,
+    hecha: !!r.hecha,
+    creadoPor: r.creado_por
   };
 }
 
@@ -664,4 +691,66 @@ export async function urlEvidencia(ruta: string): Promise<string> {
   const { data, error } = await sb.storage.from('evidencias').createSignedUrl(ruta, 600);
   if (error || !data) throw new Error(error?.message ?? 'No se pudo abrir la foto');
   return data.signedUrl;
+}
+
+// ---------------- CRM ----------------
+
+function filaCliente(c: Partial<CrmClient>): Row {
+  const f: Row = {};
+  if (c.name !== undefined) f.nombre = c.name;
+  if (c.doc !== undefined) {
+    f.num_doc = c.doc || null;
+    f.tipo_doc = c.doc?.length === 11 ? '6' : c.doc?.length === 8 ? '1' : null;
+  }
+  if (c.phone !== undefined) f.telefono = c.phone || null;
+  if (c.email !== undefined) f.email = c.email || null;
+  if (c.address !== undefined) f.direccion = c.address || null;
+  if (c.district !== undefined) f.distrito = c.district || null;
+  if (c.canal !== undefined) f.canal_origen = c.canal || null;
+  if (c.plantsOwned !== undefined) f.plantas = c.plantsOwned;
+  if (c.seasonalAlert !== undefined) f.alerta_estacional = c.seasonalAlert || null;
+  if (c.recommendedAction !== undefined) f.accion_recomendada = c.recommendedAction || null;
+  if (c.urgency !== undefined) f.urgencia = c.urgency;
+  return f;
+}
+
+/** Crea (sin id) o actualiza la ficha; devuelve la ficha guardada. */
+export async function guardarFichaCliente(c: Partial<CrmClient>, id?: string): Promise<CrmClient> {
+  const sb = await db();
+  const q = id
+    ? sb.from('clientes').update(filaCliente(c)).eq('id', Number(id)).select('*').single()
+    : sb.from('clientes').insert(filaCliente(c)).select('*').single();
+  return clienteDesdeFila(ok<Row>(await q));
+}
+
+/** Importación masiva: con documento actualiza la ficha existente; sin documento crea una nueva. */
+export async function importarClientes(filas: Partial<CrmClient>[]): Promise<CrmClient[]> {
+  const sb = await db();
+  const conDoc = filas.filter(f => f.doc).map(filaCliente);
+  const sinDoc = filas.filter(f => !f.doc).map(filaCliente);
+  const res: Row[] = [];
+  if (conDoc.length) res.push(...ok<Row[]>(await sb.from('clientes').upsert(conDoc, { onConflict: 'num_doc' }).select('*')));
+  if (sinDoc.length) res.push(...ok<Row[]>(await sb.from('clientes').insert(sinDoc).select('*')));
+  return res.map(clienteDesdeFila);
+}
+
+export async function agregarNota(clienteId: string, texto: string, autor: string): Promise<NotaCliente> {
+  const sb = await db();
+  return notaDesdeFila(ok<Row>(await sb.from('cliente_notas').insert({ cliente_id: Number(clienteId), texto, autor }).select('*').single()));
+}
+
+export async function crearTarea(t: Omit<Tarea, 'id' | 'hecha'>): Promise<Tarea> {
+  const sb = await db();
+  return tareaDesdeFila(ok<Row>(await sb.from('tareas').insert({
+    cliente_id: t.clienteId ? Number(t.clienteId) : null,
+    titulo: t.titulo,
+    vence: t.vence,
+    asignado_a: t.asignadoA ?? null,
+    creado_por: t.creadoPor
+  }).select('*').single()));
+}
+
+export async function marcarTarea(id: string, hecha: boolean) {
+  const sb = await db();
+  ok(await sb.from('tareas').update({ hecha, hecha_at: hecha ? new Date().toISOString() : null }).eq('id', Number(id)));
 }
