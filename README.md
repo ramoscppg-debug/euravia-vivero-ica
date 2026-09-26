@@ -34,7 +34,7 @@ vivero-360/
 ├── playwright.config.ts
 ├── .env.example            # Credenciales Supabase + SUNAT / AFPnet
 ├── tests/
-│   └── vivero-e2e.spec.ts  # Suite E2E (29 flujos de negocio)
+│   └── vivero-e2e.spec.ts  # Suite E2E (34 flujos de negocio)
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx             # Solo arma el layout y elige la pantalla activa
@@ -77,6 +77,8 @@ Cada evento de negocio es una sola acción del store que actualiza todo a la vez
 - **Venta POS** (carrito, descuento por línea y global, pago mixto con vuelto) → comprobante SUNAT + Kardex + caja por medio de pago + (opcional) GRE, **en una sola transacción** del servidor (`registrar_comprobante`)
 - **Pedido** (WhatsApp, redes, web) → reserva stock → **cobro** (comprobante + Kardex + caja + GRE, atómico) → preparación → reparto → entrega con foto de evidencia (Storage privado)
 - **CRM**: ficha editable con historial unificado (compras, devoluciones, pedidos, servicios, notas), segmentos (VIP, frecuente, nuevo, inactivo), cuidados automáticos cada 30 días según las plantas compradas, tareas/recordatorios e importación/exportación CSV
+- **Crecer ventas**: cotizaciones que se convierten en venta con un clic (WhatsApp/PDF), cupones (%, S/, mínimo, vencimiento, usos) y puntos (1 por cada S/ 10; 1 punto = S/ 0.10) validados en el servidor, contratos de mantenimiento mensual (factura una vez por mes, detracción y visitas agendadas) y reportes por producto, canal, vendedor, medio de pago y día
+- **Fechas** siempre en hora de Lima (no UTC), en la app y en el servidor
 - **Devolución** → nota de crédito (BC01/FC01) que devuelve stock y registra el reembolso; nunca supera lo vendido
 - **Compra** → suma stock → Kardex → Registro de Compras (SIRE RCE)
 - **Merma / desmedro** → descuenta stock → Kardex → baja valorizada (la cuarentena no mueve stock)
@@ -120,7 +122,7 @@ Parámetros y fórmulas centralizados según normativa **vigente 2025** (revisar
 ### ✅ Pruebas
 
 ```bash
-npx playwright test        # 29 pruebas E2E de extremo a extremo
+npx playwright test        # 34 pruebas E2E de extremo a extremo
 ```
 
 ---

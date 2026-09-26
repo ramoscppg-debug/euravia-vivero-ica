@@ -3,9 +3,10 @@
 // ==========================================
 import type { CatalogProduct, ComprobanteSunat, CrmClient, GardeningProject, NotaCliente, Pedido } from '../domain/types';
 import { round2 } from './peru';
+import { hoyLocal } from './fechas';
 
 const DIA = 86_400_000;
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+const hoyISO = () => hoyLocal();
 const dias = (desde: string, hasta = hoyISO()) => Math.floor((Date.parse(hasta) - Date.parse(desde.slice(0, 10))) / DIA);
 
 const norm = (s = '') => s.trim().toLowerCase();

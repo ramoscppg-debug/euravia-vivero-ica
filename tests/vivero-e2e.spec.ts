@@ -538,4 +538,111 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(contenido).toContain('"Jardines del Sur, SAC"');
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
+
+  test('30. POS: cupón de descuento y canje de puntos del cliente', async ({ page }) => {
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Monstera Deliciosa")').click(); // 85
+    await pos.getByLabel('Documento del cliente').fill('47891234'); // Valeria: 8 puntos
+    await pos.getByLabel('Código de cupón').fill('bienvenida10');
+    await pos.locator('button:has-text("Aplicar")').click(); // 10% → 76.50
+    await expect(pos.getByText('✓ BIENVENIDA10: − S/ 8.50')).toBeVisible();
+    await pos.getByLabel('Puntos a canjear').fill('8'); // S/ 0.80 → 75.70
+    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 75.70');
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('Cupón: BIENVENIDA10')).toBeVisible();
+    await expect(page.getByText('Puntos canjeados: 8')).toBeVisible();
+    await expect(page.getByText('Puntos ganados: 7')).toBeVisible(); // piso(75.70 / 10)
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    // El cupón con compra mínima no aplica a una venta chica
+    const mensajes: string[] = [];
+    page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await pos.locator('button:has-text("Sustrato Premium")').click(); // 28 < 100
+    await pos.getByLabel('Código de cupón').fill('DELIVERY10');
+    await pos.locator('button:has-text("Aplicar")').click();
+    await expect.poll(() => mensajes.at(-1) ?? '').toContain('compra mínima');
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('31. Cotización: crear, y convertir en venta con el carrito precargado', async ({ page }) => {
+    await page.click('button:has-text("Cotizaciones & Cupones")');
+    await page.click('button:has-text("Nueva Cotización")');
+    const m = page.locator('.fixed');
+    await m.getByLabel('Cliente').fill('Oficinas Ica SAC');
+    await m.getByLabel('Producto').selectOption('AUR-002');
+    await m.locator('button:has-text("+ Agregar")').click();
+    await m.getByLabel('Cantidad AUR-002').fill('3'); // 144
+    await expect(m.getByLabel('Total cotizado')).toHaveText('S/ 144.00');
+    await m.locator('button:has-text("Guardar Cotización")').click();
+
+    const cot = page.getByRole('article').filter({ hasText: 'Oficinas Ica SAC' });
+    await expect(cot.getByText('ENVIADA')).toBeVisible();
+    await cot.locator('button:has-text("Convertir en venta")').click();
+    await expect(page.locator('.fixed').getByLabel('Total a cobrar')).toHaveText('S/ 144.00');
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await expect(cot.getByText('CONVERTIDA')).toBeVisible();
+    await expect(cot.locator('button:has-text("Convertir en venta")')).toHaveCount(0);
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('32. Contrato de mantenimiento: facturar el mes una sola vez, con detracción y visitas', async ({ page }) => {
+    page.on('dialog', d => void d.accept());
+    await page.click('button:has-text("Contratos de Mantenimiento")');
+    const con = page.getByRole('article').filter({ hasText: 'Boutique Hotel Miraflores SAC' });
+    await expect(con.getByText('Toca facturar este mes')).toBeVisible();
+    await con.locator('button:has-text("Facturar")').click();
+    await expect(page.getByText('FACTURA ELECTRÓNICA')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await expect(con.getByText(/✅ Facturado/)).toBeVisible();
+    await expect(con.locator('button:has-text("Facturar")')).toHaveCount(0);
+
+    // 850 > 700 con RUC → detracción; y quedaron agendadas las visitas del mes
+    await page.click('button:has-text("Detracciones SPOT (BN)")');
+    await expect(page.getByText('Pendiente de Pago')).toHaveCount(2);
+    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await expect(page.getByText(/2 visita\(s\) de mantenimiento/)).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('33. Reportes: ventas del mes por producto, canal y vendedor', async ({ page }) => {
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Palmera Areca")').click();
+    await pos.getByLabel('Más AUR-004').click(); // 2 × 95 = 190
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    await page.click('button:has-text("Reportes de Ventas")');
+    await expect(page.getByRole('heading', { name: 'Reportes de Ventas' })).toBeVisible();
+    const productos = page.getByRole('region', { name: 'Productos más vendidos' });
+    await expect(productos.getByText('Palmera Areca Palma de Salón')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Ventas por canal' }).getByText('Directo / Vivero')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Ventas por vendedor' }).getByText('Caja Principal')).toBeVisible();
+
+    await productos.locator('button:has-text("Ver tabla")').click();
+    await expect(productos.locator('tr', { hasText: 'Palmera Areca Palma de Salón' })).toContainText('S/ 190.00');
+
+    await page.getByRole('radio', { name: 'Mes anterior' }).click();
+    await expect(page.getByRole('region', { name: 'Productos más vendidos' }).getByText('Sin ventas en el periodo.')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
+    const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
+    const page = await ctx.newPage();
+    await page.clock.install({ time: new Date('2026-09-26T01:30:00Z') }); // 25/09 20:30 en Lima
+    await page.goto('/');
+    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await page.click('button:has-text("Facturación SUNAT SEE")');
+    await expect(page.getByText(/2026-09-25 20:30/)).toBeVisible();
+    await ctx.close();
+  });
 });

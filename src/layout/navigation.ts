@@ -5,7 +5,10 @@
 import {
   Boxes,
   Calculator,
+  BarChart3,
+  CalendarCheck,
   CalendarClock,
+  FileText,
   ClipboardList,
   Flower2,
   Landmark,
@@ -26,6 +29,9 @@ export type TabId =
   | 'caja'
   | 'catalogo'
   | 'pedidos'
+  | 'cotizaciones'
+  | 'contratos'
+  | 'reportes'
   | 'jardineria'
   | 'crm'
   | 'kardex'
@@ -73,6 +79,12 @@ export const NAV_BLOCKS: NavBlock[] = [
         icon: ClipboardList,
         iconClass: 'text-[#d4af37]',
         badge: s => String(s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length)
+      },
+      {
+        id: 'cotizaciones',
+        label: 'Cotizaciones & Cupones',
+        icon: FileText,
+        badge: s => String(s.cotizaciones.filter(c => c.estado === 'ENVIADA' || c.estado === 'ACEPTADA').length)
       }
     ]
   },
@@ -88,6 +100,13 @@ export const NAV_BLOCKS: NavBlock[] = [
         label: 'Jardines & Paisajismo VIP',
         icon: Flower2,
         badge: s => String(s.projects.filter(p => p.status !== 'CONCLUIDO').length)
+      },
+      {
+        id: 'contratos',
+        label: 'Contratos de Mantenimiento',
+        icon: CalendarCheck,
+        iconClass: 'text-[#d4af37]',
+        badge: s => String(s.contratos.filter(c => c.activo).length)
       }
     ]
   },
@@ -127,6 +146,7 @@ export const NAV_BLOCKS: NavBlock[] = [
     hint: 'sunat & rr.hh.',
     icon: Calculator,
     items: [
+      { id: 'reportes', label: 'Reportes de Ventas', icon: BarChart3, iconClass: 'text-[#d4af37]', badge: () => 'KPI' },
       { id: 'sunat', label: 'Facturación SUNAT SEE', icon: Receipt, badge: s => String(s.invoices.length) },
       { id: 'guias', label: 'Guías de Remisión GRE', icon: Truck, badge: s => s.company.serieGre },
       {
@@ -156,6 +176,9 @@ const PERMISOS: Record<TabId, Rol[]> = {
   caja: VENTAS,
   catalogo: VENTAS,
   pedidos: VENTAS,
+  cotizaciones: VENTAS,
+  contratos: TODOS,
+  reportes: DUENO,
   jardineria: TODOS,
   crm: TODOS,
   kardex: TODOS,

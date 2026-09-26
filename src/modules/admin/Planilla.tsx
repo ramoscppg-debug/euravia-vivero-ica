@@ -2,6 +2,7 @@ import { Download, Users } from 'lucide-react';
 import { descargarTxt, generarPlaprote } from '../../lib/exports';
 import { useErp } from '../../store/ErpStore';
 import { calcularPlanillaMes } from '../../store/selectors';
+import { periodoLocal } from '../../lib/fechas';
 
 export default function Planilla() {
   const { state } = useErp();
@@ -9,7 +10,7 @@ export default function Planilla() {
   const planilla = calcularPlanillaMes(employees);
 
   const exportarAfpnet = () => {
-    descargarTxt(`PLAPROTE_${company.ruc}_${new Date().toISOString().slice(0, 7).replace('-', '')}.txt`, generarPlaprote(planilla));
+    descargarTxt(`PLAPROTE_${company.ruc}_${periodoLocal().replace('-', '')}.txt`, generarPlaprote(planilla));
     alert('✅ Archivo oficial PLAPROTE.TXT generado exitosamente.\nListo para subir en afpnet.com.pe');
   };
 

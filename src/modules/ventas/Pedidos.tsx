@@ -7,6 +7,7 @@ import { resumirPagos } from '../../lib/pos';
 import { urlEvidencia } from '../../lib/repo';
 import { reservadoEnPedidos, useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
+import { hoyLocal } from '../../lib/fechas';
 
 const COLUMNAS: { estado: EstadoPedido; titulo: string; color: string }[] = [
   { estado: 'pendiente', titulo: 'Por cobrar', color: 'border-t-[#e05780]' },
@@ -16,7 +17,7 @@ const COLUMNAS: { estado: EstadoPedido; titulo: string; color: string }[] = [
   { estado: 'entregado', titulo: 'Entregado', color: 'border-t-[#082017]' }
 ];
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyLocal();
 
 /** Mensaje de WhatsApp listo según el estado del pedido. */
 function mensajeWhatsapp(p: Pedido): string {

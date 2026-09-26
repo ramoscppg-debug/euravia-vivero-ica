@@ -1,4 +1,5 @@
 import { ComprobanteSunat, GuiaRemisionSunat, ItemComprobanteSunat, TipoDocumentoIdentidad } from '../types/sunat';
+import { hoyLocal } from '../lib/fechas';
 
 export const EMISOR_AUREVIA = {
   ruc: '20609876541',
@@ -79,7 +80,7 @@ export const SunatBillingService = {
       tipoComprobante: params.tipoComprobante,
       serie: params.serie,
       correlativo: params.correlativo,
-      fechaEmision: new Date().toISOString().split('T')[0],
+      fechaEmision: hoyLocal(),
       horaEmision: new Date().toTimeString().split(' ')[0],
       moneda: 'PEN',
       emisor: EMISOR_AUREVIA,
@@ -127,8 +128,8 @@ export const SunatBillingService = {
       serie: 'T001',
       correlativo: params.correlativo,
       emisor: EMISOR_AUREVIA,
-      fechaEmision: new Date().toISOString().split('T')[0],
-      fechaTraslado: new Date().toISOString().split('T')[0],
+      fechaEmision: hoyLocal(),
+      fechaTraslado: hoyLocal(),
       motivoTraslado: '01', // Venta
       modalidadTransporte: '02', // Privado
       pesoBrutoTotal: params.pesoKg,

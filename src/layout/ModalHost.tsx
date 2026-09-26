@@ -3,6 +3,8 @@ import { GreModal } from '../modules/admin/Guias';
 import { FichaClienteModal } from '../modules/clientes/Clientes';
 import { BajaModal, CompraModal } from '../modules/inventario/InventarioModals';
 import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
+import { NuevoContratoModal } from '../modules/servicios/Contratos';
+import { NuevaCotizacionProductosModal } from '../modules/ventas/Cotizaciones';
 import { CobroPedidoModal, EntregaPedidoModal, NuevoPedidoModal } from '../modules/ventas/Pedidos';
 import { EgresoModal, PosModal, QrModal, TicketModal } from '../modules/ventas/VentasModals';
 import { useUi } from '../store/UiStore';
@@ -13,7 +15,7 @@ export default function ModalHost() {
   if (!modal) return null;
   switch (modal.type) {
     case 'pos':
-      return <PosModal key={`pos-${modal.sku ?? ''}`} presetSku={modal.sku} />;
+      return <PosModal key={`pos-${modal.sku ?? ''}-${modal.preset?.cotizacionId ?? ''}`} presetSku={modal.sku} preset={modal.preset} />;
     case 'qr':
       return <QrModal key={`qr-${modal.sku}`} presetSku={modal.sku} />;
     case 'ticket':
@@ -28,6 +30,10 @@ export default function ModalHost() {
       return <GreModal />;
     case 'proyecto':
       return <NuevaCotizacionModal />;
+    case 'cotizacion':
+      return <NuevaCotizacionProductosModal />;
+    case 'contrato':
+      return <NuevoContratoModal />;
     case 'cliente':
       return <FichaClienteModal key={modal.clienteId ?? 'nuevo'} clienteId={modal.clienteId} />;
     case 'pedido-nuevo':

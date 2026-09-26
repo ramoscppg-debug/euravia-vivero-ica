@@ -3,6 +3,7 @@ import { NAV_BLOCKS, type NavBlock, type TabId } from '../../layout/navigation';
 import { useErp, type ErpState } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { calcularCaja, calcularFinanzas, calcularPendientes, calcularPlanillaMes } from '../../store/selectors';
+import { hoyLocal } from '../../lib/fechas';
 
 interface Hub {
   block: NavBlock['id'];
@@ -70,7 +71,9 @@ export default function Dashboard() {
   const pend = calcularPendientes(state);
 
   const tareas: { text: string; tab: TabId; urgente?: boolean }[] = [
-    ...pend.tareasVencidas.map(t => ({ text: `Tarea: ${t.titulo}${t.asignadoA ? ` (${t.asignadoA})` : ''}`, tab: 'crm' as TabId, urgente: t.vence < new Date().toISOString().slice(0, 10) })),
+    ...pend.contratosPorFacturar.map(c => ({ text: `Facturar mensualidad de ${c.cliente.nombre} (S/ ${c.montoMensual.toFixed(2)})`, tab: 'contratos' as TabId, urgente: true })),
+    ...pend.cotizacionesPorVencer.map(c => ({ text: `Cotización ${c.id} de ${c.cliente.nombre} vence el ${c.vence}`, tab: 'cotizaciones' as TabId })),
+    ...pend.tareasVencidas.map(t => ({ text: `Tarea: ${t.titulo}${t.asignadoA ? ` (${t.asignadoA})` : ''}`, tab: 'crm' as TabId, urgente: t.vence < hoyLocal() })),
     ...pend.pedidosPorCobrar.map(p => ({ text: `Cobrar pedido ${p.id} de ${p.cliente.nombre} (S/ ${p.total.toFixed(2)})`, tab: 'pedidos' as TabId })),
     ...pend.pedidosParaEntregar.map(p => ({ text: `Entregar pedido ${p.id} en ${p.distrito || p.direccion}`, tab: 'pedidos' as TabId, urgente: true })),
     ...pend.stockBajo.map(p => ({ text: `Reponer ${p.name}: quedan ${p.stock} u. (mín. ${p.minStock})`, tab: 'kardex' as TabId, urgente: true })),

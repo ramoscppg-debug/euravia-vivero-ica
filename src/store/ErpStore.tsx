@@ -24,7 +24,11 @@ import {
   INITIAL_PURCHASES,
   INITIAL_PEDIDOS,
   INITIAL_NOTAS,
-  INITIAL_TAREAS
+  INITIAL_TAREAS,
+  INITIAL_COTIZACIONES,
+  INITIAL_CUPONES,
+  INITIAL_CONTRATOS,
+  INITIAL_PUNTOS
 } from '../data/seed';
 import type {
   BiologicalLoss,
@@ -48,6 +52,9 @@ import type {
   PedidoItem,
   NotaCliente,
   Tarea,
+  Contrato,
+  Cotizacion,
+  Cupon,
   CanalVenta,
   EstadoPedido,
   ProjectStatus,
@@ -58,10 +65,12 @@ import type {
 import { emisorDe } from '../domain/types';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
+import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
+import { hoyLocal } from '../lib/fechas';
 
 export interface ErpState {
   company: EmpresaConfig;
@@ -81,6 +90,10 @@ export interface ErpState {
   pedidos: Pedido[];
   notasClientes: NotaCliente[];
   tareas: Tarea[];
+  cotizaciones: Cotizacion[];
+  cupones: Cupon[];
+  contratos: Contrato[];
+  puntosSaldo: Record<string, number>; // saldo de puntos por DNI/RUC
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -94,6 +107,9 @@ export interface VentaInput {
   pagos: Pago[];
   generarGre: boolean;
   direccionEntrega?: string;
+  cupon?: string;
+  puntosCanjear?: number;
+  cotizacionId?: string;
 }
 
 export interface DevolucionInput {
@@ -139,7 +155,21 @@ interface VentaCore {
   generarGre: boolean;
   direccionEntrega?: string;
   pedidoId?: string;
+  canal?: string;
+  cupon?: { codigo: string; base: number; descuento: number };
+  puntosCanjear?: number;
+  cotizacionId?: string;
 }
+
+export interface CotizacionInput {
+  cliente: { nombre: string; doc?: string; telefono?: string };
+  lineas: LineaCarrito[];
+  descuentoGlobal: DescuentoGlobal;
+  diasVigencia: number;
+  notas?: string;
+}
+
+export type ContratoInput = Omit<Contrato, 'id' | 'activo' | 'ultimoPeriodo'>;
 
 interface MovimientoCaja {
   tipo: 'INGRESO' | 'EGRESO';
@@ -187,7 +217,7 @@ export interface ProyectoInput {
 const STORAGE_KEY = 'aurevia.erp.v1';
 const PROJECT_FLOW: ProjectStatus[] = ['COTIZADO', 'APROBADO', 'EN_EJECUCION', 'CONCLUIDO'];
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => hoyLocal();
 /** Id corto y único entre cajas: prefijo-año-sufijo base36 del reloj. */
 const nuevoId = (prefijo: string) => `${prefijo}-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
@@ -209,7 +239,11 @@ function seedState(): ErpState {
     kardex: INITIAL_KARDEX,
     pedidos: INITIAL_PEDIDOS,
     notasClientes: INITIAL_NOTAS,
-    tareas: INITIAL_TAREAS
+    tareas: INITIAL_TAREAS,
+    cotizaciones: INITIAL_COTIZACIONES,
+    cupones: INITIAL_CUPONES,
+    contratos: INITIAL_CONTRATOS,
+    puntosSaldo: INITIAL_PUNTOS
   };
 }
 
@@ -230,7 +264,11 @@ function nubeVacia(): ErpState {
     kardex: [],
     pedidos: [],
     notasClientes: [],
-    tareas: []
+    tareas: [],
+    cotizaciones: [],
+    cupones: [],
+    contratos: [],
+    puntosSaldo: {}
   };
 }
 
@@ -292,6 +330,31 @@ export function reservadoEnPedidos(pedidos: Pedido[]): Map<string, number> {
   const r = new Map<string, number>();
   pedidos.filter(p => p.estado === 'pendiente').forEach(p => p.items.forEach(it => r.set(it.sku, (r.get(it.sku) ?? 0) + it.qty)));
   return r;
+}
+
+/**
+ * Descuento manual + cupón + canje de puntos sobre el carrito.
+ * El cupón se calcula sobre el total ya con descuentos manuales (misma base que valida el servidor).
+ */
+export function aplicarPromociones(lineas: LineaCarrito[], manual: DescuentoGlobal, cupon: string | undefined, puntos: number, s: Pick<ErpState, 'products' | 'cupones'>):
+  Result<{ carrito: ReturnType<typeof calcularCarrito>; cupon?: { codigo: string; base: number; descuento: number }; descuentoPuntos: number }> {
+  const conManual = calcularCarrito(lineas, s.products, manual);
+  const base = conManual.total;
+  let cup: { codigo: string; base: number; descuento: number } | undefined;
+  if (cupon?.trim()) {
+    const codigo = cupon.trim().toUpperCase();
+    const r = descuentoCupon(s.cupones.find(c => c.codigo === codigo), base);
+    if (r.error) return { ok: false, error: r.error };
+    cup = { codigo, base, descuento: r.descuento };
+  }
+  const restante = round2(base - (cup?.descuento ?? 0));
+  const descuentoPuntos = round2(Math.max(0, Math.floor(puntos)) * VALOR_PUNTO);
+  if (descuentoPuntos > restante) return { ok: false, error: `Los puntos (S/ ${descuentoPuntos.toFixed(2)}) superan el total a pagar.` };
+  const extra = (cup?.descuento ?? 0) + descuentoPuntos;
+  const carrito = extra > 0
+    ? calcularCarrito(lineas, s.products, { tipo: 'MONTO', valor: round2(conManual.descuentoGlobal + extra) })
+    : conManual;
+  return { ok: true, carrito, cupon: cup, descuentoPuntos };
 }
 
 /** Refleja cobros y reembolsos en la caja del día. */
@@ -453,6 +516,12 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       }
       const pagos = resumirPagos(v.total, v.pagos);
       if (pagos.error) return { ok: false, error: pagos.error };
+      const canje = Math.max(0, Math.floor(v.puntosCanjear ?? 0));
+      if (canje > 0) {
+        if (!validarDni(v.docIdentidad) && !validarRuc(v.docIdentidad)) return { ok: false, error: 'Para canjear puntos el cliente debe identificarse con DNI o RUC.' };
+        const saldo = s.puntosSaldo[v.docIdentidad] ?? 0;
+        if (canje > saldo) return { ok: false, error: `El cliente sólo tiene ${saldo} puntos.` };
+      }
 
       const serie = v.tipoComprobante === '01' ? s.company.serieFactura : s.company.serieBoleta;
       const emitir = async () => {
@@ -466,6 +535,12 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         );
         invoice.descuentoTotal = v.descuentoTotal;
         invoice.pagos = pagos.ingresos;
+        invoice.vendedor = responsable('Caja Principal');
+        invoice.canal = v.canal ?? 'Directo / Vivero';
+        invoice.cupon = v.cupon?.codigo;
+        invoice.puntosCanjeados = canje;
+        invoice.puntosGanados = puntosPorCompra(invoice.montoTotal, v.docIdentidad);
+        invoice.cotizacionId = v.cotizacionId;
         return invoice;
       };
 
@@ -504,7 +579,8 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
               guia,
               cliente: tipoDoc ? { nombre: v.clientName, tipoDoc, numDoc: v.docIdentidad } : null,
               responsable: usuario,
-              pedidoId: v.pedidoId
+              pedidoId: v.pedidoId,
+              cupon: v.cupon
             });
           } catch (e) {
             if (intento === 0 && nube && String(e instanceof Error ? e.message : e).includes('duplicate key')) invoice = await emitir();
@@ -521,7 +597,14 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             ...next,
             cashRegister: aplicarCaja(next.cashRegister, caja(invoice.id), responsable('POS Aurevia')),
             invoices: [invoice, ...next.invoices],
-            guiasRemision: guia ? [guia, ...next.guiasRemision] : next.guiasRemision
+            guiasRemision: guia ? [guia, ...next.guiasRemision] : next.guiasRemision,
+            cupones: v.cupon ? next.cupones.map(c => (c.codigo === v.cupon!.codigo ? { ...c, usos: c.usos + 1 } : c)) : next.cupones,
+            cotizaciones: v.cotizacionId
+              ? next.cotizaciones.map(c => (c.id === v.cotizacionId ? { ...c, estado: 'CONVERTIDA', comprobanteId: invoice.id } : c))
+              : next.cotizaciones,
+            puntosSaldo: invoice.puntosGanados || canje
+              ? { ...next.puntosSaldo, [v.docIdentidad]: (next.puntosSaldo[v.docIdentidad] ?? 0) + (invoice.puntosGanados ?? 0) - canje }
+              : next.puntosSaldo
           }
         };
       } catch (e) {
@@ -552,7 +635,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
 
       // ---------------- VENDER ----------------
       async registrarVenta(v: VentaInput): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number }>> {
-        const carrito = calcularCarrito(v.lineas, get().products, v.descuentoGlobal);
+        const s = get();
+        const r1 = aplicarPromociones(v.lineas, v.descuentoGlobal, v.cupon, v.puntosCanjear ?? 0, s);
+        if (!r1.ok) return r1;
+        const carrito = r1.carrito;
         if (!carrito.lineas.length) return { ok: false, error: 'Agrega al menos un producto al carrito.' };
         const r = await venderYGuardar({
           lineas: carrito.lineas.map(l => ({ sku: l.sku, name: l.name, qty: l.qty, precioUnitNeto: l.precioUnitNeto, esProducto: true })),
@@ -563,11 +649,167 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           clientName: v.clientName,
           pagos: v.pagos,
           generarGre: v.generarGre,
-          direccionEntrega: v.direccionEntrega
+          direccionEntrega: v.direccionEntrega,
+          cupon: r1.cupon,
+          puntosCanjear: v.puntosCanjear,
+          cotizacionId: v.cotizacionId
         });
         if (!r.ok) return r;
         commit(r.next);
         return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
+      },
+
+      // ---------------- COTIZACIONES, CUPONES Y CONTRATOS ----------------
+      async crearCotizacion(c: CotizacionInput): Promise<Result<{ cotizacion: Cotizacion }>> {
+        if (!c.cliente.nombre.trim()) return { ok: false, error: 'Indica el nombre del cliente.' };
+        const s = get();
+        const carrito = calcularCarrito(c.lineas, s.products, c.descuentoGlobal);
+        if (!carrito.lineas.length) return { ok: false, error: 'Agrega al menos un producto a la cotización.' };
+        const hoy = today();
+        const cot: Cotizacion = {
+          id: nuevoId('COT'),
+          fecha: hoy,
+          vence: new Date(Date.parse(hoy) + Math.max(1, c.diasVigencia) * 86_400_000).toISOString().slice(0, 10),
+          cliente: { nombre: c.cliente.nombre.trim(), doc: c.cliente.doc?.trim() || undefined, telefono: c.cliente.telefono?.trim() || undefined },
+          lineas: c.lineas.filter(l => l.qty > 0),
+          descuentoGlobal: c.descuentoGlobal,
+          total: carrito.total,
+          estado: 'ENVIADA',
+          notas: c.notas?.trim() || undefined,
+          creadoPor: responsable('Caja Principal')
+        };
+        try {
+          if (nube) await repo.guardarCotizacion(cot);
+          const cur = get();
+          commit({ ...cur, cotizaciones: [cot, ...cur.cotizaciones] });
+          return { ok: true, cotizacion: cot };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async marcarCotizacion(id: string, estado: 'ACEPTADA' | 'RECHAZADA'): Promise<Result> {
+        const cot = get().cotizaciones.find(c => c.id === id);
+        if (!cot || cot.estado === 'CONVERTIDA') return { ok: false, error: 'Esa cotización ya fue convertida en venta.' };
+        try {
+          if (nube) await repo.marcarCotizacion(id, estado);
+          const s = get();
+          commit({ ...s, cotizaciones: s.cotizaciones.map(c => (c.id === id ? { ...c, estado } : c)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async crearCupon(c: Omit<Cupon, 'usos' | 'activo'>): Promise<Result> {
+        const codigo = c.codigo.trim().toUpperCase();
+        if (!/^[A-Z0-9_-]{3,30}$/.test(codigo)) return { ok: false, error: 'El código debe tener de 3 a 30 letras, números, guion o guion bajo (sin espacios).' };
+        if (!(c.valor > 0) || (c.tipo === 'PCT' && c.valor > 100)) return { ok: false, error: 'El valor del cupón no es válido.' };
+        if (get().cupones.some(x => x.codigo === codigo)) return { ok: false, error: `Ya existe el cupón ${codigo}.` };
+        const cupon: Cupon = { ...c, codigo, minimoCompra: Math.max(0, c.minimoCompra || 0), usos: 0, activo: true };
+        try {
+          if (nube) await repo.guardarCupon(cupon);
+          const s = get();
+          commit({ ...s, cupones: [cupon, ...s.cupones] });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async activarCupon(codigo: string, activo: boolean): Promise<Result> {
+        try {
+          if (nube) await repo.activarCupon(codigo, activo);
+          const s = get();
+          commit({ ...s, cupones: s.cupones.map(c => (c.codigo === codigo ? { ...c, activo } : c)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async crearContrato(c: ContratoInput): Promise<Result> {
+        if (!c.cliente.nombre.trim()) return { ok: false, error: 'Indica el cliente.' };
+        if (!validarDni(c.cliente.doc) && !validarRuc(c.cliente.doc)) return { ok: false, error: 'El contrato necesita un DNI o RUC válido para facturar cada mes.' };
+        if (!c.servicio.trim()) return { ok: false, error: 'Describe el servicio.' };
+        if (!(c.montoMensual > 0)) return { ok: false, error: 'El monto mensual debe ser mayor a cero.' };
+        if (c.diaCobro < 1 || c.diaCobro > 28) return { ok: false, error: 'El día de cobro va del 1 al 28.' };
+        const contrato: Contrato = { ...c, id: nuevoId('CON'), activo: true };
+        try {
+          if (nube) await repo.guardarContrato(contrato, usuario);
+          const s = get();
+          commit({ ...s, contratos: [...s.contratos, contrato] });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async activarContrato(id: string, activo: boolean): Promise<Result> {
+        try {
+          if (nube) await repo.activarContrato(id, activo);
+          const s = get();
+          commit({ ...s, contratos: s.contratos.map(c => (c.id === id ? { ...c, activo } : c)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Emite el comprobante del mes (sin caja: se cobra por transferencia) y agenda las visitas. */
+      async facturarContrato(id: string): Promise<Result<{ invoice: ComprobanteSunat }>> {
+        const s = get();
+        const con = s.contratos.find(c => c.id === id);
+        if (!con || !con.activo) return { ok: false, error: 'El contrato no existe o está inactivo.' };
+        const periodo = today().slice(0, 7);
+        if (con.ultimoPeriodo && con.ultimoPeriodo >= periodo) return { ok: false, error: `El contrato ya se facturó en ${periodo}.` };
+        const esFactura = validarRuc(con.cliente.doc);
+        const serie = esFactura ? s.company.serieFactura : s.company.serieBoleta;
+        const mes = new Date(`${periodo}-01T12:00:00`).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+        try {
+          const invoice = await emitirCpe(
+            s.company, esFactura ? '01' : '03', serie, await correlativo(serie),
+            { numDoc: con.cliente.doc, nombre: con.cliente.nombre, direccion: con.direccion ?? 'Lima, Perú' },
+            [{ sku: 'SRV-MANT', name: `${con.servicio} - ${mes}`, quantity: 1, priceWithIgv: con.montoMensual }]
+          );
+          invoice.vendedor = responsable('Caja Principal');
+          invoice.canal = 'Contrato';
+          invoice.contratoId = con.id;
+          invoice.puntosGanados = puntosPorCompra(invoice.montoTotal, con.cliente.doc);
+
+          const det = calcularDetraccion(con.montoMensual, s.company.tasaDetraccionServicios);
+          const fecha = today();
+          const detraccion: DetraccionRecord | null = esFactura && det.aplica
+            ? { id: nuevoId('DET'), facturaId: invoice.id, cliente: con.cliente.nombre, rucCliente: con.cliente.doc, fechaEmision: fecha,
+                fechaVencimientoBn: vencimientoDetraccion(fecha), montoFactura: con.montoMensual, tasa: s.company.tasaDetraccionServicios,
+                montoDetraccion: det.montoDetraccion, estado: 'PENDIENTE' }
+            : null;
+
+          const next = await persistirComprobante({
+            invoice, medioPago: 'Por cobrar', movimientos: [], caja: [], responsable: usuario,
+            cliente: { nombre: con.cliente.nombre, tipoDoc: esFactura ? '6' : '1', numDoc: con.cliente.doc }
+          });
+          if (nube && detraccion) await repo.guardarDetraccion(detraccion);
+          const visitas: Tarea = {
+            id: `TAR-${Date.now().toString(36).toUpperCase()}`,
+            titulo: `${con.visitasMes} visita(s) de mantenimiento ${mes} · ${con.cliente.nombre}`,
+            vence: `${periodo}-28`, asignadoA: con.jardinero, hecha: false, creadoPor: responsable('Administración')
+          };
+          const tarea = nube ? await repo.crearTarea(visitas).catch(() => visitas) : visitas;
+          commit({
+            ...next,
+            invoices: [invoice, ...next.invoices],
+            detracciones: detraccion ? [detraccion, ...next.detracciones] : next.detracciones,
+            contratos: next.contratos.map(c => (c.id === id ? { ...c, ultimoPeriodo: periodo } : c)),
+            tareas: [...next.tareas, tarea],
+            puntosSaldo: invoice.puntosGanados
+              ? { ...next.puntosSaldo, [con.cliente.doc]: (next.puntosSaldo[con.cliente.doc] ?? 0) + invoice.puntosGanados }
+              : next.puntosSaldo
+          });
+          return { ok: true, invoice };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
       },
 
       // ---------------- CLIENTES (CRM) ----------------
@@ -727,7 +969,8 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           pagos: c.pagos,
           generarGre: c.generarGre,
           direccionEntrega: [pedido.direccion, pedido.distrito].filter(Boolean).join(', '),
-          pedidoId: pedido.id
+          pedidoId: pedido.id,
+          canal: pedido.canal
         });
         if (!r.ok) return r;
         commit({
@@ -823,6 +1066,9 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           nota.referencia = original.id;
           nota.motivo = d.motivo.trim();
           nota.pagos = [{ medio: d.medioReembolso, monto: nota.montoTotal }];
+          nota.vendedor = responsable('Caja Principal');
+          nota.canal = original.canal;
+          nota.puntosGanados = -puntosPorCompra(nota.montoTotal, original.cliente.numDoc);
 
           const caja: MovimientoCaja[] = [{ tipo: 'EGRESO', medioPago: d.medioReembolso, monto: nota.montoTotal, concepto: `Devolución ${nota.id} (${original.id})` }];
           const next = await persistirComprobante({
@@ -838,7 +1084,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           commit({
             ...next,
             cashRegister: aplicarCaja(next.cashRegister, caja, responsable('POS Aurevia')),
-            invoices: [nota, ...next.invoices]
+            invoices: [nota, ...next.invoices],
+            puntosSaldo: nota.puntosGanados
+              ? { ...next.puntosSaldo, [original.cliente.numDoc]: (next.puntosSaldo[original.cliente.numDoc] ?? 0) + nota.puntosGanados }
+              : next.puntosSaldo
           });
           return { ok: true, invoice: nota };
         } catch (e) {

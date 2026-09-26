@@ -3,31 +3,40 @@ import { Printer, QrCode, ScanLine, Trash2, Truck, X } from 'lucide-react';
 import { ModalShell, useDocLookup, useScanner } from '../../components/shared';
 import { MEDIOS_PAGO, type ComprobanteSunat, type DescuentoGlobal, type LineaCarrito, type MedioPago, type Pago } from '../../domain/types';
 import { round2 } from '../../lib/peru';
+import { VALOR_PUNTO } from '../../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../../lib/pos';
+import { aplicarPromociones } from '../../store/ErpStore';
+import type { PosPreset } from '../../store/UiStore';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 
 // ============================================================
 // MODAL: PUNTO DE VENTA (carrito, descuentos, pago mixto)
 // ============================================================
-export function PosModal({ presetSku }: { presetSku?: string }) {
+export function PosModal({ presetSku, preset }: { presetSku?: string; preset?: PosPreset }) {
   const { state, actions } = useErp();
   const { open, close } = useUi();
   const { busy, consultar } = useDocLookup();
-  const { products, company, invoices, crmClients } = state;
+  const { products, company, invoices, crmClients, puntosSaldo } = state;
 
-  const [lineas, setLineas] = useState<LineaCarrito[]>(presetSku ? [{ sku: presetSku, qty: 1, descuentoPct: 0 }] : []);
+  const [lineas, setLineas] = useState<LineaCarrito[]>(preset?.lineas ?? (presetSku ? [{ sku: presetSku, qty: 1, descuentoPct: 0 }] : []));
   const [busqueda, setBusqueda] = useState('');
-  const [descGlobal, setDescGlobal] = useState<DescuentoGlobal>({ tipo: 'PCT', valor: 0 });
-  const [tipo, setTipo] = useState<'01' | '03'>('03');
-  const [doc, setDoc] = useState('');
-  const [clientName, setClientName] = useState('Clientes Varios');
+  const [descGlobal, setDescGlobal] = useState<DescuentoGlobal>(preset?.descuentoGlobal ?? { tipo: 'PCT', valor: 0 });
+  const [tipo, setTipo] = useState<'01' | '03'>(preset?.doc?.length === 11 ? '01' : '03');
+  const [doc, setDoc] = useState(preset?.doc ?? '');
+  const [clientName, setClientName] = useState(preset?.nombre ?? 'Clientes Varios');
+  const [cuponTexto, setCuponTexto] = useState('');
+  const [cupon, setCupon] = useState<string | undefined>();
+  const [puntos, setPuntos] = useState(0);
   const [pagosManual, setPagosManual] = useState<Pago[] | null>(null); // null = cobro exacto en efectivo
   const [generarGre, setGenerarGre] = useState(false);
   const [direccion, setDireccion] = useState('');
   const [sending, setSending] = useState(false);
 
-  const carrito = calcularCarrito(lineas, products, descGlobal);
+  // Descuento manual + cupón + puntos (misma regla que valida el servidor)
+  const promo = aplicarPromociones(lineas, descGlobal, cupon, puntos, state);
+  const carrito = promo.ok ? promo.carrito : calcularCarrito(lineas, products, descGlobal);
+  const saldoPuntos = puntosSaldo[doc] ?? 0;
   const pagos = pagosManual ?? [{ medio: 'Efectivo' as MedioPago, monto: carrito.total }];
   const resumen = resumirPagos(carrito.total, pagos);
   const igv = round2(carrito.total - carrito.total / 1.18);
@@ -57,7 +66,8 @@ export function PosModal({ presetSku }: { presetSku?: string }) {
   const emitir = async () => {
     setSending(true);
     const r = await actions.registrarVenta({
-      lineas, descuentoGlobal: descGlobal, tipoComprobante: tipo, docIdentidad: doc, clientName, pagos, generarGre, direccionEntrega: direccion
+      lineas, descuentoGlobal: descGlobal, tipoComprobante: tipo, docIdentidad: doc, clientName, pagos, generarGre, direccionEntrega: direccion,
+      cupon, puntosCanjear: puntos, cotizacionId: preset?.cotizacionId
     });
     setSending(false);
     if (!r.ok) {
@@ -165,7 +175,30 @@ export function PosModal({ presetSku }: { presetSku?: string }) {
               <p className="text-[#5c7367]">Subtotal: <span className="font-mono">S/ {carrito.subtotal.toFixed(2)}</span></p>
               {carrito.descuentoTotal > 0 && <p className="text-[#b91c1c]">Descuentos: <span className="font-mono">− S/ {carrito.descuentoTotal.toFixed(2)}</span></p>}
               <p className="text-[#5c7367]">IGV incluido: <span className="font-mono">S/ {igv.toFixed(2)}</span></p>
+              {doc && carrito.total > 0 && <p className="text-[10px] text-[#134e2e]">Ganará {Math.floor(carrito.total / 10)} puntos</p>}
               <p className="font-serif text-2xl font-bold text-[#082017]" aria-label="Total a cobrar">S/ {carrito.total.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Cupón y puntos */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold block mb-1 text-[#082017]">Cupón</label>
+              <div className="flex gap-1.5">
+                <input aria-label="Código de cupón" value={cupon ?? cuponTexto} disabled={!!cupon} onChange={e => setCuponTexto(e.target.value.toUpperCase())} placeholder="Ej: BIENVENIDA10" className={`${input} w-full min-w-0 font-mono uppercase`} />
+                {cupon
+                  ? <button type="button" onClick={() => { setCupon(undefined); setCuponTexto(''); }} className="shrink-0 px-2 rounded-xl bg-[#fee2e2] text-[#b91c1c] font-bold">Quitar</button>
+                  : <button type="button" onClick={() => {
+                      const r = aplicarPromociones(lineas, descGlobal, cuponTexto, 0, state);
+                      if (!r.ok) alert(r.error); else setCupon(cuponTexto.trim().toUpperCase());
+                    }} className="shrink-0 px-2 rounded-xl bg-[#082017] text-[#d4af37] font-bold">Aplicar</button>}
+              </div>
+              {cupon && promo.ok && promo.cupon && <p className="text-[10px] font-bold text-[#134e2e] mt-1">✓ {cupon}: − S/ {promo.cupon.descuento.toFixed(2)}</p>}
+            </div>
+            <div>
+              <label className="font-bold block mb-1 text-[#082017]">Puntos {saldoPuntos > 0 ? `(tiene ${saldoPuntos} = S/ ${(saldoPuntos * VALOR_PUNTO).toFixed(2)})` : ''}</label>
+              <input aria-label="Puntos a canjear" type="number" min={0} max={saldoPuntos} disabled={saldoPuntos <= 0} value={puntos} onChange={e => setPuntos(Math.min(saldoPuntos, Math.max(0, Math.floor(Number(e.target.value) || 0))))} className={`${input} w-full`} />
+              {!promo.ok && <p className="text-[10px] font-bold text-[#b91c1c] mt-1">{promo.error}</p>}
             </div>
           </div>
 
@@ -238,7 +271,7 @@ export function PosModal({ presetSku }: { presetSku?: string }) {
 
           <div className="flex gap-2">
             <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-[#5c7367]">Cancelar</button>
-            <button onClick={emitir} disabled={sending || !!resumen.error} className="flex-[2] py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg disabled:opacity-50">
+            <button onClick={emitir} disabled={sending || !!resumen.error || !promo.ok} className="flex-[2] py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg disabled:opacity-50">
               {sending ? 'Enviando a SUNAT...' : `Emitir Comprobante SUNAT · S/ ${carrito.total.toFixed(2)}`}
             </button>
           </div>
@@ -285,6 +318,9 @@ export function TicketModal({ invoice, vuelto }: { invoice: ComprobanteSunat; vu
         <p className="text-[11px] text-right font-bold">Total: S/ {invoice.montoTotal.toFixed(2)}</p>
         {invoice.pagos?.map(p => <p key={p.medio} className="text-[10px] text-right">{invoice.tipoComprobante === '07' ? 'Reembolso' : 'Pago'} {p.medio}: {p.monto.toFixed(2)}</p>)}
         {!!vuelto && <p className="text-[11px] text-right font-bold">Vuelto: S/ {vuelto.toFixed(2)}</p>}
+        {invoice.cupon && <p className="text-[10px] text-right">Cupón: {invoice.cupon}</p>}
+        {!!invoice.puntosCanjeados && <p className="text-[10px] text-right">Puntos canjeados: {invoice.puntosCanjeados}</p>}
+        {!!invoice.puntosGanados && invoice.puntosGanados > 0 && <p className="text-[10px] text-right">Puntos ganados: {invoice.puntosGanados}</p>}
       </div>
       <button onClick={() => { window.print(); close(); }} className="w-full py-2.5 rounded-2xl bg-[#082017] text-[#d4af37] font-bold">
         Imprimir Ticket

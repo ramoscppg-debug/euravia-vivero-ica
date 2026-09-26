@@ -7,6 +7,7 @@ import { descargarTxt } from '../../lib/exports';
 import { useAuth } from '../../store/AuthStore';
 import { useErp, type FichaClienteInput } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
+import { hoyLocal } from '../../lib/fechas';
 
 const SEGMENTOS: (Segmento | 'Todos' | 'Toca cuidado')[] = ['Todos', 'VIP', 'Frecuente', 'Nuevo', 'Activo', 'Inactivo', 'Sin compras', 'Toca cuidado'];
 const COLOR_SEGMENTO: Record<Segmento, string> = {
@@ -17,7 +18,7 @@ const COLOR_SEGMENTO: Record<Segmento, string> = {
   Inactivo: 'bg-[#fee2e2] text-[#b91c1c]',
   'Sin compras': 'bg-[#f3f4f6] text-[#4b5563]'
 };
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => hoyLocal();
 const enlaceWhatsapp = (telefono: string, texto: string) =>
   `https://api.whatsapp.com/send?phone=${telefono.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(texto)}`;
 

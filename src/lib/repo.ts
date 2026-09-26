@@ -16,6 +16,9 @@ import type {
   GuiaRemisionSunat,
   KardexMovement,
   MovementType,
+  Contrato,
+  Cotizacion,
+  Cupon,
   NotaCliente,
   Tarea,
   Pedido,
@@ -70,11 +73,15 @@ export interface DatosNube {
   pedidos: Pedido[];
   notasClientes: NotaCliente[];
   tareas: Tarea[];
+  cotizaciones: Cotizacion[];
+  cupones: Cupon[];
+  contratos: Contrato[];
+  puntosSaldo: Record<string, number>;
 }
 
 export async function cargarTodo(): Promise<DatosNube> {
   const sb = await db();
-  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas] = await Promise.all([
+  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos] = await Promise.all([
     sb.from('empresa_config').select('*').limit(1).maybeSingle(),
     sb.from('productos').select('*').eq('activo', true).order('sku'),
     sb.from('kardex_movimientos').select('*').order('id', { ascending: false }).limit(500),
@@ -88,7 +95,11 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('caja_movimientos').select('*').gte('fecha', inicioDelDia()).order('id'),
     sb.from('pedidos').select('*, pedidos_detalle(*)').order('created_at', { ascending: false }).limit(300),
     sb.from('cliente_notas').select('*').order('created_at', { ascending: false }).limit(1000),
-    sb.from('tareas').select('*').order('vence').limit(500)
+    sb.from('tareas').select('*').order('vence').limit(500),
+    sb.from('cotizaciones').select('*').order('created_at', { ascending: false }).limit(300),
+    sb.from('cupones').select('*').order('created_at', { ascending: false }),
+    sb.from('contratos').select('*').order('created_at'),
+    sb.from('puntos_saldos').select('*')
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -111,7 +122,11 @@ export async function cargarTodo(): Promise<DatosNube> {
     cashRegister: cajaDesdeFilas(ok<Row[]>(caja)),
     pedidos: ok<Row[]>(pedidos).map(r => pedidoDesdeFila(r, nombres)),
     notasClientes: ok<Row[]>(notas).map(notaDesdeFila),
-    tareas: ok<Row[]>(tareas).map(tareaDesdeFila)
+    tareas: ok<Row[]>(tareas).map(tareaDesdeFila),
+    cotizaciones: ok<Row[]>(cotizaciones).map(cotizacionDesdeFila),
+    cupones: ok<Row[]>(cupones).map(cuponDesdeFila),
+    contratos: ok<Row[]>(contratos).map(contratoDesdeFila),
+    puntosSaldo: Object.fromEntries(ok<Row[]>(puntos).map(r => [r.cliente_doc, r.saldo]))
   };
 }
 
@@ -196,7 +211,14 @@ function comprobanteDesdeFila(r: Row, company: EmpresaConfig): ComprobanteSunat 
     descuentoTotal: num(r.descuento_total),
     pagos: r.pagos ?? [],
     referencia: r.comprobante_referencia ?? undefined,
-    motivo: r.motivo ?? undefined
+    motivo: r.motivo ?? undefined,
+    vendedor: r.vendedor ?? undefined,
+    canal: r.canal ?? undefined,
+    cupon: r.cupon ?? undefined,
+    puntosGanados: r.puntos_ganados ?? 0,
+    puntosCanjeados: r.puntos_canjeados ?? 0,
+    cotizacionId: r.cotizacion_id ?? undefined,
+    contratoId: r.contrato_id ?? undefined
   };
 }
 
@@ -336,6 +358,52 @@ function tareaDesdeFila(r: Row): Tarea {
   };
 }
 
+function cotizacionDesdeFila(r: Row): Cotizacion {
+  return {
+    id: r.id,
+    fecha: r.fecha,
+    vence: r.vence,
+    cliente: { nombre: r.cliente_nombre, doc: r.cliente_doc ?? undefined, telefono: r.cliente_telefono ?? undefined },
+    lineas: r.items ?? [],
+    descuentoGlobal: r.descuento_global ?? { tipo: 'PCT', valor: 0 },
+    total: num(r.total),
+    estado: r.estado,
+    comprobanteId: r.comprobante_id ?? undefined,
+    notas: r.notas ?? undefined,
+    creadoPor: r.creado_por
+  };
+}
+
+function cuponDesdeFila(r: Row): Cupon {
+  return {
+    codigo: r.codigo,
+    descripcion: r.descripcion ?? undefined,
+    tipo: r.tipo,
+    valor: num(r.valor),
+    minimoCompra: num(r.minimo_compra),
+    vence: r.vence ?? undefined,
+    usosMax: r.usos_max ?? undefined,
+    usos: r.usos,
+    activo: !!r.activo
+  };
+}
+
+function contratoDesdeFila(r: Row): Contrato {
+  return {
+    id: r.id,
+    cliente: { nombre: r.cliente_nombre, doc: r.cliente_doc, telefono: r.cliente_telefono ?? undefined },
+    direccion: r.direccion ?? undefined,
+    servicio: r.servicio,
+    montoMensual: num(r.monto_mensual),
+    diaCobro: r.dia_cobro,
+    visitasMes: r.visitas_mes,
+    jardinero: r.jardinero ?? undefined,
+    inicio: r.inicio,
+    activo: !!r.activo,
+    ultimoPeriodo: r.ultimo_periodo ?? undefined
+  };
+}
+
 function cajaDesdeFilas(rows: Row[]): CashRegisterState {
   const suma = (f: (r: Row) => boolean) => rows.filter(f).reduce((a, r) => a + num(r.monto), 0);
   // Medios digitales: ingresos menos devoluciones pagadas por ese mismo medio
@@ -403,6 +471,7 @@ export interface ComprobanteAtomico {
   cliente?: { nombre: string; tipoDoc: string; numDoc: string } | null;
   responsable: string;
   pedidoId?: string; // cobro de un pedido: pasa a "pagado" en la misma transacción
+  cupon?: { codigo: string; base: number; descuento: number };
 }
 
 /** Venta o nota de crédito en una sola transacción del servidor (función registrar_comprobante). */
@@ -434,7 +503,14 @@ export async function registrarComprobanteAtomico(c: ComprobanteAtomico, nombres
         pagos: inv.pagos ?? [],
         comprobante_referencia: inv.referencia ?? null,
         motivo: inv.motivo ?? null,
-        pedido_id: c.pedidoId ?? null
+        pedido_id: c.pedidoId ?? null,
+        canal: inv.canal ?? null,
+        cupon: c.cupon?.codigo ?? null,
+        base_cupon: c.cupon?.base ?? null,
+        descuento_cupon: c.cupon?.descuento ?? null,
+        puntos_canjeados: inv.puntosCanjeados ?? 0,
+        cotizacion_id: inv.cotizacionId ?? null,
+        contrato_id: inv.contratoId ?? null
       },
       movimientos: c.movimientos.map(m => ({
         producto_sku: m.sku,
@@ -753,4 +829,47 @@ export async function crearTarea(t: Omit<Tarea, 'id' | 'hecha'>): Promise<Tarea>
 export async function marcarTarea(id: string, hecha: boolean) {
   const sb = await db();
   ok(await sb.from('tareas').update({ hecha, hecha_at: hecha ? new Date().toISOString() : null }).eq('id', Number(id)));
+}
+
+// ---------------- CRECER VENTAS ----------------
+
+export async function guardarCotizacion(c: Cotizacion) {
+  const sb = await db();
+  ok(await sb.from('cotizaciones').insert({
+    id: c.id, fecha: c.fecha, vence: c.vence, cliente_nombre: c.cliente.nombre, cliente_doc: c.cliente.doc ?? null,
+    cliente_telefono: c.cliente.telefono ?? null, items: c.lineas, descuento_global: c.descuentoGlobal, total: c.total,
+    estado: c.estado, notas: c.notas ?? null, creado_por: c.creadoPor
+  }));
+}
+
+export async function marcarCotizacion(id: string, estado: Cotizacion['estado']) {
+  const sb = await db();
+  ok(await sb.from('cotizaciones').update({ estado }).eq('id', id));
+}
+
+export async function guardarCupon(c: Cupon) {
+  const sb = await db();
+  ok(await sb.from('cupones').insert({
+    codigo: c.codigo, descripcion: c.descripcion ?? null, tipo: c.tipo, valor: c.valor, minimo_compra: c.minimoCompra,
+    vence: c.vence ?? null, usos_max: c.usosMax ?? null, activo: c.activo
+  }));
+}
+
+export async function activarCupon(codigo: string, activo: boolean) {
+  const sb = await db();
+  ok(await sb.from('cupones').update({ activo }).eq('codigo', codigo));
+}
+
+export async function guardarContrato(c: Contrato, creadoPor: string) {
+  const sb = await db();
+  ok(await sb.from('contratos').insert({
+    id: c.id, cliente_nombre: c.cliente.nombre, cliente_doc: c.cliente.doc, cliente_telefono: c.cliente.telefono ?? null,
+    direccion: c.direccion ?? null, servicio: c.servicio, monto_mensual: c.montoMensual, dia_cobro: c.diaCobro,
+    visitas_mes: c.visitasMes, jardinero: c.jardinero ?? null, inicio: c.inicio, activo: c.activo, creado_por: creadoPor
+  }));
+}
+
+export async function activarContrato(id: string, activo: boolean) {
+  const sb = await db();
+  ok(await sb.from('contratos').update({ activo }).eq('id', id));
 }

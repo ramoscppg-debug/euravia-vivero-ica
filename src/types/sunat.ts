@@ -91,6 +91,13 @@ export interface ComprobanteSunat {
   pagos?: { medio: string; monto: number }[]; // pago mixto
   referencia?: string; // nota de crédito: comprobante que modifica
   motivo?: string; // nota de crédito: motivo de la devolución
+  vendedor?: string;
+  canal?: string;
+  cupon?: string;
+  puntosGanados?: number;
+  puntosCanjeados?: number;
+  cotizacionId?: string;
+  contratoId?: string;
 }
 
 // GUÍA DE REMISIÓN REMITENTE ELECTRÓNICA (GRE - SUNAT)

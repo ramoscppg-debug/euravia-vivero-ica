@@ -3,10 +3,21 @@
 // ==========================================
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ALL_TABS, puedeVer, tabInicial, type TabId } from '../layout/navigation';
-import type { ComprobanteSunat, Pedido, Rol } from '../domain/types';
+import type { ComprobanteSunat, DescuentoGlobal, LineaCarrito, Pedido, Rol } from '../domain/types';
+
+/** Carrito precargado (por ejemplo, al convertir una cotización en venta). */
+export interface PosPreset {
+  lineas: LineaCarrito[];
+  descuentoGlobal: DescuentoGlobal;
+  doc?: string;
+  nombre?: string;
+  cotizacionId?: string;
+}
 
 export type Modal =
-  | { type: 'pos'; sku?: string }
+  | { type: 'pos'; sku?: string; preset?: PosPreset }
+  | { type: 'cotizacion' }
+  | { type: 'contrato' }
   | { type: 'compra' }
   | { type: 'baja' }
   | { type: 'egreso' }

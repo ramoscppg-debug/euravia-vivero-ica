@@ -285,3 +285,44 @@ export interface Pedido {
   fotoEvidencia?: string; // ruta en Storage (nube) o nombre del archivo (demo)
   entregadoAt?: string;
 }
+
+// ---------- Crecer ventas ----------
+export interface Cotizacion {
+  id: string;
+  fecha: string;
+  vence: string;
+  cliente: { nombre: string; doc?: string; telefono?: string };
+  lineas: LineaCarrito[];
+  descuentoGlobal: DescuentoGlobal;
+  total: number;
+  estado: 'ENVIADA' | 'ACEPTADA' | 'CONVERTIDA' | 'RECHAZADA';
+  comprobanteId?: string;
+  notas?: string;
+  creadoPor: string;
+}
+
+export interface Cupon {
+  codigo: string;
+  descripcion?: string;
+  tipo: 'PCT' | 'MONTO';
+  valor: number;
+  minimoCompra: number;
+  vence?: string;
+  usosMax?: number;
+  usos: number;
+  activo: boolean;
+}
+
+export interface Contrato {
+  id: string;
+  cliente: { nombre: string; doc: string; telefono?: string };
+  direccion?: string;
+  servicio: string;
+  montoMensual: number;
+  diaCobro: number; // 1-28
+  visitasMes: number;
+  jardinero?: string;
+  inicio: string;
+  activo: boolean;
+  ultimoPeriodo?: string; // 'YYYY-MM'
+}

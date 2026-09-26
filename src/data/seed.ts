@@ -15,6 +15,9 @@ import type {
   GuiaRemisionSunat,
   InternalConsumption,
   KardexMovement,
+  Contrato,
+  Cotizacion,
+  Cupon,
   NotaCliente,
   Tarea,
   Pedido,
@@ -538,3 +541,46 @@ export const INITIAL_TAREAS: Tarea[] = [
   { id: 'TAR-001', clienteId: 'CRM-03', titulo: 'Visita técnica: boquillas de riego del jardín vertical', vence: '2026-09-20', asignadoA: 'José Paredes', hecha: false, creadoPor: 'Administración' },
   { id: 'TAR-002', clienteId: 'CRM-02', titulo: 'Llamar para ofrecer fertilizante de temporada', vence: '2026-10-05', asignadoA: 'Sofía Castillo', hecha: false, creadoPor: 'Administración' }
 ];
+
+// Crecer ventas: cupones, una cotización, un contrato y puntos de ejemplo
+export const INITIAL_CUPONES: Cupon[] = [
+  { codigo: 'BIENVENIDA10', descripcion: '10% en la primera compra', tipo: 'PCT', valor: 10, minimoCompra: 50, usos: 0, activo: true },
+  { codigo: 'DELIVERY10', descripcion: 'S/ 10 menos (cubre el delivery)', tipo: 'MONTO', valor: 10, minimoCompra: 100, vence: '2026-12-31', usos: 3, activo: true }
+];
+
+export const INITIAL_COTIZACIONES: Cotizacion[] = [
+  {
+    id: 'COT-2026-000031',
+    fecha: '2026-09-22',
+    vence: '2026-09-29',
+    cliente: { nombre: 'Estudio Arquitectura Verde SAC', doc: '20601234567', telefono: '+51 944 222 333' },
+    lineas: [
+      { sku: 'AUR-003', qty: 4, descuentoPct: 5 },
+      { sku: 'MAC-001', qty: 4, descuentoPct: 0 }
+    ],
+    descuentoGlobal: { tipo: 'PCT', valor: 0 },
+    total: 676,
+    estado: 'ENVIADA',
+    notas: 'Ambientación de recepción; entrega en obra.',
+    creadoPor: 'Sofía Castillo'
+  }
+];
+
+export const INITIAL_CONTRATOS: Contrato[] = [
+  {
+    id: 'CON-2026-0001',
+    cliente: { nombre: 'Boutique Hotel Miraflores SAC', doc: '20601122333', telefono: '+51 998 765 432' },
+    direccion: 'Calle Alcanfores 280, Miraflores',
+    servicio: 'Mantenimiento mensual de jardín vertical y áreas verdes',
+    montoMensual: 850,
+    diaCobro: 5,
+    visitasMes: 2,
+    jardinero: 'José Paredes',
+    inicio: '2026-07-01',
+    activo: true,
+    ultimoPeriodo: '2026-08'
+  }
+];
+
+/** Saldo de puntos por DNI/RUC (Valeria ganó 8 puntos con la boleta B001-00000342 de S/ 85). */
+export const INITIAL_PUNTOS: Record<string, number> = { '47891234': 8 };

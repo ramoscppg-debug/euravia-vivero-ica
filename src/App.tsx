@@ -18,6 +18,9 @@ import Proyectos from './modules/servicios/Proyectos';
 import Caja from './modules/ventas/Caja';
 import Catalogo from './modules/ventas/Catalogo';
 import Pedidos from './modules/ventas/Pedidos';
+import Cotizaciones from './modules/ventas/Cotizaciones';
+import Contratos from './modules/servicios/Contratos';
+import Reportes from './modules/admin/Reportes';
 import { AuthProvider, useAuth } from './store/AuthStore';
 import { ErpProvider, useErp } from './store/ErpStore';
 import { UiProvider, useUi } from './store/UiStore';
@@ -27,6 +30,9 @@ const SCREENS: Record<TabId, ComponentType> = {
   caja: Caja,
   catalogo: Catalogo,
   pedidos: Pedidos,
+  cotizaciones: Cotizaciones,
+  contratos: Contratos,
+  reportes: Reportes,
   jardineria: Proyectos,
   crm: Clientes,
   kardex: Kardex,

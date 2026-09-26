@@ -13,6 +13,8 @@ import {
 } from '../lib/peru';
 import type { CashRegisterState, RegimenTributario, TrabajadorAurevia } from '../domain/types';
 import type { ErpState } from './ErpStore';
+import { porFacturar } from '../lib/contratos';
+import { hoyLocal, periodoLocal, sumarDias } from '../lib/fechas';
 
 export const REGIMEN_LABELS: Record<RegimenTributario, string> = {
   NRUS: 'Nuevo RUS (NRUS)',
@@ -22,7 +24,7 @@ export const REGIMEN_LABELS: Record<RegimenTributario, string> = {
 };
 
 /** Periodo tributario actual en formato YYYY-MM. */
-export const periodoActual = () => new Date().toISOString().slice(0, 7);
+export const periodoActual = () => periodoLocal();
 
 /** Pre-liquidación del mes: sólo cuentan los comprobantes y compras del periodo. */
 export function calcularFinanzas(estado: ErpState, periodo = periodoActual()) {
@@ -154,8 +156,10 @@ export function calcularPendientes(s: ErpState) {
     proyectosPorFacturar: s.projects.filter(p => !p.invoiceId && p.status !== 'COTIZADO'),
     detraccionesPendientes: s.detracciones.filter(d => d.estado === 'PENDIENTE'),
     clientesUrgentes: s.crmClients.filter(c => c.urgency === 'ALTA'),
-    tareasVencidas: s.tareas.filter(t => !t.hecha && t.vence <= new Date().toISOString().slice(0, 10)),
+    tareasVencidas: s.tareas.filter(t => !t.hecha && t.vence <= hoyLocal()),
+    contratosPorFacturar: s.contratos.filter(c => porFacturar(c)),
+    cotizacionesPorVencer: s.cotizaciones.filter(c => (c.estado === 'ENVIADA' || c.estado === 'ACEPTADA') && c.vence <= sumarDias(hoyLocal(), 2)),
     pedidosPorCobrar: s.pedidos.filter(p => p.estado === 'pendiente'),
-    pedidosParaEntregar: s.pedidos.filter(p => ['pagado', 'preparando', 'en-reparto'].includes(p.estado) && p.fechaEntrega <= new Date().toISOString().slice(0, 10))
+    pedidosParaEntregar: s.pedidos.filter(p => ['pagado', 'preparando', 'en-reparto'].includes(p.estado) && p.fechaEntrega <= hoyLocal())
   };
 }
