@@ -45,6 +45,8 @@ import type {
 } from '../domain/types';
 import { emisorDe } from '../domain/types';
 import { cargarEstadoDemo, guardarEstadoDemo, seedState, STORAGE_KEY } from '../data/estadoDemo';
+import { EMPRESA_VACIA } from '../data/seed';
+import { fotoComoJpeg } from '../lib/imagen';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
@@ -118,6 +120,8 @@ export interface PedidoInput {
   items: PedidoItem[];
   costoDelivery: number;
   notas?: string;
+  tipoComprobante?: '01' | '03';
+  razonSocial?: string;
 }
 
 export interface CobroPedidoInput {
@@ -209,6 +213,8 @@ const nuevoId = (prefijo: string) => `${prefijo}-${new Date().getFullYear()}-${D
 function nubeVacia(): ErpState {
   return {
     ...seedState(),
+    company: EMPRESA_VACIA,
+    employees: [],
     products: [],
     projects: [],
     detracciones: [],
@@ -432,6 +438,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
      */
     async function venderYGuardar(v: VentaCore): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number; next: ErpState; guia: GuiaRemisionSunat | null }>> {
       const s = get();
+      if (!/^\d{11}$/.test(s.company.ruc) || !s.company.razonSocial.trim()) return { ok: false, error: 'Antes de vender configura el RUC y la razón social de tu empresa en Ajustes.' };
       const productos = v.lineas.filter(l => l.esProducto);
 
       // Stock por producto (un mismo SKU puede estar en varias líneas)
@@ -770,8 +777,9 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: prod?.price ?? it.precio };
         });
         const r = await acciones.crearPedido({
-          canal: 'Web', cliente: { nombre: sol.nombre, telefono: sol.telefono }, direccion: datos.direccion, distrito: datos.distrito || sol.distrito || '',
-          fechaEntrega: datos.fechaEntrega, items, costoDelivery: datos.costoDelivery, notas: sol.mensaje
+          canal: 'Web', cliente: { nombre: sol.nombre, telefono: sol.telefono, doc: sol.docCliente }, direccion: datos.direccion, distrito: datos.distrito || sol.distrito || '',
+          fechaEntrega: datos.fechaEntrega, items, costoDelivery: datos.costoDelivery, notas: sol.mensaje,
+          tipoComprobante: sol.comprobante === 'FACTURA' ? '01' : '03', razonSocial: sol.razonSocial
         });
         if (!r.ok) return r;
         try {
@@ -811,13 +819,24 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         }
       },
 
+      /** Foto para el catálogo o un servicio: se reduce a JPEG liviano; en la nube se sube al almacenamiento público. */
+      async subirFoto(archivo: File, carpeta: 'productos' | 'servicios', nombre: string): Promise<Result<{ url: string }>> {
+        try {
+          const jpeg = await fotoComoJpeg(archivo);
+          if (!nube) return { ok: true, url: jpeg.dataUrl };
+          return { ok: true, url: await repo.subirFotoCatalogo(jpeg.blob, carpeta, nombre) };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
       /** Alta o edición de la ficha comercial (precio, textos, foto, visibilidad). El stock sólo cambia por el Kardex. */
       async guardarProducto(p: CatalogProduct, nuevo: boolean): Promise<Result> {
         const sku = p.sku.trim().toUpperCase();
         if (!/^[A-Z0-9-]{3,30}$/.test(sku)) return { ok: false, error: 'El SKU debe tener de 3 a 30 letras, números o guiones.' };
         if (!p.name.trim()) return { ok: false, error: 'El producto necesita un nombre.' };
         if (!(p.price > 0) || p.cost < 0) return { ok: false, error: 'Revisa el precio (mayor a cero) y el costo.' };
-        if (p.fullImage && !/^https:\/\//.test(p.fullImage)) return { ok: false, error: 'La foto debe ser un enlace https.' };
+        if (p.fullImage && !/^https:\/\//.test(p.fullImage) && !(!nube && p.fullImage.startsWith('data:image/jpeg'))) return { ok: false, error: 'La foto debe ser un enlace https o una foto subida.' };
         const s = get();
         if (nuevo && s.products.some(x => x.sku === sku)) return { ok: false, error: `Ya existe el SKU ${sku}.` };
         const ficha: CatalogProduct = { ...p, sku, name: p.name.trim(), stock: nuevo ? 0 : p.stock };
@@ -958,7 +977,9 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           items,
           costoDelivery,
           total: round2(items.reduce((a, it) => a + it.qty * it.unitPrice, 0) + costoDelivery),
-          notas: p.notas?.trim() || undefined
+          notas: p.notas?.trim() || undefined,
+          tipoComprobante: p.tipoComprobante,
+          razonSocial: p.razonSocial?.trim() || undefined
         };
         try {
           if (nube) await repo.guardarPedidoNuevo(pedido, usuario);

@@ -59,6 +59,16 @@ export const INITIAL_COMPANY_CONFIG: EmpresaConfig = {
   tasaDetraccionServicios: SPOT_TASA_SERVICIOS // 12% — "Demás servicios gravados con IGV" (Anexo 3, cód. 037)
 };
 
+/** Empresa en la nube antes de que el dueño la configure: sin datos inventados (RUC, cuentas, dirección). */
+export const EMPRESA_VACIA: EmpresaConfig = {
+  ruc: '', razonSocial: '', nombreComercial: '', direccion: '', ubigeo: '', distrito: '', provincia: '', departamento: '',
+  telefono: '', email: '', actividadCiiu: '', codigoEstablecimiento: '0000', sunatAmbiente: 'BETA',
+  usuarioSol: '', claveSol: '', certificadoCdtNombre: '', certificadoVencimiento: '',
+  serieBoleta: 'B001', serieFactura: 'F001', serieGre: 'T001', formatoTicket: '80mm', pieDePaginaTicket: '',
+  afpnetUsuario: '', afpnetCodigoEmpresa: '', cuentaDetraccionesBn: '', cuentaBcpSoles: '', cuentaBbvaSoles: '',
+  tasaDetraccionServicios: SPOT_TASA_SERVICIOS
+};
+
 // ============================================================================
 // PRODUCTOS & ESPECIES BOTÁNICAS
 // ============================================================================

@@ -1,74 +1,28 @@
-import { AlertTriangle, Check, CheckCircle2, Printer } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { NAV_BLOCKS, type NavBlock, type TabId } from '../../layout/navigation';
 import { useErp, type ErpState } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import CentroControl from './CentroControl';
-import { calcularCaja, calcularFinanzas, calcularPendientes, calcularPlanillaMes } from '../../store/selectors';
+import { calcularPendientes } from '../../store/selectors';
 import { hoyLocal } from '../../lib/fechas';
 
 interface Hub {
   block: NavBlock['id'];
-  title: string;
-  subtitle: string;
   lines: (s: ErpState) => [string, string][];
-  actions: [string, TabId][];
 }
 
+// Un vistazo por área: al tocarla se abre su primera sección
 const HUBS: Hub[] = [
-  {
-    block: 'vender',
-    title: 'Vender',
-    subtitle: 'Caja • Tienda • Pedidos',
-    lines: s => [
-      ['Catálogo', `${s.products.length} productos`],
-      ['Comprobantes emitidos', `${s.invoices.length} CPE`],
-      ['Pedidos activos', `${s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length}`],
-      ['Caja', s.cashRegister.estadoCaja]
-    ],
-    actions: [['Tienda POS', 'catalogo'], ['Pedidos', 'pedidos']]
-  },
-  {
-    block: 'servicios',
-    title: 'Servicios',
-    subtitle: 'Cotización • Ejecución • Cobro',
-    lines: s => [
-      ['Proyectos activos', `${s.projects.filter(p => p.status !== 'CONCLUIDO').length} proyectos`],
-      ['Por facturar', `${s.projects.filter(p => !p.invoiceId && p.status !== 'COTIZADO').length} proyectos`],
-      ['Alertas CRM', `${s.crmClients.length} clientes en seguimiento`]
-    ],
-    actions: [['Proyectos VIP', 'jardineria'], ['Clientes', 'crm']]
-  },
-  {
-    block: 'inventario',
-    title: 'Inventario',
-    subtitle: 'Kardex • Mermas • Compras',
-    lines: s => [
-      ['Movimientos Kardex', `${s.kardex.length} registros`],
-      ['Bajas / Mermas', `${s.losses.length} eventos registrados`],
-      ['Consumo Interno', `${s.consumptions.length} aplicaciones vivero`]
-    ],
-    actions: [['Kardex Físico', 'kardex'], ['Mermas & Bajas', 'bajas']]
-  },
-  {
-    block: 'admin',
-    title: 'Administración',
-    subtitle: 'SUNAT • SPOT BN • SIRE • AFPnet',
-    lines: s => [
-      ['Guías GRE', `${s.guiasRemision.length} guías ${s.company.serieGre}`],
-      ['Detracciones SPOT', `Cta. BN ${s.company.cuentaDetraccionesBn}`],
-      ['Colaboradores', `${s.employees.length} en nómina MYPE`]
-    ],
-    actions: [['Detracciones BN', 'detracciones'], ['SIRE 621', 'contabilidad']]
-  }
+  { block: 'ventas', lines: s => [['Pedidos web nuevos', String(s.solicitudes.filter(x => x.estado === 'NUEVA').length)], ['Pedidos activos', String(s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length)], ['Caja', s.cashRegister.estadoCaja]] },
+  { block: 'catalogo', lines: s => [['Productos', String(s.products.length)], ['Stock bajo', String(s.products.filter(p => p.stock <= p.minStock).length)], ['Unidades en stock', String(s.products.reduce((a, p) => a + Math.max(0, p.stock), 0))]] },
+  { block: 'servicios', lines: s => [['Proyectos activos', String(s.projects.filter(p => p.status !== 'CONCLUIDO').length)], ['Contratos activos', String(s.contratos.filter(c => c.activo).length)]] },
+  { block: 'contable', lines: s => [['Pedidos por emitir', String(s.pedidos.filter(p => p.estado === 'pendiente').length)], ['Comprobantes', String(s.invoices.length)], ['Detracciones pendientes', String(s.detracciones.filter(d => d.estado === 'PENDIENTE').length)]] }
 ];
 
 export default function Dashboard() {
   const { state } = useErp();
-  const { setTab, open } = useUi();
-  const { products, cashRegister, detracciones, invoices } = state;
-  const f = calcularFinanzas(state);
-  const { diferenciaCaja } = calcularCaja(cashRegister);
-  const planilla = calcularPlanillaMes(state.employees);
+  const { setTab } = useUi();
+  const { cashRegister } = state;
   const pend = calcularPendientes(state);
 
   const tareas: { text: string; tab: TabId; urgente?: boolean }[] = [
@@ -88,47 +42,6 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <CentroControl />
-
-      <h3 className="font-serif text-lg font-bold text-tinta pt-2">Finanzas del mes <span className="text-xs font-sans font-semibold text-tinta-suave">· {f.regimenLabel} · {f.pagoCuentaRentaDetalle.tasaAplicada > 0 ? `renta ${(f.pagoCuentaRentaDetalle.tasaAplicada * 100).toFixed(1)}%` : `cuota fija S/ ${f.pagoCuentaRentaDetalle.cuotaFija.toFixed(2)}`} · {f.usaIgv ? 'IGV 18%' : 'sin IGV (NRUS)'}</span></h3>
-
-      {/* 6 KPIs Clave */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-crema-300 shadow-sm">
-          <span className="text-[11px] font-bold text-tinta-suave uppercase">Ventas del Mes</span>
-          <div className="text-2xl font-serif font-bold text-tinta mt-1">S/ {f.totalVentas.toFixed(2)}</div>
-          <p className="text-[10px] text-bosque-700 mt-1 font-semibold">IGV Débito: S/ {f.totalIgvVentas.toFixed(2)}</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-crema-300 shadow-sm">
-          <span className="text-[11px] font-bold text-tinta-suave uppercase">Caja Chica (Gaveta)</span>
-          <div className="text-2xl font-serif font-bold text-bosque-700 mt-1">S/ {cashRegister.conteoRealEfectivo.toFixed(2)}</div>
-          <p className="text-[10px] text-tinta-suave mt-1">Arqueo {diferenciaCaja === 0 ? '✅ Cuadrado' : '⚠️ Descuadre'}</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-crema-300 shadow-sm">
-          <span className="text-[11px] font-bold text-tinta-suave uppercase">Compras del Mes</span>
-          <div className="text-2xl font-serif font-bold text-tinta mt-1">S/ {f.totalCompras.toFixed(2)}</div>
-          <p className="text-[10px] text-bosque-700 mt-1 font-semibold">Crédito Fiscal: S/ {f.totalIgvCompras.toFixed(2)}</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-crema-300 shadow-sm">
-          <span className="text-[11px] font-bold text-tinta-suave uppercase">Stock Físico Vivo</span>
-          <div className="text-2xl font-serif font-bold text-tinta mt-1">{products.reduce((a, b) => a + b.stock, 0)} u.</div>
-          <p className="text-[10px] text-tinta-suave mt-1">{products.length} especies y macetas</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-crema-300 shadow-sm">
-          <span className="text-[11px] font-bold text-tinta-suave uppercase">Detracciones SPOT</span>
-          <div className="text-2xl font-serif font-bold text-[#e05780] mt-1">S/ {detracciones.filter(d => d.estado === 'PENDIENTE').reduce((a, b) => a + b.montoDetraccion, 0).toFixed(2)}</div>
-          <p className="text-[10px] text-[#e05780] mt-1 font-bold">Por depositar en BN</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-crema-300 shadow-sm">
-          <span className="text-[11px] font-bold text-tinta-suave uppercase">Planilla + Provisiones</span>
-          <div className="text-2xl font-serif font-bold text-tinta mt-1">S/ {planilla.costoTotalPlanilla.toFixed(2)}</div>
-          <p className="text-[10px] text-tinta-suave mt-1">Costo Laboral MYPE Real</p>
-        </div>
-      </div>
 
       {/* Qué atender hoy */}
       <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-3">
@@ -154,73 +67,22 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* HUBS POR FLUJO DE NEGOCIO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      {/* Áreas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {HUBS.map(hub => {
-          const Icon = NAV_BLOCKS.find(b => b.id === hub.block)!.icon;
+          const area = NAV_BLOCKS.find(b => b.id === hub.block)!;
           return (
-            <div key={hub.block} className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-4 hover:border-oro/50 transition">
-              <div className="flex items-center gap-2">
-                <div className="p-2.5 rounded-2xl bg-bosque-950 text-oro">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-serif font-bold text-base text-tinta">{hub.title}</h4>
-                  <p className="text-[11px] text-tinta-suave">{hub.subtitle}</p>
-                </div>
+            <button key={hub.block} onClick={() => setTab(area.items[0].id)} className="text-left bg-white rounded-3xl border border-crema-300 p-5 hover:border-bosque-700 transition space-y-3">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-bosque-50 text-bosque-700"><area.icon className="w-5 h-5" aria-hidden /></span>
+                <span><h4 className="font-extrabold text-tinta">{area.label}</h4><span className="block text-[11px] text-tinta-suave">{area.hint}</span></span>
               </div>
-              <div className="p-3.5 bg-crema rounded-2xl border border-[#eae4dc] space-y-1.5 text-xs">
-                {hub.lines(state).map(([k, v]) => (
-                  <p key={k} className="text-tinta-suave">{k}: <strong className="text-tinta">{v}</strong></p>
-                ))}
-              </div>
-              <div className="flex gap-2 pt-1">
-                {hub.actions.map(([label, tab], i) => (
-                  <button
-                    key={tab}
-                    onClick={() => setTab(tab)}
-                    className={`flex-1 py-2 rounded-xl font-bold text-xs ${i === 0 ? 'bg-bosque-950 text-oro' : 'bg-crema-200 text-tinta'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <dl className="space-y-1 text-xs">
+                {hub.lines(state).map(([k, v]) => <div key={k} className="flex justify-between"><dt className="text-tinta-suave">{k}</dt><dd className="font-bold text-tinta">{v}</dd></div>)}
+              </dl>
+            </button>
           );
         })}
-      </div>
-
-      {/* Comprobantes Recientes */}
-      <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-4">
-        <div className="flex justify-between items-center">
-          <h4 className="font-serif font-bold text-base text-tinta">Comprobantes Electrónicos Emitidos (SEE SUNAT)</h4>
-          <button onClick={() => setTab('sunat')} className="text-xs font-bold text-bosque-700 hover:underline">Ver todos los comprobantes →</button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          {invoices.slice(0, 6).map(inv => (
-            <div key={inv.id} className="p-4 bg-crema rounded-2xl border border-[#eae4dc] flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-sm text-tinta">{inv.id}</span>
-                  <span className="text-[10px] bg-exito-fondo text-bosque-700 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Check className="w-3 h-3" /> SUNAT OK
-                  </span>
-                </div>
-                <p className="font-serif font-bold text-tinta text-xs mt-1">{inv.cliente.nombreRazonSocial}</p>
-                <p className="text-[10px] text-tinta-suave font-mono">Hash: {inv.hashCpe}</p>
-              </div>
-              <div className="text-right space-y-1">
-                <span className="font-serif font-bold text-base text-tinta block">S/ {inv.montoTotal.toFixed(2)}</span>
-                <button
-                  onClick={() => open({ type: 'ticket', invoice: inv })}
-                  className="px-2.5 py-1 bg-bosque-950 text-oro rounded-xl font-bold text-[10px] flex items-center gap-1 ml-auto"
-                >
-                  <Printer className="w-3 h-3" /> Ticket 80mm
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

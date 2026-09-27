@@ -38,7 +38,7 @@ vivero-360/
 ├── src/
 │   ├── main.tsx
 │   ├── app/
-│   │   ├── App.tsx         # Raíz: tienda pública en "/", centro de control en "/panel" (cargado aparte)
+│   │   ├── App.tsx         # Raíz: centro de control del equipo en "/", tienda de clientes en "/tienda" (cada uno se descarga aparte)
 │   │   ├── PanelApp.tsx    # Centro de control: sesión, datos del negocio y navegación por rol
 │   │   └── router.tsx      # Enrutador mínimo (History API, sin dependencias) y <Enlace>
 │   ├── index.css           # Base, foco visible y prefers-reduced-motion
@@ -55,7 +55,7 @@ vivero-360/
 │   │   ├── ui.tsx          # Sistema visual compartido: Boton, Tarjeta, Insignia, estados vacío/error/carga
 │   │   └── shared.tsx      # ModalShell, consulta RUC/DNI, escáner
 │   ├── modules/
-│   │   ├── tienda/         # TIENDA PÚBLICA: portada, catálogo, fichas, servicios, contacto, pedido, SEO
+│   │   ├── tienda/         # TIENDA PÚBLICA (/tienda): portada, catálogo con stock, fichas, servicios, cotizar en 3 pasos → WhatsApp
 │   │   ├── inicio/         # Centro de control de ventas + "Pendientes de Hoy"
 │   │   ├── ventas/         # Caja, Catálogo/POS y editor de productos, pedidos, solicitudes web, cotizaciones
 │   │   ├── servicios/      # Proyectos de jardinería (cotizado → concluido)
@@ -94,24 +94,31 @@ Cada evento de negocio es una sola acción del store que actualiza todo a la vez
 - **Merma / desmedro** → descuenta stock → Kardex → baja valorizada (la cuarentena no mueve stock)
 - **Servicio de jardinería** → descarga de insumos al Kardex → factura/boleta (una sola vez) → detracción SPOT con vencimiento calculado
 
-### 🛍️ Tienda pública y centro de control
+### 🛍️ Tienda de clientes y centro de control
+
+**Dos enlaces:** el principal (`/`) es del equipo de ventas y el administrador; a los clientes se les comparte **`/tienda`**, que no muestra ningún acceso al panel. Los enlaces antiguos a `/panel` redirigen a `/`.
 
 | Ruta | Quién | Qué |
 |---|---|---|
-| `/` | Público | Portada: propuesta, categorías, destacados y servicios |
-| `/plantas`, `/productos` | Público | Catálogo con búsqueda, categorías, "sólo disponibles" y orden (filtros en la URL: `?q=&cat=&disp=1&orden=`) |
-| `/producto/:sku` | Público | Ficha con precio, disponibilidad (Disponible / Últimas unidades / Agotado), cuidados si existen, compartir |
-| `/servicios`, `/servicios/:slug` | Público | Servicios de jardinería y solicitud de cotización |
-| `/contacto`, `/pedido` | Público | Consulta y carrito → solicitud de pedido (sin pagos en línea) |
-| `/panel` (`#caja`, `#pedidos`, `#solicitudes`…) | Equipo | Centro de control privado; cada pestaña respeta el rol |
+| `/` (`#caja`, `#solicitudes`, `#finanzas`…) | Equipo | Centro de control por áreas; cada sección respeta el rol |
+| `/tienda` | Clientes | Portada: buscador, "tu pedido en 3 pasos", categorías, disponibles y servicios |
+| `/tienda/plantas`, `/tienda/productos` | Clientes | Catálogo con búsqueda, categorías, "sólo disponibles" y orden (filtros en la URL) |
+| `/tienda/producto/:sku` | Clientes | Ficha con precio, **cantidad disponible**, cuidados y "Agregar a mi cotización" |
+| `/tienda/servicios`, `/tienda/servicios/:slug` | Clientes | Servicios y "Cotizar este servicio" |
+| `/tienda/cotizar` | Clientes | 1) selección 2) datos, **boleta o factura** (DNI/RUC), recojo o delivery 3) confirmar → número de pedido → **Enviar por WhatsApp** |
+| `/tienda/contacto` | Clientes | Consulta simple |
 
-La tienda **nunca** lee tablas del negocio: en la nube usa `catalogo_publico()` (sin costos ni stock exacto), `servicios_publicos`, `tienda_config` y envía solicitudes por `crear_solicitud()`, que valida datos, toma precios de la base y limita 5 envíos por teléfono por hora. Las solicitudes aparecen en *Vender → Solicitudes de la Tienda* y se convierten en pedidos del tablero.
+**Flujo comercial:** la tienda muestra el stock real; si el cliente pide más, puede igual y la solicitud queda marcada *para asesor*. Al confirmar, el pedido se registra (`crear_solicitud()` valida RUC/DNI, toma precios de la base y limita 5 envíos por teléfono por hora) y el cliente lo envía por WhatsApp con un mensaje ya armado (sólo si el dueño configuró el número). En el panel llega a **Ventas → Pedidos web**; al convertirlo en pedido conserva el comprobante elegido, que aparece en **Contabilidad → Por emitir** y se emite al cobrar. No hay pagos en línea: el pago se coordina por WhatsApp.
 
-**El dueño completa en *Ajustes → 5. Tienda pública*:** WhatsApp de ventas (sin él, la tienda ofrece el formulario en lugar del botón), correo, dirección, horario y textos de servicios. En *Tienda & Catálogo POS* edita productos: precio, descripción, foto (enlace https), visibilidad en la tienda y destacados.
+**Centro de control por áreas:** Ventas (caja/POS, pedidos web, pedidos y delivery, cotizaciones, documentos y brochure) · Catálogo y almacén (catálogo con fotos, Kardex, mermas, etiquetas QR por lote, guías, reportes de almacén) · Servicios · Clientes · Contabilidad (por emitir, ingresos y egresos, comprobantes, detracciones, impuestos/SIRE, planilla) · Reportes (ventas; productos que más salen, servicios más pedidos y compras sugeridas) · Ajustes.
+
+**Documentos** (`src/lib/documentos.ts`): cotización, proforma, nota de pedido, brochure, ticket 80 mm con QR SUNAT y etiquetas QR se imprimen desde un marco propio (nunca la pantalla); "Guardar como PDF" da el archivo. El QR de cada etiqueta abre la ficha pública (precio en el celular) y la caja lo lee con lector USB o con la cámara.
+
+**El dueño completa en *Ajustes*:** RUC y razón social (sin ellos no se emiten comprobantes), WhatsApp de ventas, correo, dirección, horario y servicios; en *Catálogo* crea productos y **sube fotos** (se guardan en el almacenamiento público `catalogo`).
 
 **Modos (`src/lib/supabase.ts`):**
 
-- **Modo nube** (por defecto; usa el proyecto de producción o el de `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`): login obligatorio en `/panel` y Supabase como fuente de verdad. El stock lo recalcula el servidor en cada movimiento del Kardex. Cada rol ve sólo lo suyo:
+- **Modo nube** (por defecto; usa el proyecto de producción o el de `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`): login obligatorio en `/` y Supabase como fuente de verdad. El stock lo recalcula el servidor en cada movimiento del Kardex. Cada rol ve sólo lo suyo:
   - **Dueño**: todo, incluida la asignación de roles (*Ajustes → Usuarios*).
   - **Vendedor**: caja, tienda/POS, servicios, clientes, inventario, comprobantes y guías.
   - **Jardinero**: sus servicios (avanzar etapas, descargar insumos), clientes, Kardex y mermas.

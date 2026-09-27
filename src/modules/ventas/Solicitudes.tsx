@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Inbox, MessageCircle, PackagePlus, X } from 'lucide-react';
+import { Inbox, MessageCircle, PackagePlus, Printer, UserRound, X } from 'lucide-react';
 import { Boton, EstadoVacio, Insignia, Tarjeta } from '../../components/ui';
 import { ModalShell } from '../../components/shared';
 import type { SolicitudTienda } from '../../domain/types';
@@ -7,6 +7,7 @@ import { hoyLocal } from '../../lib/fechas';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { soles } from '../../lib/formato';
+import { docDeSolicitud, imprimir } from './documentosVenta';
 
 const TIPO: Record<SolicitudTienda['tipo'], string> = { PEDIDO: 'Pedido', SERVICIO: 'Cotización de servicio', CONSULTA: 'Consulta' };
 const ESTADO_TONO = { NUEVA: 'acento', EN_PROCESO: 'aviso', ATENDIDA: 'exito', DESCARTADA: 'neutro' } as const;
@@ -31,10 +32,10 @@ export default function Solicitudes() {
     <div className="space-y-6">
       <Tarjeta className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="font-serif text-xl font-bold text-tinta flex items-center gap-2"><Inbox className="w-5 h-5 text-bosque-700" aria-hidden /> Solicitudes de la tienda</h3>
-          <p className="text-xs text-tinta-suave">Pedidos, cotizaciones y consultas que dejan los clientes en la tienda pública. Responde y convierte los pedidos en el tablero.</p>
+          <h3 className="text-xl font-extrabold text-tinta flex items-center gap-2"><Inbox className="w-5 h-5 text-bosque-700" aria-hidden /> Pedidos web</h3>
+          <p className="text-xs text-tinta-suave">Lo que confirman los clientes en la tienda (/tienda). Responde por WhatsApp, genera la proforma y conviértelo en pedido: el comprobante elegido pasa a Contabilidad para emitirlo al cobrar.</p>
         </div>
-        <a href="/" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-terracota hover:underline">Abrir la tienda ↗</a>
+        <a href="/tienda" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-terracota hover:underline">Abrir la tienda ↗</a>
       </Tarjeta>
 
       <div className="flex flex-wrap gap-1.5 text-xs" role="group" aria-label="Filtrar solicitudes">
@@ -64,12 +65,16 @@ export default function Solicitudes() {
                   <div className="flex flex-col items-end gap-1">
                     <Insignia tono={ESTADO_TONO[s.estado]}>{ESTADO_TEXTO[s.estado]}</Insignia>
                     <Insignia>{TIPO[s.tipo]}</Insignia>
+                    <Insignia tono={s.comprobante === 'FACTURA' ? 'marca' : 'neutro'}>{s.comprobante === 'FACTURA' ? 'Factura' : 'Boleta'}</Insignia>
                   </div>
                 </div>
+                {(s.docCliente || s.razonSocial) && <p className="text-xs text-tinta"><b>{s.comprobante === 'FACTURA' ? 'RUC' : 'DNI'} {s.docCliente}</b>{s.razonSocial ? ` · ${s.razonSocial}` : ''}</p>}
+                {s.tipo === 'PEDIDO' && <p className="text-xs text-tinta-suave">Entrega: <b className="text-tinta">{s.entrega === 'DELIVERY' ? `Delivery · ${[s.direccion, s.distrito].filter(Boolean).join(', ')}` : 'Recojo en vivero'}</b></p>}
+                {s.requiereAsesor && <p className="flex items-center gap-1.5 p-2 rounded-control bg-aviso-fondo text-aviso text-xs font-bold"><UserRound className="w-4 h-4" aria-hidden /> Pide más que el stock: coordinar cantidades y fecha con el cliente.</p>}
                 {servicio && <p className="font-semibold text-tinta">Servicio: {servicio.nombre}</p>}
                 {!!s.items.length && (
                   <ul className="text-tinta">
-                    {s.items.map(it => <li key={it.sku}>• {it.cantidad}× {it.nombre} ({soles(it.precio)})</li>)}
+                    {s.items.map(it => <li key={it.sku}>• {it.cantidad}× {it.nombre} ({soles(it.precio)}){it.stock !== undefined && it.cantidad > it.stock && <span className="text-aviso font-bold"> · había {it.stock}</span>}</li>)}
                     <li className="font-bold pt-1">Total referencial: {soles(s.totalReferencial)}</li>
                   </ul>
                 )}
@@ -77,6 +82,7 @@ export default function Solicitudes() {
                 {s.pedidoId && <p className="font-mono text-xs text-exito font-bold">✅ Convertida en el pedido {s.pedidoId}</p>}
                 <div className="flex flex-wrap gap-2 pt-1">
                   <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-control bg-exito-fondo text-exito font-bold text-xs"><MessageCircle className="w-4 h-4" aria-hidden /> Responder</a>
+                  {s.tipo !== 'CONSULTA' && <Boton tamano="sm" variante="secundario" onClick={() => imprimir(docDeSolicitud(state, s))}><Printer className="w-4 h-4" aria-hidden /> Proforma</Boton>}
                   {s.tipo === 'PEDIDO' && !s.pedidoId && s.estado !== 'DESCARTADA' && (
                     <Boton tamano="sm" onClick={() => open({ type: 'solicitud-pedido', solicitud: s })}><PackagePlus className="w-4 h-4" aria-hidden /> Crear pedido</Boton>
                   )}
@@ -103,7 +109,7 @@ export default function Solicitudes() {
 export function SolicitudAPedidoModal({ solicitud }: { solicitud: SolicitudTienda }) {
   const { actions } = useErp();
   const { close, setTab } = useUi();
-  const [direccion, setDireccion] = useState('');
+  const [direccion, setDireccion] = useState(solicitud.direccion ?? '');
   const [distrito, setDistrito] = useState(solicitud.distrito ?? '');
   const [fechaEntrega, setFechaEntrega] = useState(hoyLocal());
   const [costoDelivery, setCostoDelivery] = useState(0);
@@ -131,7 +137,8 @@ export function SolicitudAPedidoModal({ solicitud }: { solicitud: SolicitudTiend
       <div className="flex justify-between items-center pb-3 border-b border-crema-300">
         <div>
           <h3 className="font-serif font-bold text-lg text-tinta">Crear pedido desde {solicitud.id}</h3>
-          <p className="text-[11px] text-tinta-suave">{solicitud.nombre} · {solicitud.items.length} producto(s). Quedará "por cobrar" en el tablero.</p>
+          <p className="text-[11px] text-tinta-suave">{solicitud.nombre} · {solicitud.items.length} producto(s) · {solicitud.comprobante === 'FACTURA' ? `factura a RUC ${solicitud.docCliente}` : 'boleta'}. Quedará "por cobrar" en el tablero y por emitir en Contabilidad.</p>
+          {solicitud.requiereAsesor && <p className="text-[11px] font-bold text-aviso">Ajusta las cantidades con el cliente: el pedido no puede superar el stock libre.</p>}
         </div>
         <button onClick={close} aria-label="Cerrar"><X className="w-5 h-5 text-tinta-suave" /></button>
       </div>

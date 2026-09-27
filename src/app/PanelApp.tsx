@@ -23,6 +23,11 @@ import Solicitudes from '../modules/ventas/Solicitudes';
 import Cotizaciones from '../modules/ventas/Cotizaciones';
 import Contratos from '../modules/servicios/Contratos';
 import Reportes from '../modules/admin/Reportes';
+import Finanzas from '../modules/admin/Finanzas';
+import Estadisticas from '../modules/admin/Estadisticas';
+import Almacen from '../modules/inventario/Almacen';
+import Etiquetas from '../modules/inventario/Etiquetas';
+import Documentos from '../modules/ventas/Documentos';
 import { AuthProvider, useAuth } from '../store/AuthStore';
 import { ErpProvider, useErp } from '../store/ErpStore';
 import { UiProvider, useUi } from '../store/UiStore';
@@ -45,7 +50,12 @@ const SCREENS: Record<TabId, ComponentType> = {
   detracciones: Detracciones,
   contabilidad: Contabilidad,
   planilla: Planilla,
-  configuracion: Ajustes
+  configuracion: Ajustes,
+  documentos: Documentos,
+  etiquetas: Etiquetas,
+  almacen: Almacen,
+  finanzas: Finanzas,
+  estadisticas: Estadisticas
 };
 
 function Shell() {
@@ -53,11 +63,11 @@ function Shell() {
   const { cargando, errorCarga, actions } = useErp();
   const Screen = SCREENS[tab];
   return (
-    <div className="flex h-screen bg-crema text-[#1c2e24] overflow-hidden font-sans">
+    <div className="flex h-screen bg-crema text-tinta overflow-hidden font-sans">
       <Sidebar />
       <main className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar space-y-8 bg-crema-100">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar space-y-8 bg-[#f7f8f6]">
           {errorCarga && (
             <div role="alert" className="p-4 rounded-2xl bg-error-fondo text-error text-xs font-semibold flex items-center justify-between gap-3">
               <span>No se pudieron cargar los datos: {errorCarga}</span>
@@ -90,7 +100,7 @@ function Portero() {
   );
 }
 
-/** Centro de control privado (/panel): sesión, datos del negocio y navegación por roles. */
+/** Centro de control privado ("/"): sesión, datos del negocio y navegación por roles. */
 export default function PanelApp() {
   return (
     <AuthProvider>

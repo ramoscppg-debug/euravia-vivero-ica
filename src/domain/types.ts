@@ -286,6 +286,8 @@ export interface Pedido {
   guiaId?: string;
   fotoEvidencia?: string; // ruta en Storage (nube) o nombre del archivo (demo)
   entregadoAt?: string;
+  tipoComprobante?: '01' | '03'; // lo que pidió el cliente (factura o boleta); se emite al cobrar
+  razonSocial?: string; // para factura
 }
 
 // ---------- Crecer ventas ----------
@@ -329,7 +331,7 @@ export interface Contrato {
   ultimoPeriodo?: string; // 'YYYY-MM'
 }
 
-// ---------- Tienda pública (sólo datos de vitrina: sin costos ni stock exacto) ----------
+// ---------- Tienda pública (sólo datos de vitrina: sin costos) ----------
 export type DisponibilidadPublica = 'DISPONIBLE' | 'POCAS' | 'AGOTADO';
 
 export interface ProductoPublico {
@@ -343,6 +345,7 @@ export interface ProductoPublico {
   imagen?: string;
   precio: number;
   disponibilidad: DisponibilidadPublica;
+  stock: number; // unidades disponibles; si el cliente pide más, lo atiende un asesor
   luz?: string;
   riego?: string;
   esPlantaViva: boolean;
@@ -377,8 +380,14 @@ export interface SolicitudTienda {
   distrito?: string;
   mensaje?: string;
   servicioSlug?: string;
-  items: { sku: string; nombre: string; cantidad: number; precio: number }[];
+  items: { sku: string; nombre: string; cantidad: number; precio: number; stock?: number }[];
   totalReferencial: number;
+  comprobante: 'BOLETA' | 'FACTURA';
+  docCliente?: string; // DNI (boleta, opcional) o RUC (factura)
+  razonSocial?: string;
+  entrega: 'RECOJO' | 'DELIVERY';
+  direccion?: string;
+  requiereAsesor: boolean; // pidió más cantidad que el stock
   estado: 'NUEVA' | 'EN_PROCESO' | 'ATENDIDA' | 'DESCARTADA';
   pedidoId?: string;
   createdAt: string;

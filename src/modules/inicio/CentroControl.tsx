@@ -66,7 +66,7 @@ export default function CentroControl() {
   const accesos: { texto: string; icono: React.ReactNode; accion: () => void; tab?: TabId }[] = [
     { texto: 'Nueva venta', icono: <PlusCircle className="w-4 h-4" aria-hidden />, accion: () => open({ type: 'pos' }), tab: 'caja' },
     { texto: 'Pedidos', icono: <ClipboardList className="w-4 h-4" aria-hidden />, accion: ir('pedidos'), tab: 'pedidos' },
-    { texto: `Solicitudes${solicitudesNuevas.length ? ` (${solicitudesNuevas.length})` : ''}`, icono: <Inbox className="w-4 h-4" aria-hidden />, accion: ir('solicitudes'), tab: 'solicitudes' },
+    { texto: `Pedidos web${solicitudesNuevas.length ? ` (${solicitudesNuevas.length})` : ''}`, icono: <Inbox className="w-4 h-4" aria-hidden />, accion: ir('solicitudes'), tab: 'solicitudes' },
     { texto: 'Catálogo', icono: <PackagePlus className="w-4 h-4" aria-hidden />, accion: ir('catalogo'), tab: 'catalogo' },
     { texto: 'Reportes', icono: <BarChart3 className="w-4 h-4" aria-hidden />, accion: ir('reportes'), tab: 'reportes' }
   ];
@@ -85,7 +85,7 @@ export default function CentroControl() {
               {a.icono} {a.texto}
             </button>
           ))}
-          <a href="/" target="_blank" rel="noopener noreferrer" className="min-h-[40px] px-3.5 rounded-control text-xs font-bold inline-flex items-center gap-1.5 bg-white border border-crema-300 text-terracota"><Store className="w-4 h-4" aria-hidden /> Ver tienda ↗</a>
+          <a href="/tienda" target="_blank" rel="noopener noreferrer" className="min-h-[40px] px-3.5 rounded-control text-xs font-bold inline-flex items-center gap-1.5 bg-white border border-crema-300 text-terracota"><Store className="w-4 h-4" aria-hidden /> Ver tienda ↗</a>
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export default function CentroControl() {
         <Metrica titulo="Ventas de hoy" valor={soles(rHoy.ventasNetas)} detalle={`${rHoy.tickets} ticket(s)`} periodo={hoy} />
         <Metrica titulo="Ventas del mes" valor={soles(rMes.ventasNetas)} detalle={`ticket prom. ${soles(rMes.ticketPromedio)}`} periodo={`${mes.desde} al ${mes.hasta}`} />
         <Metrica titulo="Pedidos por cobrar" valor={String(porCobrar.length)} detalle={soles(porCobrar.reduce((a, p) => a + p.total, 0))} periodo="al momento" />
-        <Metrica titulo="Solicitudes nuevas" valor={String(solicitudesNuevas.length)} detalle="desde la tienda" periodo="sin atender" />
+        <Metrica titulo="Pedidos web nuevos" valor={String(solicitudesNuevas.length)} detalle="desde la tienda" periodo="sin atender" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

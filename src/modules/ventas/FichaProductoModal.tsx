@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ExternalLink, X } from 'lucide-react';
 import { Boton } from '../../components/ui';
 import { ModalShell } from '../../components/shared';
+import { SubirFoto } from '../../components/SubirFoto';
 import type { CatalogProduct, Category } from '../../domain/types';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
@@ -70,8 +71,8 @@ export function FichaProductoModal({ sku }: { sku?: string }) {
         <F label="Precio de venta (S/, inc. IGV)"><input aria-label="Precio de venta" type="number" min={0} step="0.1" value={p.price} onChange={e => set({ price: Number(e.target.value) || 0 })} className={campo} /></F>
         <F label="Costo unitario (S/, privado)"><input aria-label="Costo unitario" type="number" min={0} step="0.1" value={p.cost} onChange={e => set({ cost: Number(e.target.value) || 0 })} className={campo} /></F>
         <F label="Stock mínimo"><input aria-label="Stock mínimo" type="number" min={0} value={p.minStock} onChange={e => set({ minStock: Math.max(0, Math.floor(Number(e.target.value) || 0)) })} className={campo} /></F>
-        <F label="Foto (enlace https)" span="sm:col-span-2"><input aria-label="Enlace de la foto" value={p.fullImage} onChange={e => set({ fullImage: e.target.value.trim() })} className={campo} placeholder="https://…" /></F>
         <F label="Ubicación en almacén"><input aria-label="Ubicación" value={p.location} onChange={e => set({ location: e.target.value })} className={campo} /></F>
+        <div className="sm:col-span-3"><p className="text-xs font-bold text-tinta mb-1">Foto del producto</p><SubirFoto valor={p.fullImage} cambiar={url => set({ fullImage: url })} carpeta="productos" nombre={p.sku || p.name} /></div>
         <F label="Descripción para la tienda" span="sm:col-span-3"><textarea aria-label="Descripción" value={p.description} onChange={e => set({ description: e.target.value })} className={`${campo} min-h-[72px] py-2`} /></F>
         {p.isLivePlant && (
           <>
@@ -85,7 +86,7 @@ export function FichaProductoModal({ sku }: { sku?: string }) {
       <div className="flex flex-wrap gap-4 p-3 rounded-control bg-crema-200/60 text-sm font-semibold">
         <label className="flex items-center gap-2"><input type="checkbox" checked={p.visibleTienda !== false} onChange={e => set({ visibleTienda: e.target.checked })} /> Mostrar en la tienda pública</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={!!p.destacado} onChange={e => set({ destacado: e.target.checked })} /> Destacar en la portada</label>
-        {existente && <a href={`/producto/${encodeURIComponent(existente.sku)}`} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-terracota font-bold">Ver en la tienda <ExternalLink className="w-4 h-4" aria-hidden /></a>}
+        {existente && <a href={`/tienda/producto/${encodeURIComponent(existente.sku)}`} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-terracota font-bold">Ver en la tienda <ExternalLink className="w-4 h-4" aria-hidden /></a>}
       </div>
 
       <div className="flex gap-2 pt-2 border-t border-crema-300">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, CheckCircle2, ChevronLeft, ClipboardList, Image, MapPin, MessageCircle, PlusCircle, Receipt, Trash2, Truck, X, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, ChevronLeft, ClipboardList, FileText, Image, MapPin, MessageCircle, PlusCircle, Receipt, Trash2, Truck, X, XCircle } from 'lucide-react';
 import { ModalShell, useDocLookup } from '../../components/shared';
 import { CANALES_VENTA, MEDIOS_PAGO, type CanalVenta, type EstadoPedido, type MedioPago, type Pago, type Pedido, type PedidoItem } from '../../domain/types';
 import { round2 } from '../../lib/peru';
@@ -8,6 +8,7 @@ import { urlEvidencia } from '../../lib/repo';
 import { reservadoEnPedidos, useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { hoyLocal } from '../../lib/fechas';
+import { docDePedido, imprimir } from './documentosVenta';
 
 const COLUMNAS: { estado: EstadoPedido; titulo: string; color: string }[] = [
   { estado: 'pendiente', titulo: 'Por cobrar', color: 'border-t-[#e05780]' },
@@ -98,9 +99,13 @@ export default function Pedidos() {
                   <article key={p.id} aria-label={`Pedido ${p.id}`} className="bg-white rounded-2xl border border-crema-300 p-3 space-y-2 text-xs shadow-sm">
                     <div className="flex justify-between items-start gap-2">
                       <span className="font-mono font-bold text-[10px] text-tinta-suave">{p.id}</span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-bosque-100 text-bosque-700">{p.canal}</span>
+                      <span className="flex gap-1">
+                        {p.tipoComprobante && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-bosque-950 text-white">{p.tipoComprobante === '01' ? 'Factura' : 'Boleta'}</span>}
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-bosque-100 text-bosque-700">{p.canal}</span>
+                      </span>
                     </div>
-                    <p className="font-serif font-bold text-tinta text-sm leading-tight">{p.cliente.nombre}</p>
+                    <p className="font-serif font-bold text-tinta text-sm leading-tight">{p.razonSocial || p.cliente.nombre}</p>
+                    {p.razonSocial && <p className="text-[10px] text-tinta-suave">Contacto: {p.cliente.nombre} · RUC {p.cliente.doc}</p>}
                     <p className="text-tinta-suave flex gap-1"><MapPin className="w-3.5 h-3.5 shrink-0 text-oro" /> {[p.direccion, p.distrito].filter(Boolean).join(', ')}</p>
                     <p className={`font-semibold ${atrasado ? 'text-error' : 'text-tinta-suave'}`}>
                       📅 {p.fechaEntrega}{p.franja ? ` · ${p.franja}` : ''}{atrasado ? ' · atrasado' : ''}
@@ -115,6 +120,7 @@ export default function Pedidos() {
                     {p.notas && <p className="text-[10px] italic text-earth-500">“{p.notas}”</p>}
 
                     <div className="flex flex-wrap gap-1.5 pt-1 border-t border-[#f0eae1]">
+                      <button onClick={() => imprimir(docDePedido(state, p))} title="Imprimir nota de pedido" aria-label={`Nota de pedido ${p.id}`} className="px-2 py-1.5 rounded-xl bg-crema-200"><FileText className="w-3.5 h-3.5" /></button>
                       {p.estado === 'pendiente' && (
                         <>
                           <button onClick={() => open({ type: 'pedido-cobro', pedido: p })} className="flex-1 px-2 py-1.5 rounded-xl bg-bosque-950 text-oro font-bold flex items-center justify-center gap-1"><Receipt className="w-3.5 h-3.5" /> Cobrar</button>
@@ -286,9 +292,9 @@ export function CobroPedidoModal({ pedido }: { pedido: Pedido }) {
   const { actions } = useErp();
   const { open, close } = useUi();
   const { busy, consultar } = useDocLookup();
-  const [tipo, setTipo] = useState<'01' | '03'>(pedido.cliente.doc?.length === 11 ? '01' : '03');
+  const [tipo, setTipo] = useState<'01' | '03'>(pedido.tipoComprobante ?? (pedido.cliente.doc?.length === 11 ? '01' : '03'));
   const [doc, setDoc] = useState(pedido.cliente.doc ?? '');
-  const [nombre, setNombre] = useState(pedido.cliente.nombre);
+  const [nombre, setNombre] = useState(pedido.razonSocial || pedido.cliente.nombre);
   const [pagos, setPagos] = useState<Pago[]>([{ medio: 'Yape', monto: pedido.total }]);
   const [generarGre, setGenerarGre] = useState(true);
   const [enviando, setEnviando] = useState(false);

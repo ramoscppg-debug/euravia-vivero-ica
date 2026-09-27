@@ -5,12 +5,12 @@ import type { Cotizacion, Cupon, DescuentoGlobal, LineaCarrito } from '../../dom
 import { calcularCarrito } from '../../lib/pos';
 import { useAuth } from '../../store/AuthStore';
 import { useErp } from '../../store/ErpStore';
+import { imprimirDocumento } from '../../lib/documentos';
+import { docDeCotizacion } from './documentosVenta';
 import { useUi } from '../../store/UiStore';
 import { hoyLocal, sumarDias } from '../../lib/fechas';
 
 const hoy = () => hoyLocal();
-/** Escapa texto que escribe el usuario antes de meterlo en el HTML imprimible. */
-const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 const ESTADO_COLOR: Record<Cotizacion['estado'], string> = {
   ENVIADA: 'bg-bosque-100 text-bosque-700',
   ACEPTADA: 'bg-oro text-tinta',
@@ -30,21 +30,7 @@ export default function Cotizaciones() {
     return `Hola ${c.cliente.nombre.split(' ')[0]}, te compartimos la cotización ${c.id} de ${company.nombreComercial.split(' - ')[0]} 🌿\n${lineas}\n${carrito.descuentoTotal > 0 ? `Descuento: − S/ ${carrito.descuentoTotal.toFixed(2)}\n` : ''}Total: S/ ${carrito.total.toFixed(2)} (IGV incluido)\nVálida hasta el ${c.vence}.`;
   };
 
-  const imprimir = (c: Cotizacion) => {
-    const carrito = calcularCarrito(c.lineas, products, c.descuentoGlobal);
-    const w = window.open('', '_blank', 'width=720,height=900');
-    if (!w) return;
-    const filas = carrito.lineas.map(l => `<tr><td>${esc(l.name)}</td><td style="text-align:center">${l.qty}</td><td style="text-align:right">${l.precioLista.toFixed(2)}</td><td style="text-align:right">${l.descuentoPct ? l.descuentoPct + '%' : ''}</td><td style="text-align:right">${l.neto.toFixed(2)}</td></tr>`).join('');
-    w.document.write(`<!doctype html><html><head><title>${esc(c.id)}</title><style>body{font-family:system-ui,sans-serif;padding:32px;color:#082017}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{border-bottom:1px solid #e8e2d8;padding:8px;font-size:13px}th{text-align:left;background:#faf8f5}h1{margin:0;font-size:20px}.t{font-size:18px;font-weight:700;text-align:right;margin-top:12px}</style></head><body>
-      <h1>${esc(company.razonSocial)}</h1><div>RUC ${esc(company.ruc)} · ${esc(company.direccion)}</div>
-      <h2>Cotización ${esc(c.id)}</h2><div>Fecha: ${c.fecha} · Válida hasta: ${c.vence}</div>
-      <div>Cliente: <b>${esc(c.cliente.nombre)}</b>${c.cliente.doc ? ` · ${esc(c.cliente.doc)}` : ''}</div>
-      <table><tr><th>Producto</th><th>Cant.</th><th>P. unit.</th><th>Desc.</th><th>Importe</th></tr>${filas}</table>
-      ${carrito.descuentoGlobal > 0 ? `<div style="text-align:right">Descuento adicional: − S/ ${carrito.descuentoGlobal.toFixed(2)}</div>` : ''}
-      <div class="t">Total S/ ${carrito.total.toFixed(2)} (IGV incluido)</div>${c.notas ? `<p>${esc(c.notas)}</p>` : ''}
-      <script>window.print()</script></body></html>`);
-    w.document.close();
-  };
+  const imprimir = (c: Cotizacion) => imprimirDocumento(docDeCotizacion(state, c));
 
   const convertir = (c: Cotizacion) =>
     open({ type: 'pos', preset: { lineas: c.lineas, descuentoGlobal: c.descuentoGlobal, doc: c.cliente.doc, nombre: c.cliente.nombre, cotizacionId: c.id } });

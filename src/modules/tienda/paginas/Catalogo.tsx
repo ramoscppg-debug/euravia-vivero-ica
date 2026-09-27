@@ -4,7 +4,7 @@ import { navegar, useUbicacion } from '../../../app/router';
 import { EstadoVacio, Esqueleto } from '../../../components/ui';
 import type { ProductoPublico } from '../../../domain/types';
 import { esPlanta } from '../datos';
-import { TarjetaProducto } from '../componentes';
+import { TarjetaProducto, Titulo } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useTienda } from '../TiendaApp';
 
@@ -47,29 +47,28 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
   const texto = sinTildes(q.trim());
   const lista = delGrupo
     .filter(p => !cat || p.categoria === cat)
-    .filter(p => !soloDisponibles || p.disponibilidad !== 'AGOTADO')
+    .filter(p => !soloDisponibles || p.stock > 0)
     .filter(p => !texto || sinTildes([p.nombre, p.nombreCientifico, p.categoriaNombre, p.descripcion].filter(Boolean).join(' ')).includes(texto))
     .sort((a: ProductoPublico, b: ProductoPublico) =>
       orden === 'precio-asc' ? a.precio - b.precio : orden === 'precio-desc' ? b.precio - a.precio : orden === 'nombre' ? a.nombre.localeCompare(b.nombre) : Number(b.destacado) - Number(a.destacado));
 
-  const chip = (activo: boolean) => `min-h-[40px] px-4 rounded-full text-sm font-semibold border transition-colors ${activo ? 'bg-bosque-950 text-oro border-bosque-950' : 'bg-white text-tinta border-crema-300 hover:border-bosque-600'}`;
+  const chip = (activo: boolean) => `min-h-[40px] px-4 rounded-full text-sm font-semibold border transition-colors ${activo ? 'bg-hoja-700 text-white border-hoja-700' : 'bg-white text-slate-700 border-slate-300 hover:border-hoja-600'}`;
 
   return (
     <Pagina className="py-10">
-      <h1 className="font-serif text-4xl font-bold text-bosque-950">{t.titulo}</h1>
-      <p className="text-tinta-suave mt-1 mb-6">{t.bajada}</p>
+      <div className="mb-6"><Titulo nivel="h1" antetitulo="Catálogo" titulo={t.titulo} bajada={`${t.bajada} Ves el stock real; si necesitas más, un asesor te atiende.`} /></div>
 
       <div className="space-y-3 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
-          <label className="flex-1 flex items-center gap-2 min-h-[48px] px-4 rounded-control bg-white border border-crema-300 focus-within:border-bosque-600">
-            <Search className="w-5 h-5 text-tinta-suave" aria-hidden />
+          <label className="flex-1 flex items-center gap-2 min-h-[48px] px-4 rounded-full bg-white border border-slate-300 focus-within:border-hoja-600">
+            <Search className="w-5 h-5 text-slate-500" aria-hidden />
             <span className="sr-only">Buscar en {t.titulo.toLowerCase()}</span>
             <input type="search" value={q} onChange={e => fijar({ q: e.target.value })} placeholder="Buscar por nombre…" className="flex-1 bg-transparent outline-none text-base" />
             {q && <button onClick={() => fijar({ q: '' })} aria-label="Borrar búsqueda" className="p-1"><X className="w-4 h-4" /></button>}
           </label>
           <label className="flex items-center gap-2 text-sm font-semibold">
             <span className="shrink-0">Ordenar</span>
-            <select value={orden} onChange={e => fijar({ orden: e.target.value === 'relevancia' ? '' : e.target.value })} className="min-h-[48px] px-3 rounded-control bg-white border border-crema-300">
+            <select value={orden} onChange={e => fijar({ orden: e.target.value === 'relevancia' ? '' : e.target.value })} className="min-h-[48px] px-3 rounded-full bg-white border border-slate-300">
               <option value="relevancia">Destacados</option>
               <option value="precio-asc">Precio: menor a mayor</option>
               <option value="precio-desc">Precio: mayor a menor</option>
@@ -87,10 +86,10 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
       </div>
 
       {!datos ? (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map(i => <Esqueleto key={i} className="aspect-[4/6] !rounded-tarjeta" />)}</div>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map(i => <Esqueleto key={i} className="aspect-[4/6] !rounded-3xl" />)}</div>
       ) : lista.length ? (
         <>
-          <p className="text-sm text-tinta-suave mb-3" aria-live="polite">{lista.length} resultado(s)</p>
+          <p className="text-sm text-slate-500 mb-3" aria-live="polite">{lista.length} resultado(s)</p>
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">{lista.map(p => <TarjetaProducto key={p.sku} p={p} />)}</div>
         </>
       ) : (

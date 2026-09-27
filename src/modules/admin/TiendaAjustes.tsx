@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle, ExternalLink, Store } from 'lucide-react';
+import { SubirFoto } from '../../components/SubirFoto';
 import { Boton, Insignia, Tarjeta } from '../../components/ui';
 import type { ConfigTienda, ServicioPublico } from '../../domain/types';
 import { useErp } from '../../store/ErpStore';
@@ -40,7 +41,7 @@ export default function TiendaAjustes() {
     <Tarjeta as="section" className="p-6 space-y-5 text-sm">
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-crema-300">
         <h4 className="font-serif font-bold text-base text-tinta flex items-center gap-2"><Store className="w-5 h-5 text-bosque-700" aria-hidden /> 5. Tienda pública</h4>
-        <a href="/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-terracota font-bold">Ver la tienda <ExternalLink className="w-4 h-4" aria-hidden /></a>
+        <a href="/tienda" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-terracota font-bold">Ver la tienda <ExternalLink className="w-4 h-4" aria-hidden /></a>
       </div>
 
       {!state.tiendaConfig.whatsapp && (
@@ -98,7 +99,7 @@ function ServicioEditor({ sv, alGuardar }: { sv: ServicioPublico; alGuardar: (s:
   return (
     <div className="grid gap-2 sm:grid-cols-2 pt-3">
       <label className="block text-xs font-bold">Nombre<input aria-label={`Nombre de ${sv.nombre}`} value={s.nombre} onChange={e => setS({ ...s, nombre: e.target.value })} className={`${campo} mt-1`} /></label>
-      <label className="block text-xs font-bold">Foto (enlace https, opcional)<input aria-label={`Foto de ${sv.nombre}`} value={s.imagen ?? ''} onChange={e => setS({ ...s, imagen: e.target.value.trim() || undefined })} className={`${campo} mt-1`} /></label>
+      <div><p className="text-xs font-bold mb-1">Foto (opcional)</p><SubirFoto valor={s.imagen} cambiar={url => setS({ ...s, imagen: url || undefined })} carpeta="servicios" nombre={s.slug} /></div>
       <label className="block text-xs font-bold sm:col-span-2">Resumen<input aria-label={`Resumen de ${sv.nombre}`} value={s.resumen} onChange={e => setS({ ...s, resumen: e.target.value })} className={`${campo} mt-1`} /></label>
       <label className="block text-xs font-bold sm:col-span-2">Descripción<textarea aria-label={`Descripción de ${sv.nombre}`} value={s.descripcion ?? ''} onChange={e => setS({ ...s, descripcion: e.target.value })} className={`${campo} mt-1 min-h-[64px] py-2`} /></label>
       <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={s.visible} onChange={e => setS({ ...s, visible: e.target.checked })} /> Visible en la tienda</label>

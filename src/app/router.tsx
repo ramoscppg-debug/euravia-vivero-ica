@@ -1,6 +1,6 @@
 // ==========================================
 // ENRUTADOR MÍNIMO (History API, sin dependencias)
-// Rutas públicas de la tienda en "/", centro de control privado en "/panel".
+// Centro de control del equipo en "/", tienda pública en "/tienda".
 // vercel.json ya reescribe cualquier ruta a index.html, así los enlaces compartidos abren directo.
 // ==========================================
 import { useEffect, useState, type AnchorHTMLAttributes, type MouseEvent } from 'react';

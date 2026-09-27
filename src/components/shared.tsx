@@ -2,6 +2,7 @@
 // COMPONENTES Y HOOKS COMPARTIDOS ENTRE MÓDULOS
 // ==========================================
 import { useState, type ReactNode } from 'react';
+import { skuDeLectura } from '../lib/documentos';
 import { validarDni, validarRuc } from '../lib/peru';
 import { sunatClient } from '../lib/sunatClient';
 import { useErp } from '../store/ErpStore';
@@ -79,7 +80,7 @@ export function useScanner() {
   const { state } = useErp();
   const { open } = useUi();
   return (skuOrCode: string): boolean => {
-    const cleanCode = skuOrCode.trim().toUpperCase();
+    const cleanCode = skuDeLectura(skuOrCode); // acepta el SKU o el enlace de la etiqueta QR
     if (!cleanCode) return false;
     const found = state.products.find(p => p.sku.toUpperCase() === cleanCode || p.name.toUpperCase().includes(cleanCode));
     if (found) {

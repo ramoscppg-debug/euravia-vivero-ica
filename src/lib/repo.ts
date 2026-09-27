@@ -30,7 +30,7 @@ import type {
   RegimenTributario
 } from '../domain/types';
 import { emisorDe } from '../domain/types';
-import { INITIAL_COMPANY_CONFIG } from '../data/seed';
+import { EMPRESA_VACIA } from '../data/seed';
 import type { Rol } from '../domain/types';
 import { round2 } from './peru';
 import { getSupabase } from './supabase';
@@ -143,7 +143,7 @@ export async function cargarTodo(): Promise<DatosNube> {
 }
 
 function empresaDesdeFila(r: Row | null): EmpresaConfig {
-  const base = INITIAL_COMPANY_CONFIG;
+  const base = EMPRESA_VACIA;
   if (!r) return base;
   return {
     ...base,
@@ -352,7 +352,9 @@ function pedidoDesdeFila(r: Row, nombres: Map<string, string>): Pedido {
     comprobanteId: r.comprobante_id ?? undefined,
     guiaId: r.guia_id ?? undefined,
     fotoEvidencia: r.foto_evidencia_url ?? undefined,
-    entregadoAt: r.entregado_at ?? undefined
+    entregadoAt: r.entregado_at ?? undefined,
+    tipoComprobante: r.tipo_comprobante ?? undefined,
+    razonSocial: r.razon_social ?? undefined
   };
 }
 
@@ -431,7 +433,9 @@ function solicitudDesdeFila(r: Row): SolicitudTienda {
   return {
     id: String(r.id), tipo: r.tipo, nombre: r.nombre, telefono: r.telefono, email: r.email ?? undefined, distrito: r.distrito ?? undefined,
     mensaje: r.mensaje ?? undefined, servicioSlug: r.servicio_slug ?? undefined, items: r.items ?? [], totalReferencial: num(r.total_referencial),
-    estado: r.estado, pedidoId: r.pedido_id ?? undefined, createdAt: r.created_at
+    estado: r.estado, pedidoId: r.pedido_id ?? undefined, createdAt: r.created_at,
+    comprobante: r.comprobante ?? 'BOLETA', docCliente: r.doc_cliente ?? undefined, razonSocial: r.razon_social ?? undefined,
+    entrega: r.entrega ?? 'RECOJO', direccion: r.direccion ?? undefined, requiereAsesor: !!r.requiere_asesor
   };
 }
 
@@ -719,6 +723,8 @@ export async function guardarEmpresa(c: EmpresaConfig, regimen: RegimenTributari
     regimen_tributario: regimen,
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' }));
+  // La fila se identifica por el RUC: si el RUC cambió, se retira la anterior para no tener dos empresas
+  ok(await sb.from('empresa_config').delete().neq('id', c.ruc));
 }
 
 // ---------------- USUARIOS ----------------
@@ -765,6 +771,8 @@ export async function guardarPedidoNuevo(p: Pedido, creadoPor: string) {
     fecha_entrega: p.fechaEntrega,
     franja_horaria: p.franja ?? null,
     notas: p.notas ?? null,
+    tipo_comprobante: p.tipoComprobante ?? null,
+    razon_social: p.razonSocial ?? null,
     creado_por: creadoPor
   }));
   ok(await sb.from('pedidos_detalle').insert(
@@ -930,6 +938,14 @@ export async function guardarServicioPublico(sv: ServicioPublico) {
     slug: sv.slug, nombre: sv.nombre, resumen: sv.resumen, descripcion: sv.descripcion || null, imagen_url: sv.imagen || null,
     orden: sv.orden, visible: sv.visible, updated_at: new Date().toISOString()
   }, { onConflict: 'slug' }));
+}
+
+/** Sube una foto al catálogo público (sólo el dueño) y devuelve su enlace https. */
+export async function subirFotoCatalogo(archivo: Blob, carpeta: 'productos' | 'servicios', nombre: string): Promise<string> {
+  const sb = await db();
+  const ruta = `${carpeta}/${nombre.replace(/[^a-zA-Z0-9-]/g, '-')}-${Date.now()}.jpg`;
+  ok(await sb.storage.from('catalogo').upload(ruta, archivo, { contentType: 'image/jpeg', upsert: false }));
+  return sb.storage.from('catalogo').getPublicUrl(ruta).data.publicUrl;
 }
 
 /** Alta o edición de la ficha comercial de un producto (el stock sólo cambia por el Kardex). */

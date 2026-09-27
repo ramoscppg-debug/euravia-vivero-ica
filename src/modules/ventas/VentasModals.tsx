@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { Printer, QrCode, ScanLine, Trash2, Truck, X } from 'lucide-react';
-import { ModalShell, useDocLookup, useScanner } from '../../components/shared';
+import { Camera, QrCode, ScanLine, Trash2, Truck, X } from 'lucide-react';
+import { ModalShell, useDocLookup } from '../../components/shared';
+import { camaraDisponible, EscanerCamara } from '../../components/EscanerCamara';
+import { esc, imprimirTicket, qrSvg, skuDeLectura } from '../../lib/documentos';
+import { GeneradorEtiquetas } from '../inventario/Etiquetas';
 import { MEDIOS_PAGO, type ComprobanteSunat, type DescuentoGlobal, type LineaCarrito, type MedioPago, type Pago } from '../../domain/types';
 import { round2 } from '../../lib/peru';
 import { VALOR_PUNTO } from '../../lib/fidelidad';
@@ -41,8 +44,25 @@ export function PosModal({ presetSku, preset }: { presetSku?: string; preset?: P
   const resumen = resumirPagos(carrito.total, pagos);
   const igv = round2(carrito.total - carrito.total / 1.18);
 
+  const [camara, setCamara] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const q = busqueda.trim().toLowerCase();
   const encontrados = q ? products.filter(p => p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)) : products;
+
+  /** Un escáner (USB o cámara) entrega el SKU o el enlace de la etiqueta QR: se suma una unidad. */
+  const leerCodigo = (lectura: string): boolean => {
+    const sku = skuDeLectura(lectura);
+    const texto = lectura.toUpperCase();
+    // Si el teclado del lector cambió algún símbolo del enlace, igual se reconoce el SKU dentro del texto
+    const prod = products.find(p => p.sku.toUpperCase() === sku) ?? [...products].sort((a, b) => b.sku.length - a.sku.length).find(p => texto.includes(p.sku.toUpperCase()));
+    if (!prod) {
+      setAviso(`No se encontró el código "${lectura.slice(0, 40)}"`);
+      return false;
+    }
+    agregar(prod.sku);
+    setAviso(`+1 ${prod.name}`);
+    return true;
+  };
 
   const agregar = (sku: string) => {
     setLineas(ls => (ls.some(l => l.sku === sku) ? ls.map(l => (l.sku === sku ? { ...l, qty: l.qty + 1 } : l)) : [...ls, { sku, qty: 1, descuentoPct: 0 }]));
@@ -98,11 +118,22 @@ export function PosModal({ presetSku, preset }: { presetSku?: string; preset?: P
               autoFocus
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && encontrados[0]) agregar(encontrados[0].sku); }}
+              onKeyDown={e => {
+                if (e.key !== 'Enter' || !busqueda.trim()) return;
+                if (!leerCodigo(busqueda) && encontrados[0]) agregar(encontrados[0].sku);
+                setBusqueda('');
+              }}
               placeholder="🔎 Nombre o SKU · escanea y presiona Enter"
               className={`${input} flex-1 font-mono`}
             />
+            {camaraDisponible() && (
+              <button type="button" onClick={() => setCamara(c => !c)} className={`px-3 rounded-xl font-bold text-xs flex items-center gap-1 ${camara ? 'bg-bosque-950 text-oro' : 'bg-crema-200 text-tinta'}`} aria-pressed={camara}>
+                <Camera className="w-4 h-4" aria-hidden /> Cámara
+              </button>
+            )}
           </div>
+          {camara && <EscanerCamara alLeer={leerCodigo} cerrar={() => setCamara(false)} />}
+          {aviso && <p role="status" className="text-xs font-bold text-bosque-700">{aviso}</p>}
           <div className="grid grid-cols-2 gap-2 max-h-[52vh] overflow-y-auto custom-scrollbar pr-1">
             {encontrados.map(p => {
               const enCarrito = lineas.find(l => l.sku === p.sku)?.qty ?? 0;
@@ -322,7 +353,7 @@ export function TicketModal({ invoice, vuelto }: { invoice: ComprobanteSunat; vu
         {!!invoice.puntosCanjeados && <p className="text-[10px] text-right">Puntos canjeados: {invoice.puntosCanjeados}</p>}
         {!!invoice.puntosGanados && invoice.puntosGanados > 0 && <p className="text-[10px] text-right">Puntos ganados: {invoice.puntosGanados}</p>}
       </div>
-      <button onClick={() => { window.print(); close(); }} className="w-full py-2.5 rounded-2xl bg-bosque-950 text-oro font-bold">
+      <button onClick={() => { imprimirTicket(ticketHtml(invoice, company, titulo, vuelto), invoice.id); close(); }} className="w-full py-2.5 rounded-2xl bg-bosque-950 text-oro font-bold">
         Imprimir Ticket
       </button>
     </ModalShell>
@@ -333,79 +364,14 @@ export function TicketModal({ invoice, vuelto }: { invoice: ComprobanteSunat; vu
 // MODAL: GENERADOR DE ETIQUETAS QR BOTÁNICAS
 // ============================================================
 export function QrModal({ presetSku }: { presetSku: string }) {
-  const { state } = useErp();
   const { close } = useUi();
-  const scan = useScanner();
-  const { products, company } = state;
-  const [sku, setSku] = useState(presetSku);
-  const [size, setSize] = useState<'50x30' | '70x40' | 'A4_SHEET'>('50x30');
-  const [qty, setQty] = useState(1);
-  const currentProd = products.find(p => p.sku === sku) || products[0];
-
   return (
-    <ModalShell size="max-w-xl" padding="p-6" overlay="bg-bosque-950/80" className="space-y-5">
-      <div className="flex justify-between items-center pb-3 border-b border-[#f0eae1]">
-        <div className="flex items-center gap-2">
-          <QrCode className="w-5 h-5 text-bosque-700" />
-          <h3 className="font-serif font-bold text-lg text-tinta">Generador de Etiquetas & QR Botánico</h3>
-        </div>
-        <button onClick={close}><X className="w-5 h-5 text-tinta-suave" /></button>
+    <ModalShell size="max-w-4xl" padding="p-6" overlay="bg-bosque-950/80" className="space-y-4 max-h-[94vh] overflow-y-auto custom-scrollbar">
+      <div className="flex justify-between items-center pb-3 border-b border-crema-300">
+        <h3 className="font-serif font-bold text-lg text-tinta flex items-center gap-2"><QrCode className="w-5 h-5 text-bosque-700" aria-hidden /> Etiquetas QR</h3>
+        <button onClick={close} aria-label="Cerrar"><X className="w-5 h-5 text-tinta-suave" /></button>
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className="font-bold block mb-1 text-tinta">Seleccionar Planta</label>
-          <select value={sku} onChange={(e) => setSku(e.target.value)} className="w-full p-2 bg-crema border border-crema-300 rounded-xl font-bold text-xs">
-            {products.map(p => <option key={p.sku} value={p.sku}>{p.name} ({p.sku})</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="font-bold block mb-1 text-tinta">Formato de Etiqueta</label>
-          <select value={size} onChange={(e) => setSize(e.target.value as typeof size)} className="w-full p-2 bg-crema border border-crema-300 rounded-xl font-semibold text-xs">
-            <option value="50x30">🏷️ 50x30 mm (Maceta estándar)</option>
-            <option value="70x40">🌿 70x40 mm (Estaca grande)</option>
-            <option value="A4_SHEET">📄 Pliego A4 (24 stickers)</option>
-          </select>
-        </div>
-        <div>
-          <label className="font-bold block mb-1 text-tinta">Cantidad</label>
-          <input type="number" min={1} max={100} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-full p-2 bg-crema border rounded-xl font-bold text-xs" />
-        </div>
-      </div>
-
-      {/* Vista Previa */}
-      <div className="p-4 bg-crema border-2 border-dashed border-oro/60 rounded-3xl flex items-center justify-center">
-        <div className="w-[320px] bg-white border-2 border-bosque-950 p-3.5 rounded-2xl shadow-md space-y-2 text-tinta">
-          <div className="flex items-center justify-between border-b border-bosque-950 pb-1">
-            <span className="font-serif font-bold text-[11px] uppercase tracking-wider">{company.nombreComercial.split(' - ')[0]}</span>
-            <span className="font-mono text-[9px] font-bold bg-bosque-950 text-oro px-1.5 py-0.5 rounded">{currentProd.sku}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="p-1 bg-white border border-bosque-950 rounded-xl flex flex-col items-center justify-center shrink-0">
-              <QrCode className="w-14 h-14 text-tinta" />
-              <span className="text-[7px] font-mono font-bold">ESCANEAR POS</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-serif font-bold text-sm truncate">{currentProd.name}</h4>
-              <p className="text-[9px] text-earth-500 italic font-serif truncate">{currentProd.scientificName}</p>
-              <p className="text-[8px] text-tinta-suave">{currentProd.careLight} • {currentProd.careWater}</p>
-            </div>
-          </div>
-          <div className="pt-1 border-t border-dashed flex justify-between items-center text-xs">
-            <span className="font-mono text-[8px] text-gray-500 font-bold">{currentProd.location}</span>
-            <span className="font-serif font-bold text-sm text-tinta">S/ {currentProd.price.toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-2 pt-2 border-t">
-        <button onClick={() => scan(sku)} className="flex-1 py-3 rounded-2xl bg-crema-200 hover:bg-[#eae1d5] text-tinta font-bold text-xs flex items-center justify-center gap-1.5">
-          <ScanLine className="w-4 h-4 text-bosque-700" /> Simular Escaneo en Caja
-        </button>
-        <button onClick={() => { window.print(); alert(`✅ Imprimiendo ${qty} etiqueta(s) térmica(s) (${size})`); }} className="flex-1 py-3 rounded-2xl bg-bosque-950 hover:bg-bosque-800 text-oro font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg">
-          <Printer className="w-4 h-4" /> Imprimir Etiqueta(s)
-        </button>
-      </div>
+      <GeneradorEtiquetas presetSku={presetSku} />
     </ModalShell>
   );
 }
@@ -451,4 +417,21 @@ export function EgresoModal() {
       </div>
     </ModalShell>
   );
+}
+
+/** Representación impresa del comprobante (80 mm) con el QR de SUNAT: RUC|tipo|serie|número|IGV|total|fecha|tipo doc|n° doc. */
+function ticketHtml(inv: ComprobanteSunat, company: { razonSocial: string; ruc: string; direccion: string; pieDePaginaTicket: string }, titulo: string, vuelto?: number): string {
+  const [serie, numero] = inv.id.split('-');
+  const qr = qrSvg([company.ruc, inv.tipoComprobante, serie, numero, inv.totalIgv.toFixed(2), inv.montoTotal.toFixed(2), inv.fechaEmision, inv.cliente.tipoDoc, inv.cliente.numDoc].join('|'));
+  const fila = (a: string, b: string, fuerte = false) => `<div style="display:flex;justify-content:space-between;gap:6px${fuerte ? ';font-weight:800' : ''}"><span>${a}</span><span>${b}</span></div>`;
+  return `<div style="text-align:center"><b style="font-size:13px">${esc(company.razonSocial)}</b><div>RUC ${esc(company.ruc)}</div><div>${esc(company.direccion)}</div></div>
+    <hr style="border:0;border-top:1px dashed #000"><div style="text-align:center;font-weight:800">${esc(titulo)}<br>${esc(inv.id)}</div>
+    <div>Fecha: ${esc(inv.fechaEmision)} ${esc(inv.horaEmision ?? '')}</div><div>Cliente: ${esc(inv.cliente.nombreRazonSocial)}${inv.cliente.numDoc ? ` (${esc(inv.cliente.numDoc)})` : ''}</div>
+    ${inv.referencia ? `<div>Modifica a: ${esc(inv.referencia)} · ${esc(inv.motivo ?? '')}</div>` : ''}
+    <hr style="border:0;border-top:1px dashed #000">${inv.items.map(it => fila(`${it.cantidad} x ${esc(it.descripcion)}`, it.total.toFixed(2))).join('')}
+    <hr style="border:0;border-top:1px dashed #000">
+    ${inv.descuentoTotal ? fila('Descuento', `-${inv.descuentoTotal.toFixed(2)}`) : ''}${fila('Op. gravada', inv.opGravadas.toFixed(2))}${fila('IGV 18%', inv.totalIgv.toFixed(2))}${fila('TOTAL S/', inv.montoTotal.toFixed(2), true)}
+    ${(inv.pagos ?? []).map(p => fila(`${inv.tipoComprobante === '07' ? 'Reembolso' : 'Pago'} ${esc(p.medio)}`, p.monto.toFixed(2))).join('')}${vuelto ? fila('Vuelto', vuelto.toFixed(2), true) : ''}
+    <div style="width:30mm;margin:8px auto">${qr}</div><div style="text-align:center;font-size:9px">Representación impresa de la ${esc(titulo.toLowerCase())}</div>
+    ${company.pieDePaginaTicket ? `<div style="text-align:center;margin-top:6px">${esc(company.pieDePaginaTicket)}</div>` : ''}`;
 }

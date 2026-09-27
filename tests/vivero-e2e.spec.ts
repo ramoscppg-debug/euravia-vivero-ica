@@ -1,5 +1,11 @@
 import fs from 'fs';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+/** Abre una sección del centro de control por su enlace (#hash), como un marcador del navegador. */
+async function ir(page: Page, tab: string) {
+  await page.evaluate(t => { window.location.hash = t; }, tab);
+  await page.waitForFunction(t => window.location.hash === `#${t}`, tab);
+}
 
 test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   let consoleErrors: string[] = [];
@@ -14,16 +20,16 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     page.on('pageerror', (exception) => {
       consoleErrors.push(exception.message);
     });
-    await page.goto('/panel');
+    await page.goto('/');
     // Check main branding
     await expect(page.getByRole('heading', { name: 'AUREVIA', exact: true })).toBeVisible();
   });
 
   test('1. Dashboard 360° loads without errors and renders KPI summary', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Inicio Aurevia 360°' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Inicio', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Centro de control de ventas' })).toBeVisible();
-    // Hubs organizados por flujo de negocio
-    for (const hub of ['Vender', 'Servicios', 'Inventario', 'Administración']) {
+    // Accesos por área de trabajo
+    for (const hub of ['Ventas', 'Catálogo y almacén', 'Servicios', 'Contabilidad']) {
       await expect(page.getByRole('heading', { name: hub, exact: true })).toBeVisible();
     }
     await expect(page.getByRole('heading', { name: 'Pendientes de Hoy' })).toBeVisible();
@@ -32,61 +38,62 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('2. Navigation across all business areas via Sidebar & Top Switcher', async ({ page }) => {
     // 1. Tienda & Catalogo
-    await page.click('button:has-text("Tienda & Catálogo POS")');
+    await ir(page, 'catalogo');
     await expect(page.getByRole('heading', { name: 'Monstera Deliciosa' })).toBeVisible();
 
     // 2. Jardines & Paisajismo
-    await page.click('button:has-text("Jardines & Paisajismo VIP")');
+    await ir(page, 'jardineria');
     await expect(page.getByText('Servicios de Jardinería, Paisajismo & Mantenimiento')).toBeVisible();
 
     // 3. Kardex & Almacen
-    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await ir(page, 'kardex');
     await expect(page.getByText('Control Físico de Kardex & Almacén')).toBeVisible();
 
     // 4. Guías de Remisión
-    await page.click('button:has-text("Guías de Remisión GRE")');
+    await ir(page, 'guias');
     await expect(page.getByRole('heading', { name: 'Guías de Remisión Electrónica (GRE Remitente T001)' })).toBeVisible();
 
     // 5. Facturación SUNAT
-    await page.click('button:has-text("Facturación SUNAT SEE")');
+    await ir(page, 'sunat');
     await expect(page.getByRole('heading', { name: 'Comprobantes de Pago Electrónicos' })).toBeVisible();
 
     // 6. Contabilidad & SIRE
-    await page.click('button:has-text("Contabilidad & SIRE")');
+    await ir(page, 'contabilidad');
     await expect(page.getByText('Configuración del Régimen Tributario SUNAT')).toBeVisible();
 
     // 7. Planilla & Provisiones
-    await page.click('button:has-text("Planilla & Provisiones")');
+    await ir(page, 'planilla');
     await expect(page.getByRole('heading', { name: 'Gestión de Nómina, AFP y Seguro Social' })).toBeVisible();
 
     // 8. Ajustes Empresa
-    await page.click('button:has-text("Ajustes & RUC Empresa")');
+    await ir(page, 'configuracion');
     await expect(page.getByRole('heading', { name: 'Datos Fiscales, SUNAT SOL & Cuentas Bancarias' })).toBeVisible();
 
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
-  test('3. Botanical QR & Barcode Tag Modal generates and previews labels', async ({ page }) => {
-    await page.click('button:has-text("Tienda & Catálogo POS")');
-    await page.waitForTimeout(300);
+  test('3. Etiquetas QR por lote: N copias por producto y el QR se lee en la caja', async ({ page }) => {
+    await ir(page, 'catalogo');
+    await page.locator('button:has-text("QR Tag")').first().click();
+    await expect(page.getByRole('heading', { name: 'Etiquetas QR', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Vista previa de la etiqueta').locator('svg')).toBeVisible(); // QR real, no un ícono
+    await page.getByLabel('Copias de Ficus Lyrata Pandurata').fill('30');
+    await expect(page.getByRole('button', { name: 'Imprimir 40 etiqueta(s)' })).toBeVisible(); // 10 del producto elegido + 30
+    await page.getByRole('button', { name: 'Imprimir 40 etiqueta(s)' }).click();
+    // Se imprime desde un marco propio (no la pantalla del panel) con las 40 etiquetas
+    await expect.poll(() => page.evaluate(() => document.querySelector('iframe')?.contentDocument?.querySelectorAll('.et').length ?? 0)).toBe(40);
+    await page.locator('.fixed button[aria-label="Cerrar"]').first().click();
 
-    const qrBtn = page.locator('button:has-text("QR Tag")').first();
-    await qrBtn.click();
-
-    await expect(page.getByRole('heading', { name: 'Generador de Etiquetas & QR Botánico' })).toBeVisible();
-    await expect(page.getByText('AUR-001').first()).toBeVisible();
-
-    await page.selectOption('select >> nth=1', '70x40');
-    await page.selectOption('select >> nth=1', 'A4_SHEET');
-
-    await page.click('button:has-text("Simular Escaneo en Caja")');
-    await expect(page.getByText('Emitir Venta & CPE SUNAT (POS)')).toBeVisible();
-
+    // El lector de la caja recibe el enlace del QR y suma el producto
+    await page.click('button:has-text("Nueva venta")');
+    await page.getByLabel('Buscar o escanear producto').fill('http://localhost:5199/tienda/producto/AUR-003');
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('+1 Ficus Lyrata Pandurata')).toBeVisible();
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
   test('4. POS Quick Barcode Scanner & SUNAT Electronic Invoicing Flow', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     await expect(page.getByText('Emitir Venta & CPE SUNAT (POS)')).toBeVisible();
 
     // Escáner: escribir el SKU y Enter lo agrega al carrito
@@ -103,7 +110,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('5. Inventory & Warehouse Purchases (Kardex + SIRE RCE)', async ({ page }) => {
-    await page.click('button:has-text("Ingreso Almacén (+)")');
+    await page.click('button:has-text("Ingreso a almacén")');
     await expect(page.getByText('Registrar Compra Mayorista (Almacén)')).toBeVisible();
 
     page.once('dialog', async (dialog) => {
@@ -116,7 +123,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('6. Guía de Remisión Electrónica (GRE Remitente)', async ({ page }) => {
-    await page.click('button:has-text("Guías de Remisión GRE")');
+    await ir(page, 'guias');
     await expect(page.getByRole('heading', { name: 'Guías de Remisión Electrónica (GRE Remitente T001)' })).toBeVisible();
     await expect(page.getByText('T001-00000014')).toBeVisible();
     await expect(page.getByText('Valeria Benavides (DNI 47891234)')).toBeVisible();
@@ -124,7 +131,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('7. Accounting, SIRE Electronic Books & AFPnet Export', async ({ page }) => {
-    await page.click('button:has-text("Contabilidad & SIRE")');
+    await ir(page, 'contabilidad');
     await expect(page.getByText('Configuración del Régimen Tributario SUNAT')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exportar RVIE (SIRE)' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exportar RCE (SIRE)' })).toBeVisible();
@@ -135,7 +142,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     });
     await page.click('button:has-text("Exportar RVIE (SIRE)")');
 
-    await page.click('button:has-text("Planilla & Provisiones")');
+    await ir(page, 'planilla');
     await expect(page.getByRole('heading', { name: 'Gestión de Nómina, AFP y Seguro Social' })).toBeVisible();
 
     page.once('dialog', async (dialog) => {
@@ -148,7 +155,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('8. Company Settings & SUNAT Configuration Save', async ({ page }) => {
-    await page.click('button:has-text("Ajustes & RUC Empresa")');
+    await ir(page, 'configuracion');
     
     const rucInput = page.locator('input[value="20609876541"]');
     await expect(rucInput).toBeVisible();
@@ -161,7 +168,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('9. Control de Caja Chica & Arqueo Diario', async ({ page }) => {
-    await page.click('button:has-text("Caja:")');
+    await ir(page, 'caja');
     await expect(page.getByText('Control de Caja Chica & Arqueo Diario')).toBeVisible();
     await expect(page.getByText('Efectivo en Gaveta')).toBeVisible();
     await expect(page.getByText('Yape & Plin')).toBeVisible();
@@ -177,7 +184,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('10. Monitor de Detracciones SPOT (Banco de la Nación)', async ({ page }) => {
-    await page.click('button:has-text("Detracciones SPOT (BN)")');
+    await ir(page, 'detracciones');
     await expect(page.getByText('Sistema de Detracciones SPOT (SUNAT & Banco de la Nación)')).toBeVisible();
     await expect(page.getByText('F001-00000088')).toBeVisible();
     await expect(page.getByText('Boutique Hotel Miraflores SAC')).toBeVisible();
@@ -185,7 +192,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('11. CRM Botánico & Alertas Estacionales', async ({ page }) => {
-    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await ir(page, 'crm');
     await expect(page.getByText('CRM Botánico & Fidelización de Clientes')).toBeVisible();
     await expect(page.getByText('Valeria Benavides')).toBeVisible();
     await expect(page.getByText('Enviar WhatsApp Botánico').first()).toBeVisible();
@@ -193,7 +200,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('12. Módulo de Bajas Biológicas & Cuarentena', async ({ page }) => {
-    await page.click('button:has-text("Bajas & Cuarentena")');
+    await ir(page, 'bajas');
     await expect(page.getByText('Módulo de Bajas Biológicas & Cuarentena')).toBeVisible();
     await expect(page.getByText('Monstera Deliciosa')).toBeVisible();
     await expect(page.getByText('DESMEDRO PLAGA')).toBeVisible();
@@ -201,7 +208,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('13. Detracción SPOT servicios al 12% (Anexo 3 cód. 037)', async ({ page }) => {
-    await page.click('button:has-text("Detracciones SPOT (BN)")');
+    await ir(page, 'detracciones');
     await expect(page.getByText('Sistema de Detracciones SPOT (SUNAT & Banco de la Nación)')).toBeVisible();
     // La tasa vigente para "demás servicios gravados con IGV" es 12%, no 10%
     await expect(page.getByText(/Detracción \(12%\)/).first()).toBeVisible();
@@ -210,7 +217,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('14. Planilla régimen-aware: microempresa usa SIS y sin CTS/gratificaciones', async ({ page }) => {
-    await page.click('button:has-text("Planilla & Provisiones")');
+    await ir(page, 'planilla');
     await expect(page.getByRole('heading', { name: 'Gestión de Nómina, AFP y Seguro Social' })).toBeVisible();
 
     // El aporte de salud ya no se rotula "EsSalud 9%" fijo
@@ -225,7 +232,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('15. Régimen NRUS: cuota fija y sin IGV', async ({ page }) => {
-    await page.click('button:has-text("Contabilidad & SIRE")');
+    await ir(page, 'contabilidad');
     await page.click('button:has-text("Nuevo RUS (NRUS)")');
     await expect(page.getByText(/Cuota fija NRUS categoría/)).toBeVisible();
     await expect(page.getByText(/Sin IGV en NRUS/)).toBeVisible();
@@ -233,7 +240,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('16. Botón "Consultar RUC" ejecuta la validación módulo 11 (offline)', async ({ page }) => {
-    await page.click('button:has-text("Ajustes & RUC Empresa")');
+    await ir(page, 'configuracion');
     await expect(page.getByRole('heading', { name: 'Datos Fiscales, SUNAT SOL & Cuentas Bancarias' })).toBeVisible();
 
     // El RUC de demo (20609876541) no cumple el dígito verificador -> aviso módulo 11
@@ -249,13 +256,13 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('17. Una venta POS descuenta stock y queda registrada en el Kardex', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
 
-    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await ir(page, 'kardex');
     const fila = page.locator('tr', { hasText: 'Venta Cliente' }).first();
     await expect(fila).toContainText('AUR-001');
     await expect(fila).toContainText('27'); // 28 iniciales - 1 vendida
@@ -263,7 +270,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('18. Proyecto de jardinería: se factura una sola vez y genera detracción', async ({ page }) => {
-    await page.click('button:has-text("Jardines & Paisajismo VIP")');
+    await ir(page, 'jardineria');
     const proyecto = page.locator('div.rounded-3xl', { hasText: 'JAR-2026-002' }).last();
     await proyecto.locator('button:has-text("Facturar con SPOT")').click();
     await expect(page.getByText('FACTURA ELECTRÓNICA')).toBeVisible();
@@ -272,7 +279,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(proyecto.getByText(/Facturado: F001-/)).toBeVisible();
     await expect(proyecto.locator('button:has-text("Facturar con SPOT")')).toHaveCount(0);
 
-    await page.click('button:has-text("Detracciones SPOT (BN)")');
+    await ir(page, 'detracciones');
     await expect(page.getByText('Pendiente de Pago')).toHaveCount(2); // la inicial + la nueva
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
@@ -281,7 +288,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     const mensajes: string[] = [];
     page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
     for (let i = 0; i < 2; i++) {
-      await page.click('button:has-text("Ingreso Almacén (+)")');
+      await page.click('button:has-text("Ingreso a almacén")');
       await page.click('button:has-text("Registrar e Incrementar Stock")');
     }
     await expect.poll(() => mensajes.length).toBe(2);
@@ -290,7 +297,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('21. La Clave SOL no se guarda en el navegador ni en los comprobantes', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
     await page.check('input[type=checkbox]'); // con guía de remisión
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
@@ -304,11 +311,11 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('19. Los datos persisten al recargar y la pestaña queda en la URL', async ({ page }) => {
-    await page.click('button:has-text("Ingreso Almacén (+)")');
+    await page.click('button:has-text("Ingreso a almacén")');
     page.once('dialog', dialog => dialog.accept());
     await page.click('button:has-text("Registrar e Incrementar Stock")');
 
-    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await ir(page, 'kardex');
     await expect(page).toHaveURL(/#kardex$/);
     await page.reload();
     await expect(page.getByText('Control Físico de Kardex & Almacén')).toBeVisible();
@@ -317,7 +324,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('22. Carrito con varios productos, descuento global y pago mixto', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Monstera Deliciosa")').click();
     await pos.getByLabel('Más AUR-001').click(); // 2 × 85 = 170
@@ -336,14 +343,14 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.getByText('Descuento aplicado: -21.80')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
 
-    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await ir(page, 'kardex');
     await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-001' }).locator('td').nth(5)).toHaveText('26');
     await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-002' }).locator('td').nth(5)).toHaveText('34');
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
   test('23. Pago con billete calcula el vuelto y no permite pagar de menos', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Monstera Deliciosa")').click();
     await pos.getByLabel('Monto 1').fill('50');
@@ -358,7 +365,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('24. Devolución parcial emite nota de crédito y devuelve stock', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Monstera Deliciosa")').click();
     await pos.getByLabel('Más AUR-001').click();
@@ -366,7 +373,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
 
-    await page.click('button:has-text("Facturación SUNAT SEE")');
+    await ir(page, 'sunat');
     await page.locator('button:has-text("Devolución")').first().click();
     const modal = page.locator('.fixed');
     await modal.getByLabel('Devolver AUR-001').fill('1');
@@ -382,7 +389,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.locator('.fixed').getByLabel('Devolver AUR-001')).toHaveValue('1');
     await page.locator('.fixed button:has(svg.lucide-x)').first().click();
 
-    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await ir(page, 'kardex');
     await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-001' }).locator('td').nth(5)).toHaveText('27'); // 28 - 2 + 1
     await expect(page.locator('table').nth(1).locator('tr', { hasText: 'Devolucion Cliente' })).toHaveCount(1);
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
@@ -390,7 +397,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('25. Pedido completo: crear → cobrar → preparar → en ruta → entregado', async ({ page }) => {
     page.on('dialog', d => void d.accept(d.type() === 'prompt' ? 'Raúl Morales Alva' : undefined));
-    await page.click('button:has-text("Pedidos & Delivery")');
+    await ir(page, 'pedidos');
     await expect(page.getByRole('heading', { name: 'Pedidos & Delivery' })).toBeVisible();
 
     await page.click('button:has-text("Nuevo Pedido")');
@@ -423,9 +430,9 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.getByRole('region', { name: 'Columna Entregado' }).getByText('Lucía Torres')).toBeVisible();
 
     // El stock bajó al cobrar (14 → 13) y quedó la guía de remisión
-    await page.click('button:has-text("Kardex & Almacén Físico")');
+    await ir(page, 'kardex');
     await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-003' }).locator('td').nth(5)).toHaveText('13');
-    await page.click('button:has-text("Guías de Remisión GRE")');
+    await ir(page, 'guias');
     await expect(page.getByText('Av. Primavera 900, Surco')).toBeVisible();
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
@@ -433,7 +440,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   test('26. Pedidos reservan stock y un pedido pendiente se puede cancelar', async ({ page }) => {
     const mensajes: string[] = [];
     page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
-    await page.click('button:has-text("Pedidos & Delivery")');
+    await ir(page, 'pedidos');
 
     // Ficus: 14 en stock → pedir 15 no se permite
     await page.click('button:has-text("Nuevo Pedido")');
@@ -457,7 +464,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('27. CRM: crear cliente, buscarlo y anotar en su ficha', async ({ page }) => {
-    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await ir(page, 'crm');
     await page.click('button:has-text("Nuevo cliente")');
     const m = page.locator('.fixed');
     await m.getByLabel('Nombre').fill('Rosa Quispe');
@@ -491,7 +498,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('28. CRM: una venta aparece en el historial y en los cuidados; tareas se completan', async ({ page }) => {
     // Venta a Valeria por su DNI (el POS completa el nombre)
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Ficus Lyrata Pandurata")').click();
     await pos.getByLabel('Documento del cliente').fill('47891234');
@@ -500,7 +507,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
 
-    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await ir(page, 'crm');
     const tarjeta = page.locator('div.rounded-3xl', { has: page.getByRole('heading', { name: 'Valeria Benavides' }) }).last();
     await tarjeta.locator('button:has-text("Ver ficha")').click();
     const ficha = page.locator('.fixed');
@@ -522,7 +529,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   test('29. CRM: importar y exportar clientes en CSV', async ({ page }) => {
     const mensajes: string[] = [];
     page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
-    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await ir(page, 'crm');
     await page.getByLabel('Archivo CSV de clientes').setInputFiles({
       name: 'clientes.csv',
       mimeType: 'text/csv',
@@ -540,7 +547,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('30. POS: cupón de descuento y canje de puntos del cliente', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Monstera Deliciosa")').click(); // 85
     await pos.getByLabel('Documento del cliente').fill('47891234'); // Valeria: 8 puntos
@@ -558,7 +565,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     // El cupón con compra mínima no aplica a una venta chica
     const mensajes: string[] = [];
     page.on('dialog', d => { mensajes.push(d.message()); void d.accept(); });
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     await pos.locator('button:has-text("Sustrato Premium")').click(); // 28 < 100
     await pos.getByLabel('Código de cupón').fill('DELIVERY10');
     await pos.locator('button:has-text("Aplicar")').click();
@@ -567,7 +574,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   });
 
   test('31. Cotización: crear, y convertir en venta con el carrito precargado', async ({ page }) => {
-    await page.click('button:has-text("Cotizaciones & Cupones")');
+    await ir(page, 'cotizaciones');
     await page.click('button:has-text("Nueva Cotización")');
     const m = page.locator('.fixed');
     await m.getByLabel('Cliente').fill('Oficinas Ica SAC');
@@ -591,7 +598,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('32. Contrato de mantenimiento: facturar el mes una sola vez, con detracción y visitas', async ({ page }) => {
     page.on('dialog', d => void d.accept());
-    await page.click('button:has-text("Contratos de Mantenimiento")');
+    await ir(page, 'contratos');
     const con = page.getByRole('article').filter({ hasText: 'Boutique Hotel Miraflores SAC' });
     await expect(con.getByText('Toca facturar este mes')).toBeVisible();
     await con.locator('button:has-text("Facturar")').click();
@@ -601,22 +608,22 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(con.locator('button:has-text("Facturar")')).toHaveCount(0);
 
     // 850 > 700 con RUC → detracción; y quedaron agendadas las visitas del mes
-    await page.click('button:has-text("Detracciones SPOT (BN)")');
+    await ir(page, 'detracciones');
     await expect(page.getByText('Pendiente de Pago')).toHaveCount(2);
-    await page.click('button:has-text("CRM Botánico & Alertas")');
+    await ir(page, 'crm');
     await expect(page.getByText(/2 visita\(s\) de mantenimiento/)).toBeVisible();
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
   test('33. Reportes: ventas del mes por producto, canal y vendedor', async ({ page }) => {
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Palmera Areca")').click();
     await pos.getByLabel('Más AUR-004').click(); // 2 × 95 = 190
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await page.locator('button:has(svg.lucide-x)').first().click();
 
-    await page.click('button:has-text("Reportes de Ventas")');
+    await ir(page, 'reportes');
     await expect(page.getByRole('heading', { name: 'Reportes de Ventas' })).toBeVisible();
     const productos = page.getByRole('region', { name: 'Productos más vendidos' });
     await expect(productos.getByText('Palmera Areca Palma de Salón')).toBeVisible();
@@ -635,19 +642,19 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();
     await page.clock.install({ time: new Date('2026-09-26T01:30:00Z') }); // 25/09 20:30 en Lima
-    await page.goto('/panel');
-    await page.click('button:has-text("Nueva Venta (POS & CPE)")');
+    await page.goto('/');
+    await page.click('button:has-text("Nueva venta")');
     await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
-    await page.click('button:has-text("Facturación SUNAT SEE")');
+    await ir(page, 'sunat');
     await expect(page.getByText(/2026-09-25 20:30/)).toBeVisible();
     await ctx.close();
   });
 });
 
-test.describe('Tienda pública AUREVIA', () => {
+test.describe('Tienda pública AUREVIA (/tienda)', () => {
   let errores: string[] = [];
   test.beforeEach(async ({ page }) => {
     errores = [];
@@ -655,90 +662,108 @@ test.describe('Tienda pública AUREVIA', () => {
     page.on('pageerror', e => errores.push(e.message));
   });
 
-  test('T1. Se navega sin iniciar sesión y no muestra datos internos', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: /Plantas, insumos y jardinería/ })).toBeVisible();
+  test('T1. El cliente navega sin iniciar sesión, ve el stock real y no ve datos internos', async ({ page }) => {
+    await page.goto('/tienda');
+    await expect(page.getByRole('heading', { level: 1, name: /Cotiza tus plantas/ })).toBeVisible();
     await expect(page).toHaveTitle(/AUREVIA/);
+    await expect(page.getByRole('link', { name: /Acceso del equipo/ })).toHaveCount(0); // el enlace del equipo no aparece
     await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Plantas' }).click();
-    await expect(page).toHaveURL(/\/plantas$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Plantas' })).toBeVisible();
-
-    // Búsqueda y filtros viven en la URL (se pueden compartir)
+    await expect(page).toHaveURL(/\/tienda\/plantas$/);
     await page.getByPlaceholder('Buscar por nombre…').fill('monstera');
     await expect(page).toHaveURL(/q=monstera/);
     await expect(page.getByRole('article')).toHaveCount(1);
-
-    // La tienda no expone costos, stock exacto ni herramientas del panel
+    await expect(page.getByRole('article').getByText('28 disponibles')).toBeVisible();
     const texto = await page.locator('body').innerText();
-    expect(texto).not.toMatch(/Costo|Kardex|RUC|Stock:/);
+    expect(texto).not.toMatch(/Costo|Kardex|RUC|Ubicación/);
     expect(errores).toHaveLength(0);
   });
 
-  test('T2. Enlace directo a un producto: precio, disponibilidad, cuidados y metadatos', async ({ page }) => {
-    await page.goto('/producto/AUR-001');
+  test('T2. Enlace directo a un producto: precio, stock, cuidados y metadatos', async ({ page }) => {
+    await page.goto('/tienda/producto/AUR-001');
     await expect(page.getByRole('heading', { level: 1, name: 'Monstera Deliciosa' })).toBeVisible();
     await expect(page.getByText('S/ 85.00').first()).toBeVisible();
-    await expect(page.getByRole('main').getByText('Disponible', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('main').getByText('28 disponibles')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Cuidados' })).toContainText('Riego semanal moderado');
     await expect(page).toHaveTitle('Monstera Deliciosa | AUREVIA');
-    expect(await page.locator('meta[property="og:title"]').getAttribute('content')).toBe('Monstera Deliciosa | AUREVIA');
-    // Un insumo no muestra una sección de cuidados vacía
-    await page.goto('/producto/MAC-001');
-    await expect(page.getByRole('heading', { level: 1, name: /Maceta/ })).toBeVisible();
-    await page.goto('/producto/NO-EXISTE');
+    await page.goto('/tienda/producto/NO-EXISTE');
     await expect(page.getByText('Este producto ya no está en el catálogo')).toBeVisible();
-    await page.goto('/una-ruta-inexistente');
+    await page.goto('/tienda/una-ruta-inexistente');
     await expect(page.getByText('No encontramos esta página')).toBeVisible();
     expect(errores).toHaveLength(0);
   });
 
-  test('T3. Sin WhatsApp configurado no hay enlace falso: se ofrece el formulario', async ({ page }) => {
-    await page.goto('/producto/AUR-002');
-    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
-    await page.getByRole('link', { name: 'Enviar una consulta' }).click();
-    await expect(page).toHaveURL(/\/contacto\?producto=AUR-002/);
-    await expect(page.getByLabel('Mensaje')).toHaveValue(/Sansevieria Laurentii/);
+  test('T3. Pedir más que el stock avisa que lo atiende un asesor', async ({ page }) => {
+    await page.goto('/tienda/producto/AUR-001');
+    await page.getByRole('spinbutton', { name: 'Cantidad de Monstera Deliciosa' }).fill('40');
+    await expect(page.getByText('Tenemos 28 disponibles. 12 u. adicional(es) se atienden como pedido con un asesor de ventas.')).toBeVisible();
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await expect(page.getByRole('dialog', { name: 'Mi cotización' })).toBeVisible();
+    await expect(page.getByRole('dialog').getByText(/Tenemos 28 disponibles/)).toBeVisible();
     expect(errores).toHaveLength(0);
   });
 
-  test('T4. Pedido desde la tienda llega al panel y se convierte en pedido del tablero', async ({ page }) => {
-    await page.goto('/producto/AUR-003');
+  test('T4. Flujo completo: cotización → datos y factura → confirmar → pedido web → pedido → por emitir', async ({ page }) => {
+    await page.goto('/tienda/producto/AUR-003');
     await page.getByRole('button', { name: 'Más' }).click();
-    await page.getByRole('button', { name: 'Agregar a mi pedido' }).click();
-    await page.getByRole('link', { name: /Mi pedido: 2/ }).click();
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirmar pedido' }).click();
+    await expect(page).toHaveURL(/\/tienda\/cotizar$/);
     await expect(page.getByText('S/ 240.00').first()).toBeVisible();
-    await page.getByLabel('Nombre *').fill('Ana Flores');
-    await page.getByLabel('Teléfono o WhatsApp *').fill('+51 955 444 333');
-    await page.getByLabel('Distrito (opcional)').fill('Ica');
-    await page.getByRole('button', { name: 'Enviar solicitud de pedido' }).click();
-    await expect(page.getByText('¡Recibimos tu solicitud!')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Mi pedido: 0/ })).toBeVisible(); // el carrito se vació
+    await page.getByRole('button', { name: 'Continuar' }).click();
 
-    await page.goto('/panel#solicitudes');
+    // Paso 2: validaciones de comprobante
+    await page.getByLabel('Nombre *').fill('Ana Flores');
+    await page.getByLabel('WhatsApp *').fill('+51 955 444 333');
+    await page.getByRole('button', { name: /Factura/ }).click();
+    await page.getByLabel('RUC *').fill('123');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByRole('alert')).toHaveText('Para factura indica un RUC válido de 11 dígitos.');
+    await page.getByLabel('RUC *').fill('20100070970');
+    await page.getByLabel('Razón social *').fill('Jardines Ica SAC');
+    await page.getByRole('button', { name: /Delivery/ }).click();
+    await page.getByLabel('Dirección *').fill('Calle Lima 123');
+    await page.getByLabel('Distrito').fill('Ica');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+
+    // Paso 3: confirmar
+    await expect(page.getByRole('heading', { name: 'Confirma tu pedido' })).toBeVisible();
+    await page.getByRole('button', { name: 'Confirmar pedido' }).click();
+    await expect(page.getByText('¡Pedido registrado!')).toBeVisible();
+    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0); // sin WhatsApp configurado no hay enlace falso
+
+    // Panel: llega como pedido web con factura y se convierte en pedido por emitir
+    await page.goto('/#solicitudes');
     const sol = page.getByRole('article').filter({ hasText: 'Ana Flores' });
-    await expect(sol.getByText('2× Ficus Lyrata Pandurata')).toBeVisible();
-    await expect(sol.getByText('Total referencial: S/ 240.00')).toBeVisible();
+    await expect(sol.getByText('RUC 20100070970')).toBeVisible();
+    await expect(sol.getByText('Factura', { exact: true })).toBeVisible();
     await sol.getByRole('button', { name: 'Crear pedido' }).click();
-    await page.locator('.fixed').getByLabel('Dirección de entrega').fill('Calle Lima 123');
+    await expect(page.locator('.fixed').getByLabel('Dirección de entrega')).toHaveValue('Calle Lima 123');
     await page.locator('.fixed').getByRole('button', { name: 'Crear pedido' }).click();
     await expect(page).toHaveURL(/#pedidos$/);
-    await expect(page.getByRole('region', { name: 'Columna Por cobrar' }).getByText('Ana Flores')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Columna Por cobrar' }).getByText('Jardines Ica SAC')).toBeVisible();
+
+    await ir(page, 'finanzas');
+    const fila = page.getByRole('region', { name: 'Por emitir' }).getByRole('listitem').filter({ hasText: 'Jardines Ica SAC' });
+    await expect(fila.getByText('Factura')).toBeVisible();
+    await fila.getByRole('button', { name: 'Cobrar y emitir' }).click();
+    await expect(page.getByLabel('Tipo de comprobante')).toHaveValue('01'); // el cobro parte de la factura que pidió el cliente
     expect(errores).toHaveLength(0);
   });
 
-  test('T5. Servicios con enlace propio y solicitud de cotización', async ({ page }) => {
-    await page.goto('/servicios');
+  test('T5. Servicio con enlace propio: cotización en pasos', async ({ page }) => {
+    await page.goto('/tienda/servicios');
     await page.getByRole('link', { name: /Jardín Vertical/ }).click();
-    await expect(page).toHaveURL(/\/servicios\/jardin-vertical$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Jardín Vertical' })).toBeVisible();
+    await expect(page).toHaveURL(/\/tienda\/servicios\/jardin-vertical$/);
+    await page.getByRole('link', { name: 'Cotizar este servicio' }).click();
+    await page.getByLabel('¿Qué necesitas? *').fill('Muro de 3 x 2 m en recepción');
+    await page.getByRole('button', { name: 'Continuar' }).click();
     await page.getByLabel('Nombre *').fill('Hotel Paracas');
-    await page.getByLabel('Teléfono o WhatsApp *').fill('956111222');
-    await page.getByLabel('Mensaje').fill('Muro de 3 x 2 m en recepción');
-    await page.getByRole('button', { name: 'Enviar solicitud' }).click();
-    await expect(page.getByText('¡Recibimos tu solicitud!')).toBeVisible();
+    await page.getByLabel('WhatsApp *').fill('956111222');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Confirmar solicitud' }).click();
+    await expect(page.getByText('¡Solicitud registrada!')).toBeVisible();
 
-    // Validación: teléfono inválido no se envía
-    await page.goto('/contacto');
+    await page.goto('/tienda/contacto');
     await page.getByLabel('Nombre *').fill('X Y');
     await page.getByLabel('Teléfono o WhatsApp *').fill('12');
     await page.getByRole('button', { name: 'Enviar consulta' }).click();
@@ -746,30 +771,39 @@ test.describe('Tienda pública AUREVIA', () => {
     expect(errores).toHaveLength(0);
   });
 
-  test('T6. El dueño configura WhatsApp y la tienda usa ese número', async ({ page }) => {
-    await page.goto('/panel#configuracion');
+  test('T6. Con WhatsApp configurado, el pedido confirmado se envía por WhatsApp con su número', async ({ page }) => {
+    await page.goto('/#configuracion');
     await page.getByLabel('WhatsApp de la tienda').fill('+51 987 111 222');
     await page.getByRole('button', { name: 'Guardar datos de la tienda' }).click();
     await expect(page.getByText('Guardado ✓')).toBeVisible();
-    await page.goto('/producto/AUR-001');
-    const wa = page.getByRole('link', { name: 'Consultar por WhatsApp' });
+    await page.goto('/tienda/producto/AUR-001');
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirmar pedido' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByLabel('Nombre *').fill('Luis Pérez');
+    await page.getByLabel('WhatsApp *').fill('987000111');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Confirmar pedido' }).click();
+    const wa = page.getByRole('link', { name: 'Enviar pedido por WhatsApp' });
     await expect(wa).toHaveAttribute('href', /^https:\/\/wa\.me\/51987111222\?text=/);
+    expect(decodeURIComponent((await wa.getAttribute('href'))!)).toMatch(/Pedido AUREVIA N° WEB-.*Comprobante: Boleta.*1 × Monstera Deliciosa/s);
     expect(errores).toHaveLength(0);
   });
 
-  test('T7. En el celular la tienda y el panel tienen menú desplegable', async ({ browser }) => {
+  test('T7. En el celular la tienda y el panel tienen menú desplegable; /panel sigue funcionando', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();
-    await page.goto('/');
+    await page.goto('/tienda');
     await page.getByRole('button', { name: 'Abrir menú' }).click();
     await page.getByRole('navigation', { name: 'Principal (móvil)' }).getByRole('link', { name: 'Servicios' }).click();
-    await expect(page).toHaveURL(/\/servicios$/);
+    await expect(page).toHaveURL(/\/tienda\/servicios$/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-    await page.goto('/panel');
+    await page.goto('/panel#pedidos'); // enlace antiguo: redirige al centro de control
+    await expect(page).toHaveURL(/localhost:5199\/#pedidos$/);
     await page.getByRole('button', { name: 'Abrir menú' }).click();
-    await page.getByRole('button', { name: /Pedidos & Delivery/ }).click();
-    await expect(page.getByRole('heading', { name: 'Pedidos & Delivery' })).toBeVisible();
+    await page.getByRole('button', { name: 'Contabilidad' }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'Ingresos, egresos y por emitir' })).toBeVisible();
     await ctx.close();
   });
 });

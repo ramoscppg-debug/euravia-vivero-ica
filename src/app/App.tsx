@@ -1,20 +1,27 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useUbicacion } from './router';
-import TiendaApp from '../modules/tienda/TiendaApp';
 import { Cargando } from '../components/ui';
 
-// El panel (ERP completo) sólo se descarga cuando alguien entra a /panel
+// Cada lado se descarga por separado: el cliente nunca baja el panel y el equipo no baja la tienda
 const PanelApp = lazy(() => import('./PanelApp'));
+const TiendaApp = lazy(() => import('../modules/tienda/TiendaApp'));
 
-/** Raíz: la tienda pública vive en "/", el centro de control privado en "/panel". */
+/**
+ * Raíz: el enlace principal ("/") es el centro de control del equipo de ventas y el administrador;
+ * la tienda de los clientes vive en "/tienda" (ése es el enlace que se comparte al público).
+ */
 export default function App() {
   const { ruta } = useUbicacion();
-  if (ruta === '/panel' || ruta.startsWith('/panel/')) {
-    return (
-      <Suspense fallback={<Cargando texto="Abriendo el centro de control…" />}>
-        <PanelApp />
-      </Suspense>
-    );
-  }
-  return <TiendaApp />;
+  const esTienda = ruta === '/tienda' || ruta.startsWith('/tienda/');
+
+  // Enlaces antiguos a /panel siguen funcionando
+  useEffect(() => {
+    if (ruta === '/panel' || ruta.startsWith('/panel/')) window.history.replaceState(null, '', `/${window.location.hash}`);
+  }, [ruta]);
+
+  return (
+    <Suspense fallback={<Cargando texto={esTienda ? 'Abriendo la tienda…' : 'Abriendo el centro de control…'} />}>
+      {esTienda ? <TiendaApp /> : <PanelApp />}
+    </Suspense>
+  );
 }
