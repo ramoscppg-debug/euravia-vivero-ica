@@ -5,6 +5,8 @@ import { BajaModal, CompraModal } from '../modules/inventario/InventarioModals';
 import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
 import { NuevoContratoModal } from '../modules/servicios/Contratos';
 import { NuevaCotizacionProductosModal } from '../modules/ventas/Cotizaciones';
+import { FichaProductoModal } from '../modules/ventas/FichaProductoModal';
+import { SolicitudAPedidoModal } from '../modules/ventas/Solicitudes';
 import { CobroPedidoModal, EntregaPedidoModal, NuevoPedidoModal } from '../modules/ventas/Pedidos';
 import { EgresoModal, PosModal, QrModal, TicketModal } from '../modules/ventas/VentasModals';
 import { useUi } from '../store/UiStore';
@@ -36,6 +38,10 @@ export default function ModalHost() {
       return <NuevoContratoModal />;
     case 'cliente':
       return <FichaClienteModal key={modal.clienteId ?? 'nuevo'} clienteId={modal.clienteId} />;
+    case 'solicitud-pedido':
+      return <SolicitudAPedidoModal key={modal.solicitud.id} solicitud={modal.solicitud} />;
+    case 'producto':
+      return <FichaProductoModal key={modal.sku ?? 'nuevo'} sku={modal.sku} />;
     case 'pedido-nuevo':
       return <NuevoPedidoModal />;
     case 'pedido-cobro':

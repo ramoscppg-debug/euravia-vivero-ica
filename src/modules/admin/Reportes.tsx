@@ -3,18 +3,18 @@ import { BarChart3, Download, Table2 } from 'lucide-react';
 import { descargarTxt } from '../../lib/exports';
 import { generarReporte, PERIODOS, rangoDe, type Fila, type Periodo } from '../../lib/reportes';
 import { useErp } from '../../store/ErpStore';
+import { soles } from '../../lib/formato';
 
 // Una sola serie por gráfico: un solo tono de la marca, sin leyenda (el título la nombra)
 const TINTA = '#134e2e';
 const PISTA = '#f4ede4';
-const soles = (n: number) => `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function Kpi({ titulo, valor, nota }: { titulo: string; valor: string; nota?: string }) {
   return (
-    <div className="bg-white p-4 rounded-2xl border border-[#e8e2d8]">
-      <span className="font-bold text-[#5c7367] uppercase text-[10px]">{titulo}</span>
-      <p className="font-serif text-2xl font-bold text-[#082017]">{valor}</p>
-      {nota && <p className="text-[10px] text-[#8fa89b]">{nota}</p>}
+    <div className="bg-white p-4 rounded-2xl border border-crema-300">
+      <span className="font-bold text-tinta-suave uppercase text-[10px]">{titulo}</span>
+      <p className="font-serif text-2xl font-bold text-tinta">{valor}</p>
+      {nota && <p className="text-[10px] text-tinta-suave">{nota}</p>}
     </div>
   );
 }
@@ -25,20 +25,20 @@ function Ranking({ titulo, filas, conMargen = false, max = 8 }: { titulo: string
   const visibles = filas.slice(0, max);
   const tope = Math.max(1, ...visibles.map(f => Math.abs(f.monto)));
   return (
-    <section aria-label={titulo} className="bg-white rounded-3xl border border-[#e8e2d8] p-5 space-y-3 text-xs">
+    <section aria-label={titulo} className="bg-white rounded-3xl border border-crema-300 p-5 space-y-3 text-xs">
       <div className="flex justify-between items-center">
-        <h4 className="font-serif font-bold text-sm text-[#082017]">{titulo}</h4>
-        <button onClick={() => setTabla(t => !t)} className="text-[10px] font-bold text-[#5c7367] flex items-center gap-1" aria-pressed={tabla}>
+        <h4 className="font-serif font-bold text-sm text-tinta">{titulo}</h4>
+        <button onClick={() => setTabla(t => !t)} className="text-[10px] font-bold text-tinta-suave flex items-center gap-1" aria-pressed={tabla}>
           {tabla ? <BarChart3 className="w-3.5 h-3.5" /> : <Table2 className="w-3.5 h-3.5" />} {tabla ? 'Ver gráfico' : 'Ver tabla'}
         </button>
       </div>
-      {!visibles.length && <p className="text-[#8fa89b]">Sin ventas en el periodo.</p>}
+      {!visibles.length && <p className="text-tinta-suave">Sin ventas en el periodo.</p>}
       {tabla ? (
         <table className="w-full">
-          <thead className="text-[10px] uppercase text-[#5c7367]"><tr><th className="text-left py-1">Nombre</th><th className="text-right">Cant.</th><th className="text-right">Monto</th>{conMargen && <th className="text-right">Margen</th>}</tr></thead>
-          <tbody className="divide-y divide-[#f5efe6]">
+          <thead className="text-[10px] uppercase text-tinta-suave"><tr><th className="text-left py-1">Nombre</th><th className="text-right">Cant.</th><th className="text-right">Monto</th>{conMargen && <th className="text-right">Margen</th>}</tr></thead>
+          <tbody className="divide-y divide-earth-100">
             {filas.map(f => (
-              <tr key={f.clave}><td className="py-1 text-[#082017]">{f.clave}</td><td className="text-right">{f.cantidad}</td><td className="text-right font-mono">{soles(f.monto)}</td>{conMargen && <td className="text-right font-mono">{soles(f.margen ?? 0)}</td>}</tr>
+              <tr key={f.clave}><td className="py-1 text-tinta">{f.clave}</td><td className="text-right">{f.cantidad}</td><td className="text-right font-mono">{soles(f.monto)}</td>{conMargen && <td className="text-right font-mono">{soles(f.margen ?? 0)}</td>}</tr>
             ))}
           </tbody>
         </table>
@@ -46,14 +46,14 @@ function Ranking({ titulo, filas, conMargen = false, max = 8 }: { titulo: string
         <ul className="space-y-2">
           {visibles.map(f => (
             <li key={f.clave} className="group" title={`${f.clave}: ${soles(f.monto)} · ${f.cantidad} ${conMargen ? 'u.' : 'venta(s)'}${conMargen ? ` · margen ${soles(f.margen ?? 0)}` : ''}`}>
-              <div className="flex justify-between gap-2 text-[#082017]">
+              <div className="flex justify-between gap-2 text-tinta">
                 <span className="truncate font-semibold">{f.clave}</span>
                 <span className="font-mono shrink-0">{soles(f.monto)}</span>
               </div>
               <div className="h-2 rounded-full mt-1" style={{ background: PISTA }}>
                 <div className="h-2 rounded-full transition-opacity group-hover:opacity-80" style={{ width: `${Math.max(2, (Math.abs(f.monto) / tope) * 100)}%`, background: TINTA }} />
               </div>
-              <span className="text-[10px] text-[#8fa89b]">{f.cantidad} {conMargen ? 'u.' : 'venta(s)'}{conMargen && f.margen !== undefined ? ` · margen ${soles(f.margen)}` : ''}</span>
+              <span className="text-[10px] text-tinta-suave">{f.cantidad} {conMargen ? 'u.' : 'venta(s)'}{conMargen && f.margen !== undefined ? ` · margen ${soles(f.margen)}` : ''}</span>
             </li>
           ))}
         </ul>
@@ -68,12 +68,12 @@ function VentasPorDia({ serie }: { serie: { fecha: string; monto: number }[] }) 
   const tope = Math.max(1, ...serie.map(d => d.monto));
   const punto = activo !== null ? serie[activo] : null;
   return (
-    <section aria-label="Ventas por día" className="bg-white rounded-3xl border border-[#e8e2d8] p-5 space-y-2 text-xs">
+    <section aria-label="Ventas por día" className="bg-white rounded-3xl border border-crema-300 p-5 space-y-2 text-xs">
       <div className="flex justify-between items-baseline">
-        <h4 className="font-serif font-bold text-sm text-[#082017]">Ventas netas por día</h4>
-        <span className="text-[#5c7367] h-4" aria-live="polite">{punto ? `${punto.fecha}: ${soles(punto.monto)}` : `Máximo ${soles(tope)}`}</span>
+        <h4 className="font-serif font-bold text-sm text-tinta">Ventas netas por día</h4>
+        <span className="text-tinta-suave h-4" aria-live="polite">{punto ? `${punto.fecha}: ${soles(punto.monto)}` : `Máximo ${soles(tope)}`}</span>
       </div>
-      <div className="h-40 flex items-end gap-[2px] border-b border-[#e8e2d8]" onMouseLeave={() => setActivo(null)}>
+      <div className="h-40 flex items-end gap-[2px] border-b border-crema-300" onMouseLeave={() => setActivo(null)}>
         {serie.map((d, i) => (
           <button
             key={d.fecha}
@@ -89,7 +89,7 @@ function VentasPorDia({ serie }: { serie: { fecha: string; monto: number }[] }) 
           </button>
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-[#8fa89b]"><span>{serie[0]?.fecha}</span><span>{serie[serie.length - 1]?.fecha}</span></div>
+      <div className="flex justify-between text-[10px] text-tinta-suave"><span>{serie[0]?.fecha}</span><span>{serie[serie.length - 1]?.fecha}</span></div>
     </section>
   );
 }
@@ -113,18 +113,18 @@ export default function Reportes() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-3xl border border-[#e8e2d8] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-6 rounded-3xl border border-crema-300 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="font-serif text-xl font-bold text-[#082017] flex items-center gap-2"><BarChart3 className="w-5 h-5 text-[#134e2e]" /> Reportes de Ventas</h3>
-          <p className="text-xs text-[#5c7367]">Del {desde} al {hasta} · incluye devoluciones · margen = base sin IGV − costo de inventario</p>
+          <h3 className="font-serif text-xl font-bold text-tinta flex items-center gap-2"><BarChart3 className="w-5 h-5 text-bosque-700" /> Reportes de Ventas</h3>
+          <p className="text-xs text-tinta-suave">Del {desde} al {hasta} · incluye devoluciones · margen = base sin IGV − costo de inventario</p>
         </div>
-        <button onClick={exportar} className="px-4 py-2.5 rounded-2xl bg-[#082017] text-[#d4af37] font-bold text-xs flex items-center gap-1.5 shadow-md"><Download className="w-4 h-4" /> Exportar CSV</button>
+        <button onClick={exportar} className="px-4 py-2.5 rounded-2xl bg-bosque-950 text-oro font-bold text-xs flex items-center gap-1.5 shadow-md"><Download className="w-4 h-4" /> Exportar CSV</button>
       </div>
 
       {/* Filtro de periodo: una sola fila sobre los gráficos */}
       <div className="flex flex-wrap gap-1.5 text-xs" role="radiogroup" aria-label="Periodo">
         {PERIODOS.map(p => (
-          <button key={p.id} role="radio" aria-checked={periodo === p.id} onClick={() => setPeriodo(p.id)} className={`px-3 py-1.5 rounded-full font-bold border ${periodo === p.id ? 'bg-[#082017] text-[#d4af37] border-[#082017]' : 'bg-white text-[#5c7367] border-[#e8e2d8]'}`}>{p.label}</button>
+          <button key={p.id} role="radio" aria-checked={periodo === p.id} onClick={() => setPeriodo(p.id)} className={`px-3 py-1.5 rounded-full font-bold border ${periodo === p.id ? 'bg-bosque-950 text-oro border-bosque-950' : 'bg-white text-tinta-suave border-crema-300'}`}>{p.label}</button>
         ))}
       </div>
 

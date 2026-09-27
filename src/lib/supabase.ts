@@ -10,11 +10,15 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? PROYECTO_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? PROYECTO_ANON_KEY;
 
 /**
- * `true` sólo cuando hay credenciales reales configuradas en el `.env`.
- * Cuando es `false`, la app funciona en modo demo (datos en el navegador, sin login):
- * el SDK de Supabase ni siquiera se descarga.
+ * Modo de trabajo:
+ * - nube (por defecto): usa el proyecto de producción de arriba, o el que indiquen VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.
+ * - demo: con VITE_MODO=demo, o con esas dos variables definidas pero vacías (así lo hacen las pruebas E2E).
+ *   Datos de ejemplo en el navegador, sin login; el SDK de Supabase ni siquiera se descarga.
  */
+const modoDemo = import.meta.env.VITE_MODO === 'demo';
+
 export const isSupabaseConfigured =
+  !modoDemo &&
   supabaseUrl.startsWith('http') &&
   !supabaseUrl.includes('tu-proyecto') &&
   !supabaseUrl.includes('placeholder') &&

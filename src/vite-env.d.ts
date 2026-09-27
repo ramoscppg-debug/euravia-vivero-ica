@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  // Modo: 'demo' fuerza datos de ejemplo sin Supabase
+  readonly VITE_MODO?: 'demo' | 'nube'
+
   // Supabase
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string

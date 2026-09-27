@@ -11,11 +11,11 @@ import { hoyLocal } from '../../lib/fechas';
 
 const SEGMENTOS: (Segmento | 'Todos' | 'Toca cuidado')[] = ['Todos', 'VIP', 'Frecuente', 'Nuevo', 'Activo', 'Inactivo', 'Sin compras', 'Toca cuidado'];
 const COLOR_SEGMENTO: Record<Segmento, string> = {
-  VIP: 'bg-[#d4af37] text-[#082017]',
-  Frecuente: 'bg-[#134e2e] text-white',
-  Nuevo: 'bg-[#dcfce7] text-[#134e2e]',
-  Activo: 'bg-[#e7f5ed] text-[#134e2e]',
-  Inactivo: 'bg-[#fee2e2] text-[#b91c1c]',
+  VIP: 'bg-oro text-tinta',
+  Frecuente: 'bg-bosque-700 text-white',
+  Nuevo: 'bg-exito-fondo text-bosque-700',
+  Activo: 'bg-bosque-100 text-bosque-700',
+  Inactivo: 'bg-error-fondo text-error',
   'Sin compras': 'bg-[#f3f4f6] text-[#4b5563]'
 };
 const hoy = () => hoyLocal();
@@ -48,17 +48,17 @@ export default function Clientes() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-[#082017] via-[#0e3324] to-[#144733] rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-[#d4af37]/30">
+      <div className="bg-gradient-to-r from-bosque-950 via-bosque-900 to-[#144733] rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-oro/30">
         <div className="space-y-1">
-          <span className="bg-[#134e2e] text-[#d4af37] px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
+          <span className="bg-bosque-700 text-oro px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit">
             <CalendarClock className="w-4 h-4" /> CRM Botánico & Fidelización de Clientes
           </span>
-          <h3 className="font-serif text-2xl font-bold text-[#fdfbf7]">Ficha Única: Compras, Pedidos, Servicios & Cuidados</h3>
-          <p className="text-xs text-[#c2d4cb]">Cada cliente reúne su historial, notas, recordatorios y los cuidados de las plantas que compró, listos para enviar por WhatsApp.</p>
+          <h3 className="font-serif text-2xl font-bold text-crema-50">Ficha Única: Compras, Pedidos, Servicios & Cuidados</h3>
+          <p className="text-xs text-bosque-200">Cada cliente reúne su historial, notas, recordatorios y los cuidados de las plantas que compró, listos para enviar por WhatsApp.</p>
         </div>
         {edita && (
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => open({ type: 'cliente' })} className="px-3.5 py-2 rounded-2xl bg-[#d4af37] text-[#082017] font-bold text-xs flex items-center gap-1.5"><UserPlus className="w-4 h-4" /> Nuevo cliente</button>
+            <button onClick={() => open({ type: 'cliente' })} className="px-3.5 py-2 rounded-2xl bg-oro text-tinta font-bold text-xs flex items-center gap-1.5"><UserPlus className="w-4 h-4" /> Nuevo cliente</button>
             <button onClick={() => archivo.current?.click()} className="px-3.5 py-2 rounded-2xl bg-white/10 border border-white/20 font-bold text-xs flex items-center gap-1.5"><Upload className="w-4 h-4" /> Importar CSV</button>
             <button onClick={() => descargarTxt(`clientes_aurevia_${hoy()}.csv`, clientesACsv(crmClients))} className="px-3.5 py-2 rounded-2xl bg-white/10 border border-white/20 font-bold text-xs flex items-center gap-1.5"><Download className="w-4 h-4" /> Exportar CSV</button>
             <input ref={archivo} aria-label="Archivo CSV de clientes" type="file" accept=".csv,text/csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void importar(f); }} />
@@ -68,21 +68,21 @@ export default function Clientes() {
 
       {/* Indicadores */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-        <div className="bg-white p-4 rounded-2xl border border-[#e8e2d8]"><span className="font-bold text-[#5c7367] uppercase text-[10px]">Clientes</span><p className="font-serif text-2xl font-bold text-[#082017]">{crmClients.length}</p></div>
-        <div className="bg-white p-4 rounded-2xl border border-[#e8e2d8]"><span className="font-bold text-[#5c7367] uppercase text-[10px]">VIP (≥ S/ 1 000)</span><p className="font-serif text-2xl font-bold text-[#d4af37]">{filas.filter(f => f.m.segmento === 'VIP').length}</p></div>
-        <div className="bg-white p-4 rounded-2xl border border-[#e8e2d8]"><span className="font-bold text-[#5c7367] uppercase text-[10px]">Les toca cuidado</span><p className="font-serif text-2xl font-bold text-[#134e2e]">{filas.filter(f => f.plantas.some(p => p.toca)).length}</p></div>
-        <div className="bg-white p-4 rounded-2xl border border-[#e8e2d8]"><span className="font-bold text-[#5c7367] uppercase text-[10px]">Tareas pendientes</span><p className="font-serif text-2xl font-bold text-[#e05780]">{pendientes.length}</p></div>
+        <div className="bg-white p-4 rounded-2xl border border-crema-300"><span className="font-bold text-tinta-suave uppercase text-[10px]">Clientes</span><p className="font-serif text-2xl font-bold text-tinta">{crmClients.length}</p></div>
+        <div className="bg-white p-4 rounded-2xl border border-crema-300"><span className="font-bold text-tinta-suave uppercase text-[10px]">VIP (≥ S/ 1 000)</span><p className="font-serif text-2xl font-bold text-oro">{filas.filter(f => f.m.segmento === 'VIP').length}</p></div>
+        <div className="bg-white p-4 rounded-2xl border border-crema-300"><span className="font-bold text-tinta-suave uppercase text-[10px]">Les toca cuidado</span><p className="font-serif text-2xl font-bold text-bosque-700">{filas.filter(f => f.plantas.some(p => p.toca)).length}</p></div>
+        <div className="bg-white p-4 rounded-2xl border border-crema-300"><span className="font-bold text-tinta-suave uppercase text-[10px]">Tareas pendientes</span><p className="font-serif text-2xl font-bold text-[#e05780]">{pendientes.length}</p></div>
       </div>
 
       {/* Buscador y segmentos */}
-      <div className="bg-white p-4 rounded-3xl border border-[#e8e2d8] space-y-3 text-xs">
-        <div className="flex items-center gap-2 p-2.5 bg-[#faf8f5] border border-[#e8e2d8] rounded-2xl">
-          <Search className="w-4 h-4 text-[#8fa89b]" />
+      <div className="bg-white p-4 rounded-3xl border border-crema-300 space-y-3 text-xs">
+        <div className="flex items-center gap-2 p-2.5 bg-crema border border-crema-300 rounded-2xl">
+          <Search className="w-4 h-4 text-tinta-suave" />
           <input aria-label="Buscar cliente" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre, DNI/RUC, teléfono, distrito o correo" className="flex-1 bg-transparent outline-none font-semibold" />
         </div>
         <div className="flex flex-wrap gap-1.5">
           {SEGMENTOS.map(sg => (
-            <button key={sg} onClick={() => setSegmento(sg)} className={`px-3 py-1 rounded-full font-bold border ${segmento === sg ? 'bg-[#082017] text-[#d4af37] border-[#082017]' : 'bg-[#faf8f5] text-[#5c7367] border-[#e8e2d8]'}`}>{sg}</button>
+            <button key={sg} onClick={() => setSegmento(sg)} className={`px-3 py-1 rounded-full font-bold border ${segmento === sg ? 'bg-bosque-950 text-oro border-bosque-950' : 'bg-crema text-tinta-suave border-crema-300'}`}>{sg}</button>
           ))}
         </div>
       </div>
@@ -91,45 +91,45 @@ export default function Clientes() {
         {visibles.map(({ c: client, m, plantas }) => {
           const proxima = plantas.filter(p => p.toca)[0];
           return (
-            <div key={client.id} className="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-4 flex flex-col justify-between">
+            <div key={client.id} className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-4 flex flex-col justify-between">
               <div className="space-y-3">
                 <div className="flex justify-between items-start gap-2">
                   <div>
-                    <h4 className="font-serif font-bold text-lg text-[#082017]">{client.name}</h4>
-                    <p className="text-xs text-[#5c7367]">{[client.district, client.phone].filter(Boolean).join(' • ')}</p>
+                    <h4 className="font-serif font-bold text-lg text-tinta">{client.name}</h4>
+                    <p className="text-xs text-tinta-suave">{[client.district, client.phone].filter(Boolean).join(' • ')}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${COLOR_SEGMENTO[m.segmento]}`}>{m.segmento}</span>
-                    {client.urgency === 'ALTA' && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#fee2e2] text-[#b91c1c]">ALTA</span>}
+                    {client.urgency === 'ALTA' && <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-error-fondo text-error">ALTA</span>}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                  <div className="p-2 bg-[#faf8f5] rounded-xl border border-[#eae4dc]"><span className="text-[9px] text-[#8fa89b] uppercase font-bold block">Compras</span><span className="font-serif font-bold text-[#082017]">S/ {m.total.toFixed(2)}</span></div>
-                  <div className="p-2 bg-[#faf8f5] rounded-xl border border-[#eae4dc]"><span className="text-[9px] text-[#8fa89b] uppercase font-bold block">Tickets</span><span className="font-serif font-bold text-[#082017]">{m.compras}</span></div>
-                  <div className="p-2 bg-[#faf8f5] rounded-xl border border-[#eae4dc]"><span className="text-[9px] text-[#8fa89b] uppercase font-bold block">Última</span><span className="font-bold text-[#082017] text-[10px]">{m.ultimaCompra ?? '—'}</span></div>
+                  <div className="p-2 bg-crema rounded-xl border border-[#eae4dc]"><span className="text-[9px] text-tinta-suave uppercase font-bold block">Compras</span><span className="font-serif font-bold text-tinta">S/ {m.total.toFixed(2)}</span></div>
+                  <div className="p-2 bg-crema rounded-xl border border-[#eae4dc]"><span className="text-[9px] text-tinta-suave uppercase font-bold block">Tickets</span><span className="font-serif font-bold text-tinta">{m.compras}</span></div>
+                  <div className="p-2 bg-crema rounded-xl border border-[#eae4dc]"><span className="text-[9px] text-tinta-suave uppercase font-bold block">Última</span><span className="font-bold text-tinta text-[10px]">{m.ultimaCompra ?? '—'}</span></div>
                 </div>
 
-                <div className="p-3 bg-[#faf8f5] rounded-2xl border border-[#eae4dc] text-xs space-y-1">
-                  <span className="text-[10px] text-[#8fa89b] uppercase font-bold block">Plantas en su Hogar / Espacio:</span>
-                  <p className="font-semibold text-[#082017]">{[...new Set([...plantas.map(p => p.nombre), ...client.plantsOwned])].join(', ') || 'Sin registrar'}</p>
+                <div className="p-3 bg-crema rounded-2xl border border-[#eae4dc] text-xs space-y-1">
+                  <span className="text-[10px] text-tinta-suave uppercase font-bold block">Plantas en su Hogar / Espacio:</span>
+                  <p className="font-semibold text-tinta">{[...new Set([...plantas.map(p => p.nombre), ...client.plantsOwned])].join(', ') || 'Sin registrar'}</p>
                 </div>
 
-                <div className={`p-3 rounded-2xl text-xs space-y-1 border ${proxima ? 'bg-[#fff7ed] border-[#ffedd5]' : 'bg-[#f0fdf4] border-[#dcfce7]'}`}>
-                  <span className="text-[10px] text-[#134e2e] uppercase font-bold block">{proxima ? `Le toca cuidado: ${proxima.nombre}` : 'Alerta Botánica de Temporada:'}</span>
-                  <p className="text-[#082017]">{proxima ? [proxima.riego, proxima.luz].filter(Boolean).join(' · ') : client.seasonalAlert}</p>
-                  {!proxima && <p className="text-[11px] text-[#5c7367] italic pt-1">💡 {client.recommendedAction}</p>}
+                <div className={`p-3 rounded-2xl text-xs space-y-1 border ${proxima ? 'bg-aviso-fondo border-[#ffedd5]' : 'bg-bosque-50 border-exito-fondo'}`}>
+                  <span className="text-[10px] text-bosque-700 uppercase font-bold block">{proxima ? `Le toca cuidado: ${proxima.nombre}` : 'Alerta Botánica de Temporada:'}</span>
+                  <p className="text-tinta">{proxima ? [proxima.riego, proxima.luz].filter(Boolean).join(' · ') : client.seasonalAlert}</p>
+                  {!proxima && <p className="text-[11px] text-tinta-suave italic pt-1">💡 {client.recommendedAction}</p>}
                 </div>
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => open({ type: 'cliente', clienteId: client.id })} className="flex-1 py-2.5 rounded-2xl bg-[#f4ede4] text-[#082017] font-bold text-xs flex items-center justify-center gap-1.5"><History className="w-3.5 h-3.5" /> Ver ficha</button>
+                <button onClick={() => open({ type: 'cliente', clienteId: client.id })} className="flex-1 py-2.5 rounded-2xl bg-crema-200 text-tinta font-bold text-xs flex items-center justify-center gap-1.5"><History className="w-3.5 h-3.5" /> Ver ficha</button>
                 {client.phone && (
                   <a
                     href={enlaceWhatsapp(client.phone, mensajeCuidados(client, plantas))}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-[1.4] py-2.5 rounded-2xl bg-[#082017] hover:bg-[#123e2c] text-[#d4af37] font-bold text-xs flex items-center justify-center gap-2 shadow-md transition"
+                    className="flex-[1.4] py-2.5 rounded-2xl bg-bosque-950 hover:bg-bosque-800 text-oro font-bold text-xs flex items-center justify-center gap-2 shadow-md transition"
                   >
                     <Send className="w-3.5 h-3.5" /> Enviar WhatsApp Botánico
                   </a>
@@ -138,28 +138,28 @@ export default function Clientes() {
             </div>
           );
         })}
-        {!visibles.length && <p className="text-xs font-semibold text-[#8fa89b]">Ningún cliente coincide con el filtro.</p>}
+        {!visibles.length && <p className="text-xs font-semibold text-tinta-suave">Ningún cliente coincide con el filtro.</p>}
       </div>
 
       {/* Tareas del equipo */}
-      <div className="bg-white rounded-3xl border border-[#e8e2d8] p-6 shadow-sm space-y-3 text-xs">
-        <h4 className="font-serif font-bold text-base text-[#082017] flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#134e2e]" /> Tareas y recordatorios pendientes</h4>
+      <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-3 text-xs">
+        <h4 className="font-serif font-bold text-base text-tinta flex items-center gap-2"><CheckSquare className="w-4 h-4 text-bosque-700" /> Tareas y recordatorios pendientes</h4>
         {pendientes.map(t => {
           const cliente = crmClients.find(c => c.id === t.clienteId);
           const vencida = t.vence < hoy();
           return (
-            <div key={t.id} className="flex items-center gap-3 p-2.5 bg-[#faf8f5] rounded-xl border border-[#eae4dc]">
-              <button aria-label={`Completar: ${t.titulo}`} onClick={() => void actions.marcarTarea(t.id, true)}><Square className="w-4 h-4 text-[#134e2e]" /></button>
+            <div key={t.id} className="flex items-center gap-3 p-2.5 bg-crema rounded-xl border border-[#eae4dc]">
+              <button aria-label={`Completar: ${t.titulo}`} onClick={() => void actions.marcarTarea(t.id, true)}><Square className="w-4 h-4 text-bosque-700" /></button>
               <span className="flex-1">
-                <span className="font-bold text-[#082017] block">{t.titulo}</span>
-                <span className="text-[10px] text-[#8fa89b]">{cliente ? `${cliente.name} · ` : ''}{t.asignadoA ? `${t.asignadoA} · ` : ''}</span>
-                <span className={`text-[10px] font-bold ${vencida ? 'text-[#b91c1c]' : 'text-[#5c7367]'}`}>{vencida ? `venció ${t.vence}` : `para ${t.vence}`}</span>
+                <span className="font-bold text-tinta block">{t.titulo}</span>
+                <span className="text-[10px] text-tinta-suave">{cliente ? `${cliente.name} · ` : ''}{t.asignadoA ? `${t.asignadoA} · ` : ''}</span>
+                <span className={`text-[10px] font-bold ${vencida ? 'text-error' : 'text-tinta-suave'}`}>{vencida ? `venció ${t.vence}` : `para ${t.vence}`}</span>
               </span>
-              {cliente && <button onClick={() => open({ type: 'cliente', clienteId: cliente.id })} className="text-[10px] font-bold underline text-[#134e2e]">ficha</button>}
+              {cliente && <button onClick={() => open({ type: 'cliente', clienteId: cliente.id })} className="text-[10px] font-bold underline text-bosque-700">ficha</button>}
             </div>
           );
         })}
-        {!pendientes.length && <p className="text-[#8fa89b] font-semibold">Sin tareas pendientes. 🌿</p>}
+        {!pendientes.length && <p className="text-tinta-suave font-semibold">Sin tareas pendientes. 🌿</p>}
       </div>
     </div>
   );
@@ -206,9 +206,9 @@ export function FichaClienteModal({ clienteId }: { clienteId?: string }) {
     if (!cliente) close();
   };
 
-  const input = 'w-full p-2.5 bg-[#faf8f5] border border-[#e8e2d8] rounded-xl font-semibold disabled:opacity-70';
+  const input = 'w-full p-2.5 bg-crema border border-crema-300 rounded-xl font-semibold disabled:opacity-70';
   const campo = (label: string, el: React.ReactNode, span = '') => (
-    <label className={`block ${span}`}><span className="font-bold block mb-1 text-[#082017]">{label}</span>{el}</label>
+    <label className={`block ${span}`}><span className="font-bold block mb-1 text-tinta">{label}</span>{el}</label>
   );
 
   const eventos = cliente ? historialCliente(cliente, { invoices: state.invoices, pedidos: state.pedidos, projects: state.projects, notas: state.notasClientes, products: state.products }) : [];
@@ -221,16 +221,16 @@ export function FichaClienteModal({ clienteId }: { clienteId?: string }) {
     <ModalShell size="max-w-3xl" padding="p-6" className="space-y-4 max-h-[94vh] overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-start pb-3 border-b border-[#f0eae1]">
         <div>
-          <h3 className="font-serif font-bold text-lg text-[#082017]">{cliente ? cliente.name : 'Nuevo cliente'}</h3>
-          {m && <p className="text-[11px] text-[#5c7367]">{m.segmento} · S/ {m.total.toFixed(2)} en {m.compras} compra(s) · ticket promedio S/ {m.ticketPromedio.toFixed(2)}{m.diasSinComprar !== undefined ? ` · ${m.diasSinComprar} días sin comprar` : ''}</p>}
+          <h3 className="font-serif font-bold text-lg text-tinta">{cliente ? cliente.name : 'Nuevo cliente'}</h3>
+          {m && <p className="text-[11px] text-tinta-suave">{m.segmento} · S/ {m.total.toFixed(2)} en {m.compras} compra(s) · ticket promedio S/ {m.ticketPromedio.toFixed(2)}{m.diasSinComprar !== undefined ? ` · ${m.diasSinComprar} días sin comprar` : ''}</p>}
         </div>
-        <button onClick={close} aria-label="Cerrar"><X className="w-5 h-5 text-[#5c7367]" /></button>
+        <button onClick={close} aria-label="Cerrar"><X className="w-5 h-5 text-tinta-suave" /></button>
       </div>
 
       {cliente && (
         <div className="flex gap-1.5 text-xs" role="tablist">
           {([['historial', 'Historial', History], ['notas', 'Notas y tareas', NotebookPen], ['cuidados', 'Cuidados', Leaf], ['datos', 'Datos', UserPlus]] as const).map(([id, label, Icon]) => (
-            <button key={id} role="tab" aria-selected={pestana === id} onClick={() => setPestana(id)} className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 ${pestana === id ? 'bg-[#082017] text-[#d4af37]' : 'bg-[#f4ede4] text-[#5c7367]'}`}>
+            <button key={id} role="tab" aria-selected={pestana === id} onClick={() => setPestana(id)} className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 ${pestana === id ? 'bg-bosque-950 text-oro' : 'bg-crema-200 text-tinta-suave'}`}>
               <Icon className="w-3.5 h-3.5" /> {label}
             </button>
           ))}
@@ -254,7 +254,7 @@ export function FichaClienteModal({ clienteId }: { clienteId?: string }) {
           </div>
           {edita && (
             <div className="flex justify-end">
-              <button onClick={guardar} disabled={guardando} className="px-6 py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg disabled:opacity-60">{guardando ? 'Guardando...' : cliente ? 'Guardar cambios' : 'Crear cliente'}</button>
+              <button onClick={guardar} disabled={guardando} className="px-6 py-3 rounded-2xl bg-bosque-950 text-oro font-bold shadow-lg disabled:opacity-60">{guardando ? 'Guardando...' : cliente ? 'Guardar cambios' : 'Crear cliente'}</button>
             </div>
           )}
         </>
@@ -263,19 +263,19 @@ export function FichaClienteModal({ clienteId }: { clienteId?: string }) {
       {pestana === 'historial' && (
         <ol className="space-y-2 text-xs">
           {eventos.map((ev, i) => (
-            <li key={i} className="flex gap-3 p-2.5 bg-[#faf8f5] rounded-xl border border-[#eae4dc]">
+            <li key={i} className="flex gap-3 p-2.5 bg-crema rounded-xl border border-[#eae4dc]">
               <span className="text-base">{ICONO[ev.tipo]}</span>
               <span className="flex-1">
-                <span className="font-bold text-[#082017] block">{ev.titulo}</span>
-                <span className="text-[#5c7367]">{ev.detalle}</span>
+                <span className="font-bold text-tinta block">{ev.titulo}</span>
+                <span className="text-tinta-suave">{ev.detalle}</span>
               </span>
               <span className="text-right shrink-0">
-                <span className="block text-[10px] text-[#8fa89b] font-mono">{ev.fecha.slice(0, 10)}</span>
-                {ev.monto !== undefined && <span className={`font-mono font-bold ${ev.monto < 0 ? 'text-[#b91c1c]' : 'text-[#082017]'}`}>S/ {ev.monto.toFixed(2)}</span>}
+                <span className="block text-[10px] text-tinta-suave font-mono">{ev.fecha.slice(0, 10)}</span>
+                {ev.monto !== undefined && <span className={`font-mono font-bold ${ev.monto < 0 ? 'text-error' : 'text-tinta'}`}>S/ {ev.monto.toFixed(2)}</span>}
               </span>
             </li>
           ))}
-          {!eventos.length && <p className="text-[#8fa89b] font-semibold">Todavía no hay movimientos con este cliente.</p>}
+          {!eventos.length && <p className="text-tinta-suave font-semibold">Todavía no hay movimientos con este cliente.</p>}
         </ol>
       )}
 
@@ -283,27 +283,27 @@ export function FichaClienteModal({ clienteId }: { clienteId?: string }) {
         <div className="space-y-4 text-xs">
           <div className="flex gap-2">
             <input aria-label="Nueva nota" value={nota} onChange={e => setNota(e.target.value)} placeholder="Ej: prefiere entregas por la tarde" className={input} />
-            <button onClick={async () => { const r = await actions.agregarNota(cliente.id, nota); if (r.ok) setNota(''); else alert(r.error); }} className="shrink-0 px-4 rounded-xl bg-[#082017] text-[#d4af37] font-bold">Guardar nota</button>
+            <button onClick={async () => { const r = await actions.agregarNota(cliente.id, nota); if (r.ok) setNota(''); else alert(r.error); }} className="shrink-0 px-4 rounded-xl bg-bosque-950 text-oro font-bold">Guardar nota</button>
           </div>
           <ul className="space-y-1.5">
             {state.notasClientes.filter(n => n.clienteId === cliente.id).map(n => (
-              <li key={n.id} className="p-2.5 bg-[#faf8f5] rounded-xl border border-[#eae4dc]"><span className="text-[#082017]">{n.texto}</span><span className="block text-[10px] text-[#8fa89b]">{n.autor} · {n.fecha.slice(0, 16).replace('T', ' ')}</span></li>
+              <li key={n.id} className="p-2.5 bg-crema rounded-xl border border-[#eae4dc]"><span className="text-tinta">{n.texto}</span><span className="block text-[10px] text-tinta-suave">{n.autor} · {n.fecha.slice(0, 16).replace('T', ' ')}</span></li>
             ))}
           </ul>
 
-          <div className="p-3 bg-[#faf8f5] rounded-2xl border border-[#eae4dc] space-y-2">
-            <span className="font-bold text-[#082017] block">Nuevo recordatorio</span>
+          <div className="p-3 bg-crema rounded-2xl border border-[#eae4dc] space-y-2">
+            <span className="font-bold text-tinta block">Nuevo recordatorio</span>
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_140px_auto] gap-2">
               <input aria-label="Tarea" value={tarea.titulo} onChange={e => setTarea({ ...tarea, titulo: e.target.value })} placeholder="Ej: llamar para ofrecer fertilizante" className={`${input} bg-white`} />
               <input aria-label="Vence" type="date" value={tarea.vence} onChange={e => setTarea({ ...tarea, vence: e.target.value })} className={`${input} bg-white`} />
               <input aria-label="Responsable" value={tarea.asignadoA} onChange={e => setTarea({ ...tarea, asignadoA: e.target.value })} placeholder="Responsable" className={`${input} bg-white`} />
-              <button onClick={async () => { const r = await actions.crearTarea({ clienteId: cliente.id, ...tarea }); if (r.ok) setTarea({ titulo: '', vence: hoy(), asignadoA: '' }); else alert(r.error); }} className="px-4 rounded-xl bg-[#082017] text-[#d4af37] font-bold">Agregar</button>
+              <button onClick={async () => { const r = await actions.crearTarea({ clienteId: cliente.id, ...tarea }); if (r.ok) setTarea({ titulo: '', vence: hoy(), asignadoA: '' }); else alert(r.error); }} className="px-4 rounded-xl bg-bosque-950 text-oro font-bold">Agregar</button>
             </div>
             {tareasCliente.map(t => (
               <button key={t.id} onClick={() => void actions.marcarTarea(t.id, !t.hecha)} className="w-full flex items-center gap-2 text-left">
-                {t.hecha ? <CheckSquare className="w-4 h-4 text-[#134e2e]" /> : <Square className="w-4 h-4 text-[#134e2e]" />}
-                <span className={t.hecha ? 'line-through text-[#8fa89b]' : 'text-[#082017] font-semibold'}>{t.titulo}</span>
-                <span className="text-[10px] text-[#8fa89b]">· {t.vence}{t.asignadoA ? ` · ${t.asignadoA}` : ''}</span>
+                {t.hecha ? <CheckSquare className="w-4 h-4 text-bosque-700" /> : <Square className="w-4 h-4 text-bosque-700" />}
+                <span className={t.hecha ? 'line-through text-tinta-suave' : 'text-tinta font-semibold'}>{t.titulo}</span>
+                <span className="text-[10px] text-tinta-suave">· {t.vence}{t.asignadoA ? ` · ${t.asignadoA}` : ''}</span>
               </button>
             ))}
           </div>
@@ -313,16 +313,16 @@ export function FichaClienteModal({ clienteId }: { clienteId?: string }) {
       {pestana === 'cuidados' && cliente && (
         <div className="space-y-2 text-xs">
           {plantas.map(p => (
-            <div key={p.sku} className={`p-3 rounded-xl border ${p.toca ? 'bg-[#fff7ed] border-[#ffedd5]' : 'bg-[#faf8f5] border-[#eae4dc]'}`}>
-              <span className="font-bold text-[#082017]">{p.nombre}</span>
-              <span className="text-[10px] text-[#8fa89b]"> · comprada el {p.compradaEl}</span>
-              <p className="text-[#5c7367]">{[p.riego, p.luz].filter(Boolean).join(' · ')}</p>
-              <p className={`font-bold ${p.toca ? 'text-[#c2410c]' : 'text-[#134e2e]'}`}>Próximo cuidado: {p.proximoCuidado}{p.toca ? ' · ¡toca ahora!' : ''}</p>
+            <div key={p.sku} className={`p-3 rounded-xl border ${p.toca ? 'bg-aviso-fondo border-[#ffedd5]' : 'bg-crema border-[#eae4dc]'}`}>
+              <span className="font-bold text-tinta">{p.nombre}</span>
+              <span className="text-[10px] text-tinta-suave"> · comprada el {p.compradaEl}</span>
+              <p className="text-tinta-suave">{[p.riego, p.luz].filter(Boolean).join(' · ')}</p>
+              <p className={`font-bold ${p.toca ? 'text-[#c2410c]' : 'text-bosque-700'}`}>Próximo cuidado: {p.proximoCuidado}{p.toca ? ' · ¡toca ahora!' : ''}</p>
             </div>
           ))}
-          {!plantas.length && <p className="text-[#8fa89b] font-semibold">No hay plantas vivas en sus compras. Puedes registrar las que tiene en la pestaña Datos.</p>}
+          {!plantas.length && <p className="text-tinta-suave font-semibold">No hay plantas vivas en sus compras. Puedes registrar las que tiene en la pestaña Datos.</p>}
           {cliente.phone && (
-            <a href={enlaceWhatsapp(cliente.phone, mensajeCuidados(cliente, plantas))} target="_blank" rel="noreferrer" className="w-full py-2.5 rounded-2xl bg-[#082017] text-[#d4af37] font-bold flex items-center justify-center gap-2">
+            <a href={enlaceWhatsapp(cliente.phone, mensajeCuidados(cliente, plantas))} target="_blank" rel="noreferrer" className="w-full py-2.5 rounded-2xl bg-bosque-950 text-oro font-bold flex items-center justify-center gap-2">
               <Send className="w-3.5 h-3.5" /> Enviar cuidados por WhatsApp
             </a>
           )}

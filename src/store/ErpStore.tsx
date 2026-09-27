@@ -8,28 +8,6 @@
 // y el stock queda con el saldo que devuelve el servidor.
 // ==========================================
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  INITIAL_CASH_REGISTER,
-  INITIAL_COMPANY_CONFIG,
-  INITIAL_CRM_CLIENTS,
-  INITIAL_DETRACCIONES,
-  INITIAL_EMPLOYEES,
-  INITIAL_GUIAS,
-  INITIAL_INTERNAL_CONSUMPTIONS,
-  INITIAL_INVOICES,
-  INITIAL_KARDEX,
-  INITIAL_LOSSES,
-  INITIAL_PRODUCTS,
-  INITIAL_PROJECTS,
-  INITIAL_PURCHASES,
-  INITIAL_PEDIDOS,
-  INITIAL_NOTAS,
-  INITIAL_TAREAS,
-  INITIAL_COTIZACIONES,
-  INITIAL_CUPONES,
-  INITIAL_CONTRATOS,
-  INITIAL_PUNTOS
-} from '../data/seed';
 import type {
   BiologicalLoss,
   CashRegisterState,
@@ -55,6 +33,9 @@ import type {
   Contrato,
   Cotizacion,
   Cupon,
+  ConfigTienda,
+  ServicioPublico,
+  SolicitudTienda,
   CanalVenta,
   EstadoPedido,
   ProjectStatus,
@@ -63,6 +44,7 @@ import type {
   TrabajadorAurevia
 } from '../domain/types';
 import { emisorDe } from '../domain/types';
+import { cargarEstadoDemo, guardarEstadoDemo, seedState, STORAGE_KEY } from '../data/estadoDemo';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
@@ -94,6 +76,9 @@ export interface ErpState {
   cupones: Cupon[];
   contratos: Contrato[];
   puntosSaldo: Record<string, number>; // saldo de puntos por DNI/RUC
+  solicitudes: SolicitudTienda[];
+  tiendaConfig: ConfigTienda;
+  serviciosPublicos: ServicioPublico[];
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -214,38 +199,11 @@ export interface ProyectoInput {
   laborRatePerHour: number;
 }
 
-const STORAGE_KEY = 'aurevia.erp.v1';
 const PROJECT_FLOW: ProjectStatus[] = ['COTIZADO', 'APROBADO', 'EN_EJECUCION', 'CONCLUIDO'];
 
 const today = () => hoyLocal();
 /** Id corto y único entre cajas: prefijo-año-sufijo base36 del reloj. */
 const nuevoId = (prefijo: string) => `${prefijo}-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
-
-function seedState(): ErpState {
-  return {
-    company: INITIAL_COMPANY_CONFIG,
-    products: INITIAL_PRODUCTS,
-    employees: INITIAL_EMPLOYEES,
-    projects: INITIAL_PROJECTS,
-    detracciones: INITIAL_DETRACCIONES,
-    crmClients: INITIAL_CRM_CLIENTS,
-    losses: INITIAL_LOSSES,
-    consumptions: INITIAL_INTERNAL_CONSUMPTIONS,
-    cashRegister: INITIAL_CASH_REGISTER,
-    regimenTributario: 'RMT',
-    invoices: INITIAL_INVOICES,
-    guiasRemision: INITIAL_GUIAS,
-    purchases: INITIAL_PURCHASES,
-    kardex: INITIAL_KARDEX,
-    pedidos: INITIAL_PEDIDOS,
-    notasClientes: INITIAL_NOTAS,
-    tareas: INITIAL_TAREAS,
-    cotizaciones: INITIAL_COTIZACIONES,
-    cupones: INITIAL_CUPONES,
-    contratos: INITIAL_CONTRATOS,
-    puntosSaldo: INITIAL_PUNTOS
-  };
-}
 
 /** Estado mientras llegan los datos de Supabase: nada de datos demo mezclados con los reales. */
 function nubeVacia(): ErpState {
@@ -268,34 +226,11 @@ function nubeVacia(): ErpState {
     cotizaciones: [],
     cupones: [],
     contratos: [],
-    puntosSaldo: {}
+    puntosSaldo: {},
+    solicitudes: [],
+    tiendaConfig: {},
+    serviciosPublicos: []
   };
-}
-
-// La Clave SOL nunca se guarda en el navegador.
-function loadState(): ErpState {
-  const seed = seedState();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seed;
-    const stored = JSON.parse(raw) as Partial<ErpState>;
-    return {
-      ...seed,
-      ...stored,
-      company: { ...seed.company, ...stored.company, claveSol: seed.company.claveSol }
-    };
-  } catch {
-    return seed;
-  }
-}
-
-function saveState(state: ErpState) {
-  try {
-    const { claveSol: _omit, ...company } = state.company;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, company }));
-  } catch {
-    // almacenamiento no disponible (modo privado): la app sigue en memoria
-  }
 }
 
 /** Mueve stock de un producto y deja la huella en el Kardex (modo demo). Función pura. */
@@ -621,7 +556,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       return dev;
     }
 
-    return {
+    const acciones = {
       async recargar(): Promise<Result> {
         if (!nube) return { ok: true };
         try {
@@ -807,6 +742,90 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
               : next.puntosSaldo
           });
           return { ok: true, invoice };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- TIENDA PÚBLICA (gestión) ----------------
+      async atenderSolicitud(id: string, estado: SolicitudTienda['estado']): Promise<Result> {
+        try {
+          if (nube) await repo.actualizarSolicitud(id, { estado, atendidaPor: usuario });
+          const s = get();
+          commit({ ...s, solicitudes: s.solicitudes.map(x => (x.id === id ? { ...x, estado } : x)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Convierte una solicitud de la tienda en un pedido del tablero (queda "por cobrar"). */
+      async convertirSolicitudEnPedido(id: string, datos: { direccion: string; distrito: string; fechaEntrega: string; costoDelivery: number }): Promise<Result<{ pedido: Pedido }>> {
+        const s = get();
+        const sol = s.solicitudes.find(x => x.id === id);
+        if (!sol || sol.tipo !== 'PEDIDO') return { ok: false, error: 'Sólo las solicitudes de pedido se convierten en pedido.' };
+        if (sol.pedidoId) return { ok: false, error: `Esta solicitud ya es el pedido ${sol.pedidoId}.` };
+        const items = sol.items.map(it => {
+          const prod = s.products.find(pr => pr.sku === it.sku);
+          return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: prod?.price ?? it.precio };
+        });
+        const r = await acciones.crearPedido({
+          canal: 'Web', cliente: { nombre: sol.nombre, telefono: sol.telefono }, direccion: datos.direccion, distrito: datos.distrito || sol.distrito || '',
+          fechaEntrega: datos.fechaEntrega, items, costoDelivery: datos.costoDelivery, notas: sol.mensaje
+        });
+        if (!r.ok) return r;
+        try {
+          if (nube) await repo.actualizarSolicitud(id, { estado: 'ATENDIDA', pedidoId: r.pedido.id, atendidaPor: usuario });
+          const cur = get();
+          commit({ ...cur, solicitudes: cur.solicitudes.map(x => (x.id === id ? { ...x, estado: 'ATENDIDA', pedidoId: r.pedido.id } : x)) });
+          return { ok: true, pedido: r.pedido };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async guardarConfigTienda(c: ConfigTienda): Promise<Result> {
+        const whatsapp = c.whatsapp?.replace(/[^0-9+]/g, '') || undefined;
+        if (whatsapp && !/^\+?[0-9]{8,15}$/.test(whatsapp)) return { ok: false, error: 'El WhatsApp debe tener entre 8 y 15 dígitos (con código de país, ej. +51...).' };
+        if (c.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email)) return { ok: false, error: 'El correo no es válido.' };
+        const cfg: ConfigTienda = { ...c, whatsapp, email: c.email?.trim() || undefined };
+        try {
+          if (nube) await repo.guardarConfigTienda(cfg);
+          commit({ ...get(), tiendaConfig: cfg });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async guardarServicioPublico(sv: ServicioPublico): Promise<Result> {
+        if (!sv.nombre.trim() || !sv.resumen.trim()) return { ok: false, error: 'El servicio necesita nombre y resumen.' };
+        try {
+          if (nube) await repo.guardarServicioPublico(sv);
+          const s = get();
+          const existe = s.serviciosPublicos.some(x => x.slug === sv.slug);
+          commit({ ...s, serviciosPublicos: existe ? s.serviciosPublicos.map(x => (x.slug === sv.slug ? sv : x)) : [...s.serviciosPublicos, sv] });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Alta o edición de la ficha comercial (precio, textos, foto, visibilidad). El stock sólo cambia por el Kardex. */
+      async guardarProducto(p: CatalogProduct, nuevo: boolean): Promise<Result> {
+        const sku = p.sku.trim().toUpperCase();
+        if (!/^[A-Z0-9-]{3,30}$/.test(sku)) return { ok: false, error: 'El SKU debe tener de 3 a 30 letras, números o guiones.' };
+        if (!p.name.trim()) return { ok: false, error: 'El producto necesita un nombre.' };
+        if (!(p.price > 0) || p.cost < 0) return { ok: false, error: 'Revisa el precio (mayor a cero) y el costo.' };
+        if (p.fullImage && !/^https:\/\//.test(p.fullImage)) return { ok: false, error: 'La foto debe ser un enlace https.' };
+        const s = get();
+        if (nuevo && s.products.some(x => x.sku === sku)) return { ok: false, error: `Ya existe el SKU ${sku}.` };
+        const ficha: CatalogProduct = { ...p, sku, name: p.name.trim(), stock: nuevo ? 0 : p.stock };
+        try {
+          const guardado = nube ? await repo.guardarProductoCatalogo(ficha, nuevo) : ficha;
+          const cur = get();
+          commit({ ...cur, products: nuevo ? [...cur.products, guardado] : cur.products.map(x => (x.sku === sku ? { ...x, ...guardado, stock: x.stock } : x)) });
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }
@@ -1449,6 +1468,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         commit(seedState());
       }
     };
+    return acciones;
   }, [get, commit, nube, usuario]);
 }
 
@@ -1465,7 +1485,7 @@ interface ErpValue {
 const ErpContext = createContext<ErpValue | null>(null);
 
 export function ErpProvider({ children, nube = false, usuario = '' }: { children: ReactNode; nube?: boolean; usuario?: string }) {
-  const [state, setState] = useState<ErpState>(() => (nube ? nubeVacia() : loadState()));
+  const [state, setState] = useState<ErpState>(() => (nube ? nubeVacia() : cargarEstadoDemo()));
   const [cargando, setCargando] = useState(nube);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const stateRef = useRef(state);
@@ -1486,8 +1506,22 @@ export function ErpProvider({ children, nube = false, usuario = '' }: { children
   }, [nube, actions]);
 
   useEffect(() => {
-    if (!nube) saveState(state);
+    if (!nube) guardarEstadoDemo(state);
   }, [state, nube]);
+
+  // Modo demo: si la tienda (otra pestaña) agregó una solicitud, se incorpora sin pisar lo demás
+  useEffect(() => {
+    if (nube) return;
+    const alCambiar = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY) return;
+      const externo = cargarEstadoDemo();
+      const cur = stateRef.current;
+      const nuevas = externo.solicitudes.filter(x => !cur.solicitudes.some(y => y.id === x.id));
+      if (nuevas.length) commit({ ...cur, solicitudes: [...nuevas, ...cur.solicitudes] });
+    };
+    window.addEventListener('storage', alCambiar);
+    return () => window.removeEventListener('storage', alCambiar);
+  }, [nube, commit]);
 
   const value = useMemo(() => ({ state, actions, nube, cargando, errorCarga }), [state, actions, nube, cargando, errorCarga]);
   return <ErpContext.Provider value={value}>{children}</ErpContext.Provider>;

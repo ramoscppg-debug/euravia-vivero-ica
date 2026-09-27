@@ -34,22 +34,30 @@ vivero-360/
 ├── playwright.config.ts
 ├── .env.example            # Credenciales Supabase + SUNAT / AFPnet
 ├── tests/
-│   └── vivero-e2e.spec.ts  # Suite E2E (34 flujos de negocio)
+│   └── vivero-e2e.spec.ts  # Suite E2E (41 flujos: panel + tienda pública)
 ├── src/
 │   ├── main.tsx
-│   ├── App.tsx             # Solo arma el layout y elige la pantalla activa
-│   ├── index.css
-│   ├── domain/types.ts     # Modelo de dominio único (todos los tipos del negocio)
-│   ├── data/seed.ts        # Datos demo iniciales
+│   ├── app/
+│   │   ├── App.tsx         # Raíz: tienda pública en "/", centro de control en "/panel" (cargado aparte)
+│   │   ├── PanelApp.tsx    # Centro de control: sesión, datos del negocio y navegación por rol
+│   │   └── router.tsx      # Enrutador mínimo (History API, sin dependencias) y <Enlace>
+│   ├── index.css           # Base, foco visible y prefers-reduced-motion
+│   ├── domain/types.ts     # Modelo de dominio único (negocio + vitrina pública)
+│   ├── data/
+│   │   ├── seed.ts         # Datos demo iniciales
+│   │   └── estadoDemo.ts   # Estado demo en el navegador (compartido por panel y tienda)
 │   ├── store/
 │   │   ├── ErpStore.tsx    # Estado + acciones de negocio (registrarVenta, facturarProyecto…) con persistencia local
 │   │   ├── UiStore.tsx     # Pestaña activa (en la URL #hash) y modal abierto
 │   │   └── selectors.ts    # Cálculos puros: finanzas, planilla, caja, pendientes del día
 │   ├── layout/             # Sidebar, Header, ModalHost y navigation.ts (menú por flujo)
-│   ├── components/shared.tsx  # ModalShell, consulta RUC/DNI, escáner
+│   ├── components/
+│   │   ├── ui.tsx          # Sistema visual compartido: Boton, Tarjeta, Insignia, estados vacío/error/carga
+│   │   └── shared.tsx      # ModalShell, consulta RUC/DNI, escáner
 │   ├── modules/
-│   │   ├── inicio/         # Panel del dueño + "Pendientes de Hoy"
-│   │   ├── ventas/         # Caja del día, Catálogo/POS, ticket, etiquetas QR
+│   │   ├── tienda/         # TIENDA PÚBLICA: portada, catálogo, fichas, servicios, contacto, pedido, SEO
+│   │   ├── inicio/         # Centro de control de ventas + "Pendientes de Hoy"
+│   │   ├── ventas/         # Caja, Catálogo/POS y editor de productos, pedidos, solicitudes web, cotizaciones
 │   │   ├── servicios/      # Proyectos de jardinería (cotizado → concluido)
 │   │   ├── clientes/       # Ficha única: compras + servicios + alertas WhatsApp
 │   │   ├── inventario/     # Kardex con historial de movimientos, mermas, compras
@@ -57,6 +65,8 @@ vivero-360/
 │   ├── lib/
 │   │   ├── peru.ts         # Parámetros y cálculos tributario-laborales (UIT, AFP, SPOT, renta 5ta, mód. 11)
 │   │   ├── exports.ts      # Archivos TXT oficiales: SIRE RVIE/RCE y AFPnet PLAPROTE
+│   │   ├── fechas.ts       # "Hoy" y periodos en hora de Lima
+│   │   ├── repo.ts         # Acceso a Supabase del panel (lectura/escritura por rol)
 │   │   ├── supabase.ts     # Cliente Supabase (carga perezosa, no-op sin backend)
 │   │   └── sunatClient.ts  # Conector SEE SUNAT (BETA/PRODUCCION) + RUC/RENIEC
 │   ├── services/
@@ -84,13 +94,28 @@ Cada evento de negocio es una sola acción del store que actualiza todo a la vez
 - **Merma / desmedro** → descuenta stock → Kardex → baja valorizada (la cuarentena no mueve stock)
 - **Servicio de jardinería** → descarga de insumos al Kardex → factura/boleta (una sola vez) → detracción SPOT con vencimiento calculado
 
-**Dos modos, según el `.env`:**
+### 🛍️ Tienda pública y centro de control
 
-- **Modo nube** (con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`): login obligatorio y Supabase como fuente de verdad. El stock lo recalcula el servidor en cada movimiento del Kardex. Cada rol ve sólo lo suyo:
+| Ruta | Quién | Qué |
+|---|---|---|
+| `/` | Público | Portada: propuesta, categorías, destacados y servicios |
+| `/plantas`, `/productos` | Público | Catálogo con búsqueda, categorías, "sólo disponibles" y orden (filtros en la URL: `?q=&cat=&disp=1&orden=`) |
+| `/producto/:sku` | Público | Ficha con precio, disponibilidad (Disponible / Últimas unidades / Agotado), cuidados si existen, compartir |
+| `/servicios`, `/servicios/:slug` | Público | Servicios de jardinería y solicitud de cotización |
+| `/contacto`, `/pedido` | Público | Consulta y carrito → solicitud de pedido (sin pagos en línea) |
+| `/panel` (`#caja`, `#pedidos`, `#solicitudes`…) | Equipo | Centro de control privado; cada pestaña respeta el rol |
+
+La tienda **nunca** lee tablas del negocio: en la nube usa `catalogo_publico()` (sin costos ni stock exacto), `servicios_publicos`, `tienda_config` y envía solicitudes por `crear_solicitud()`, que valida datos, toma precios de la base y limita 5 envíos por teléfono por hora. Las solicitudes aparecen en *Vender → Solicitudes de la Tienda* y se convierten en pedidos del tablero.
+
+**El dueño completa en *Ajustes → 5. Tienda pública*:** WhatsApp de ventas (sin él, la tienda ofrece el formulario en lugar del botón), correo, dirección, horario y textos de servicios. En *Tienda & Catálogo POS* edita productos: precio, descripción, foto (enlace https), visibilidad en la tienda y destacados.
+
+**Modos (`src/lib/supabase.ts`):**
+
+- **Modo nube** (por defecto; usa el proyecto de producción o el de `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`): login obligatorio en `/panel` y Supabase como fuente de verdad. El stock lo recalcula el servidor en cada movimiento del Kardex. Cada rol ve sólo lo suyo:
   - **Dueño**: todo, incluida la asignación de roles (*Ajustes → Usuarios*).
   - **Vendedor**: caja, tienda/POS, servicios, clientes, inventario, comprobantes y guías.
   - **Jardinero**: sus servicios (avanzar etapas, descargar insumos), clientes, Kardex y mermas.
-- **Modo demo** (sin Supabase): sin login, datos de ejemplo guardados en el navegador (`localStorage`, sin la Clave SOL). *Ajustes → Restablecer datos demo* vuelve al estado inicial. Las pruebas E2E siempre corren en este modo.
+- **Modo demo** (`VITE_MODO=demo`, o esas dos variables definidas vacías): sin login, datos de ejemplo guardados en el navegador (`localStorage`, sin la Clave SOL). *Ajustes → Restablecer datos demo* vuelve al estado inicial. Tienda y panel comparten el mismo almacenamiento del navegador. Las pruebas E2E siempre corren en este modo.
 
 Puesta en marcha de la nube: aplicar `supabase/migrations/*.sql` en orden, crear el primer usuario en *Authentication → Users* y darle el rol con `update public.perfiles set rol = 'dueno' where email = '...';`.
 
@@ -117,12 +142,12 @@ Parámetros y fórmulas centralizados según normativa **vigente 2025** (revisar
 
 - **SUNAT (`src/lib/sunatClient.ts`)**: cada emisión de Boleta/Factura/GRE se transmite por `sunatClient` que sella la CDR de respuesta (estado, código, hash). Sin conectividad hace fallback a una CDR simulada, por lo que la UI nunca se bloquea. Configurable vía `VITE_SUNAT_MODO` (`BETA` / `PRODUCCION`).
 - **Consulta de RUC / DNI**: botón **"Consultar RUC"** en Compra Mayorista, POS (Factura) y Ajustes. La **validación de módulo 11 funciona siempre offline** y autocompleta la razón social cuando hay `VITE_SUNAT_API_TOKEN` de un puente REST (apis.net.pe / decolecta / factiliza). Sin token → sólo validación local. SUNAT no expone API pública gratuita; para producción se recomienda un proxy (Supabase Edge Function) que evite CORS y oculte el token.
-- **Supabase (`src/lib/supabase.ts`)**: sincronización *best-effort* de comprobantes, movimientos de Kardex y configuración de empresa. Si `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` no están configuradas, el SDK ni siquiera se descarga y las llamadas son no-ops silenciosos (modo demo 100 % en memoria).
+- **Supabase (`src/lib/supabase.ts`)**: fuente de verdad en modo nube (URL y llave *publicable* del proyecto; la seguridad la dan las políticas RLS). En modo demo el SDK ni siquiera se descarga.
 
 ### ✅ Pruebas
 
 ```bash
-npx playwright test        # 34 pruebas E2E de extremo a extremo
+npx playwright test        # 41 pruebas E2E de extremo a extremo
 ```
 
 ---

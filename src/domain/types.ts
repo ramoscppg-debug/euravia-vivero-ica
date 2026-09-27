@@ -57,6 +57,8 @@ export interface CatalogProduct extends Product {
   description: string;
   botanicalFamily: string;
   categoryName: string;
+  visibleTienda?: boolean; // por defecto se muestra en la tienda pública
+  destacado?: boolean; // aparece en la portada
 }
 
 export type MovementType =
@@ -325,4 +327,68 @@ export interface Contrato {
   inicio: string;
   activo: boolean;
   ultimoPeriodo?: string; // 'YYYY-MM'
+}
+
+// ---------- Tienda pública (sólo datos de vitrina: sin costos ni stock exacto) ----------
+export type DisponibilidadPublica = 'DISPONIBLE' | 'POCAS' | 'AGOTADO';
+
+export interface ProductoPublico {
+  sku: string;
+  nombre: string;
+  nombreCientifico?: string;
+  categoria: Category;
+  categoriaNombre: string;
+  familia?: string;
+  descripcion?: string;
+  imagen?: string;
+  precio: number;
+  disponibilidad: DisponibilidadPublica;
+  luz?: string;
+  riego?: string;
+  esPlantaViva: boolean;
+  destacado: boolean;
+}
+
+export interface ServicioPublico {
+  slug: string;
+  nombre: string;
+  resumen: string;
+  descripcion?: string;
+  imagen?: string;
+  orden: number;
+  visible: boolean;
+}
+
+/** Contacto que muestra la tienda. Vacío hasta que el dueño lo complete (no se inventan datos). */
+export interface ConfigTienda {
+  whatsapp?: string;
+  email?: string;
+  direccion?: string;
+  horario?: string;
+  mensajePortada?: string;
+}
+
+export interface SolicitudTienda {
+  id: string;
+  tipo: 'PEDIDO' | 'SERVICIO' | 'CONSULTA';
+  nombre: string;
+  telefono: string;
+  email?: string;
+  distrito?: string;
+  mensaje?: string;
+  servicioSlug?: string;
+  items: { sku: string; nombre: string; cantidad: number; precio: number }[];
+  totalReferencial: number;
+  estado: 'NUEVA' | 'EN_PROCESO' | 'ATENDIDA' | 'DESCARTADA';
+  pedidoId?: string;
+  createdAt: string;
+}
+
+/** Plantas vs. productos e insumos (agrupa las categorías existentes para la tienda). */
+export const CATEGORIAS_PLANTAS: Category[] = ['interior', 'exterior', 'suculentas'];
+
+export function disponibilidadDe(stock: number, minimo: number): DisponibilidadPublica {
+  if (stock <= 0) return 'AGOTADO';
+  if (stock <= minimo) return 'POCAS';
+  return 'DISPONIBLE';
 }

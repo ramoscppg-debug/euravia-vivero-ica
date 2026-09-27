@@ -7,7 +7,7 @@ import { sunatClient } from '../lib/sunatClient';
 import { useErp } from '../store/ErpStore';
 import { useUi } from '../store/UiStore';
 
-export function ModalShell({ children, size = 'max-w-lg', padding = 'p-8', overlay = 'bg-[#082017]/75', className = 'space-y-4' }: {
+export function ModalShell({ children, size = 'max-w-lg', padding = 'p-8', overlay = 'bg-bosque-950/75', className = 'space-y-4' }: {
   children: ReactNode;
   size?: string;
   padding?: string;
@@ -16,7 +16,7 @@ export function ModalShell({ children, size = 'max-w-lg', padding = 'p-8', overl
 }) {
   return (
     <div className={`fixed inset-0 ${overlay} backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn`}>
-      <div className={`bg-white rounded-3xl ${padding} ${size} w-full shadow-2xl ${className} border border-[#e8e2d8] text-xs`}>
+      <div className={`bg-white rounded-3xl ${padding} ${size} w-full shadow-2xl ${className} border border-crema-300 text-xs`}>
         {children}
       </div>
     </div>
@@ -111,7 +111,7 @@ export function SmartphoneIcon() {
 
 export function CreditCardIcon() {
   return (
-    <svg className="w-4 h-4 text-[#134e2e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-4 h-4 text-bosque-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <rect x="2" y="5" width="20" height="14" rx="2" strokeWidth="2"/>
       <line x1="2" y1="10" x2="22" y2="10" strokeWidth="2"/>
     </svg>

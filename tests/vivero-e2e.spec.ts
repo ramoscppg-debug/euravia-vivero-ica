@@ -14,14 +14,14 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     page.on('pageerror', (exception) => {
       consoleErrors.push(exception.message);
     });
-    await page.goto('/');
+    await page.goto('/panel');
     // Check main branding
     await expect(page.getByRole('heading', { name: 'AUREVIA', exact: true })).toBeVisible();
   });
 
   test('1. Dashboard 360° loads without errors and renders KPI summary', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Inicio Aurevia 360°' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Panel de Control General & Finanzas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Centro de control de ventas' })).toBeVisible();
     // Hubs organizados por flujo de negocio
     for (const hub of ['Vender', 'Servicios', 'Inventario', 'Administración']) {
       await expect(page.getByRole('heading', { name: hub, exact: true })).toBeVisible();
@@ -635,7 +635,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();
     await page.clock.install({ time: new Date('2026-09-26T01:30:00Z') }); // 25/09 20:30 en Lima
-    await page.goto('/');
+    await page.goto('/panel');
     await page.click('button:has-text("Nueva Venta (POS & CPE)")');
     await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
@@ -643,6 +643,133 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.locator('button:has(svg.lucide-x)').first().click();
     await page.click('button:has-text("Facturación SUNAT SEE")');
     await expect(page.getByText(/2026-09-25 20:30/)).toBeVisible();
+    await ctx.close();
+  });
+});
+
+test.describe('Tienda pública AUREVIA', () => {
+  let errores: string[] = [];
+  test.beforeEach(async ({ page }) => {
+    errores = [];
+    page.on('console', m => { if (m.type() === 'error') errores.push(m.text()); });
+    page.on('pageerror', e => errores.push(e.message));
+  });
+
+  test('T1. Se navega sin iniciar sesión y no muestra datos internos', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1, name: /Plantas, insumos y jardinería/ })).toBeVisible();
+    await expect(page).toHaveTitle(/AUREVIA/);
+    await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Plantas' }).click();
+    await expect(page).toHaveURL(/\/plantas$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Plantas' })).toBeVisible();
+
+    // Búsqueda y filtros viven en la URL (se pueden compartir)
+    await page.getByPlaceholder('Buscar por nombre…').fill('monstera');
+    await expect(page).toHaveURL(/q=monstera/);
+    await expect(page.getByRole('article')).toHaveCount(1);
+
+    // La tienda no expone costos, stock exacto ni herramientas del panel
+    const texto = await page.locator('body').innerText();
+    expect(texto).not.toMatch(/Costo|Kardex|RUC|Stock:/);
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T2. Enlace directo a un producto: precio, disponibilidad, cuidados y metadatos', async ({ page }) => {
+    await page.goto('/producto/AUR-001');
+    await expect(page.getByRole('heading', { level: 1, name: 'Monstera Deliciosa' })).toBeVisible();
+    await expect(page.getByText('S/ 85.00').first()).toBeVisible();
+    await expect(page.getByRole('main').getByText('Disponible', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Cuidados' })).toContainText('Riego semanal moderado');
+    await expect(page).toHaveTitle('Monstera Deliciosa | AUREVIA');
+    expect(await page.locator('meta[property="og:title"]').getAttribute('content')).toBe('Monstera Deliciosa | AUREVIA');
+    // Un insumo no muestra una sección de cuidados vacía
+    await page.goto('/producto/MAC-001');
+    await expect(page.getByRole('heading', { level: 1, name: /Maceta/ })).toBeVisible();
+    await page.goto('/producto/NO-EXISTE');
+    await expect(page.getByText('Este producto ya no está en el catálogo')).toBeVisible();
+    await page.goto('/una-ruta-inexistente');
+    await expect(page.getByText('No encontramos esta página')).toBeVisible();
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T3. Sin WhatsApp configurado no hay enlace falso: se ofrece el formulario', async ({ page }) => {
+    await page.goto('/producto/AUR-002');
+    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+    await page.getByRole('link', { name: 'Enviar una consulta' }).click();
+    await expect(page).toHaveURL(/\/contacto\?producto=AUR-002/);
+    await expect(page.getByLabel('Mensaje')).toHaveValue(/Sansevieria Laurentii/);
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T4. Pedido desde la tienda llega al panel y se convierte en pedido del tablero', async ({ page }) => {
+    await page.goto('/producto/AUR-003');
+    await page.getByRole('button', { name: 'Más' }).click();
+    await page.getByRole('button', { name: 'Agregar a mi pedido' }).click();
+    await page.getByRole('link', { name: /Mi pedido: 2/ }).click();
+    await expect(page.getByText('S/ 240.00').first()).toBeVisible();
+    await page.getByLabel('Nombre *').fill('Ana Flores');
+    await page.getByLabel('Teléfono o WhatsApp *').fill('+51 955 444 333');
+    await page.getByLabel('Distrito (opcional)').fill('Ica');
+    await page.getByRole('button', { name: 'Enviar solicitud de pedido' }).click();
+    await expect(page.getByText('¡Recibimos tu solicitud!')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Mi pedido: 0/ })).toBeVisible(); // el carrito se vació
+
+    await page.goto('/panel#solicitudes');
+    const sol = page.getByRole('article').filter({ hasText: 'Ana Flores' });
+    await expect(sol.getByText('2× Ficus Lyrata Pandurata')).toBeVisible();
+    await expect(sol.getByText('Total referencial: S/ 240.00')).toBeVisible();
+    await sol.getByRole('button', { name: 'Crear pedido' }).click();
+    await page.locator('.fixed').getByLabel('Dirección de entrega').fill('Calle Lima 123');
+    await page.locator('.fixed').getByRole('button', { name: 'Crear pedido' }).click();
+    await expect(page).toHaveURL(/#pedidos$/);
+    await expect(page.getByRole('region', { name: 'Columna Por cobrar' }).getByText('Ana Flores')).toBeVisible();
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T5. Servicios con enlace propio y solicitud de cotización', async ({ page }) => {
+    await page.goto('/servicios');
+    await page.getByRole('link', { name: /Jardín Vertical/ }).click();
+    await expect(page).toHaveURL(/\/servicios\/jardin-vertical$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Jardín Vertical' })).toBeVisible();
+    await page.getByLabel('Nombre *').fill('Hotel Paracas');
+    await page.getByLabel('Teléfono o WhatsApp *').fill('956111222');
+    await page.getByLabel('Mensaje').fill('Muro de 3 x 2 m en recepción');
+    await page.getByRole('button', { name: 'Enviar solicitud' }).click();
+    await expect(page.getByText('¡Recibimos tu solicitud!')).toBeVisible();
+
+    // Validación: teléfono inválido no se envía
+    await page.goto('/contacto');
+    await page.getByLabel('Nombre *').fill('X Y');
+    await page.getByLabel('Teléfono o WhatsApp *').fill('12');
+    await page.getByRole('button', { name: 'Enviar consulta' }).click();
+    await expect(page.getByRole('alert')).toHaveText('Indica un teléfono o WhatsApp válido.');
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T6. El dueño configura WhatsApp y la tienda usa ese número', async ({ page }) => {
+    await page.goto('/panel#configuracion');
+    await page.getByLabel('WhatsApp de la tienda').fill('+51 987 111 222');
+    await page.getByRole('button', { name: 'Guardar datos de la tienda' }).click();
+    await expect(page.getByText('Guardado ✓')).toBeVisible();
+    await page.goto('/producto/AUR-001');
+    const wa = page.getByRole('link', { name: 'Consultar por WhatsApp' });
+    await expect(wa).toHaveAttribute('href', /^https:\/\/wa\.me\/51987111222\?text=/);
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T7. En el celular la tienda y el panel tienen menú desplegable', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, baseURL: 'http://localhost:5199' });
+    const page = await ctx.newPage();
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Abrir menú' }).click();
+    await page.getByRole('navigation', { name: 'Principal (móvil)' }).getByRole('link', { name: 'Servicios' }).click();
+    await expect(page).toHaveURL(/\/servicios$/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    await page.goto('/panel');
+    await page.getByRole('button', { name: 'Abrir menú' }).click();
+    await page.getByRole('button', { name: /Pedidos & Delivery/ }).click();
+    await expect(page.getByRole('heading', { name: 'Pedidos & Delivery' })).toBeVisible();
     await ctx.close();
   });
 });

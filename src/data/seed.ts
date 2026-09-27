@@ -15,6 +15,8 @@ import type {
   GuiaRemisionSunat,
   InternalConsumption,
   KardexMovement,
+  ConfigTienda,
+  ServicioPublico,
   Contrato,
   Cotizacion,
   Cupon,
@@ -584,3 +586,13 @@ export const INITIAL_CONTRATOS: Contrato[] = [
 
 /** Saldo de puntos por DNI/RUC (Valeria ganó 8 puntos con la boleta B001-00000342 de S/ 85). */
 export const INITIAL_PUNTOS: Record<string, number> = { '47891234': 8 };
+
+// Tienda pública (demo): los mismos servicios que publica la migración; contacto vacío hasta configurarlo
+export const INITIAL_SERVICIOS_PUBLICOS: ServicioPublico[] = [
+  { slug: 'diseno-paisajista', nombre: 'Diseño Paisajista', resumen: 'Diseño de jardines y áreas verdes para casas, terrazas y empresas.', descripcion: 'Te ayudamos a planificar tu jardín: selección de especies según luz y espacio, distribución y materiales. Solicita una cotización con las medidas y fotos de tu espacio.', orden: 1, visible: true },
+  { slug: 'mantenimiento-residencial', nombre: 'Mantenimiento de Jardines', resumen: 'Cuidado periódico de jardines: poda, fertilización y control de plagas.', descripcion: 'Visitas programadas para mantener tus plantas sanas. Podemos coordinar una frecuencia mensual.', orden: 2, visible: true },
+  { slug: 'jardin-vertical', nombre: 'Jardín Vertical', resumen: 'Instalación y cuidado de jardines verticales para interiores y fachadas.', descripcion: 'Diseño, instalación y mantenimiento de muros verdes. Cuéntanos el tamaño y la ubicación para cotizar.', orden: 3, visible: true },
+  { slug: 'riego-automatizado', nombre: 'Riego Automatizado', resumen: 'Sistemas de riego por goteo y aspersión para jardines y macetas.', descripcion: 'Evaluamos tu espacio para proponer un sistema de riego que ahorre agua y tiempo.', orden: 4, visible: true }
+];
+
+export const INITIAL_CONFIG_TIENDA: ConfigTienda = {};

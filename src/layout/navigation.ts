@@ -10,6 +10,7 @@ import {
   CalendarClock,
   FileText,
   ClipboardList,
+  Inbox,
   Flower2,
   Landmark,
   Receipt,
@@ -29,6 +30,7 @@ export type TabId =
   | 'caja'
   | 'catalogo'
   | 'pedidos'
+  | 'solicitudes'
   | 'cotizaciones'
   | 'contratos'
   | 'reportes'
@@ -61,24 +63,32 @@ export interface NavBlock {
   items: NavItem[];
 }
 
-const alerta = 'bg-[#fee2e2] text-[#b91c1c]';
+const alerta = 'bg-error-fondo text-error';
 
 export const NAV_BLOCKS: NavBlock[] = [
   {
     id: 'vender',
     label: 'Vender',
     emoji: '🛍️',
-    hint: 'caja, tienda, pedidos',
+    hint: 'caja, pedidos, tienda web',
     icon: Store,
     items: [
-      { id: 'caja', label: 'Caja del Día', icon: Wallet, iconClass: 'text-[#d4af37]', badge: s => s.cashRegister.estadoCaja },
+      { id: 'caja', label: 'Caja del Día', icon: Wallet, iconClass: 'text-oro', badge: s => s.cashRegister.estadoCaja },
       { id: 'catalogo', label: 'Tienda & Catálogo POS', icon: Store, badge: s => String(s.products.length) },
       {
         id: 'pedidos',
         label: 'Pedidos & Delivery',
         icon: ClipboardList,
-        iconClass: 'text-[#d4af37]',
+        iconClass: 'text-oro',
         badge: s => String(s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length)
+      },
+      {
+        id: 'solicitudes',
+        label: 'Solicitudes de la Tienda',
+        icon: Inbox,
+        iconClass: 'text-oro',
+        badge: s => String(s.solicitudes.filter(x => x.estado === 'NUEVA').length),
+        badgeClass: 'bg-terracota text-white'
       },
       {
         id: 'cotizaciones',
@@ -105,7 +115,7 @@ export const NAV_BLOCKS: NavBlock[] = [
         id: 'contratos',
         label: 'Contratos de Mantenimiento',
         icon: CalendarCheck,
-        iconClass: 'text-[#d4af37]',
+        iconClass: 'text-oro',
         badge: s => String(s.contratos.filter(c => c.activo).length)
       }
     ]
@@ -117,7 +127,7 @@ export const NAV_BLOCKS: NavBlock[] = [
     hint: 'ficha única',
     icon: Users,
     items: [
-      { id: 'crm', label: 'CRM Botánico & Alertas', icon: CalendarClock, iconClass: 'text-[#d4af37]', badge: s => String(s.crmClients.length) }
+      { id: 'crm', label: 'CRM Botánico & Alertas', icon: CalendarClock, iconClass: 'text-oro', badge: s => String(s.crmClients.length) }
     ]
   },
   {
@@ -146,20 +156,20 @@ export const NAV_BLOCKS: NavBlock[] = [
     hint: 'sunat & rr.hh.',
     icon: Calculator,
     items: [
-      { id: 'reportes', label: 'Reportes de Ventas', icon: BarChart3, iconClass: 'text-[#d4af37]', badge: () => 'KPI' },
+      { id: 'reportes', label: 'Reportes de Ventas', icon: BarChart3, iconClass: 'text-oro', badge: () => 'KPI' },
       { id: 'sunat', label: 'Facturación SUNAT SEE', icon: Receipt, badge: s => String(s.invoices.length) },
       { id: 'guias', label: 'Guías de Remisión GRE', icon: Truck, badge: s => s.company.serieGre },
       {
         id: 'detracciones',
         label: 'Detracciones SPOT (BN)',
         icon: Landmark,
-        iconClass: 'text-[#d4af37]',
+        iconClass: 'text-oro',
         badge: s => `${Math.round(s.company.tasaDetraccionServicios * 100)}%`,
         badgeClass: alerta
       },
-      { id: 'contabilidad', label: 'Contabilidad & SIRE', icon: Calculator, iconClass: 'text-[#d4af37]', badge: () => '621' },
+      { id: 'contabilidad', label: 'Contabilidad & SIRE', icon: Calculator, iconClass: 'text-oro', badge: () => '621' },
       { id: 'planilla', label: 'Planilla & Provisiones', icon: Users, iconClass: 'text-[#e05780]', badge: () => 'AFP' },
-      { id: 'configuracion', label: 'Ajustes & RUC Empresa', icon: Settings, iconClass: 'text-[#d4af37]', badge: () => 'RUC' }
+      { id: 'configuracion', label: 'Ajustes & RUC Empresa', icon: Settings, iconClass: 'text-oro', badge: () => 'RUC' }
     ]
   }
 ];
@@ -176,6 +186,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   caja: VENTAS,
   catalogo: VENTAS,
   pedidos: VENTAS,
+  solicitudes: VENTAS,
   cotizaciones: VENTAS,
   contratos: TODOS,
   reportes: DUENO,

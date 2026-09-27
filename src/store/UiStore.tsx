@@ -3,7 +3,7 @@
 // ==========================================
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ALL_TABS, puedeVer, tabInicial, type TabId } from '../layout/navigation';
-import type { ComprobanteSunat, DescuentoGlobal, LineaCarrito, Pedido, Rol } from '../domain/types';
+import type { ComprobanteSunat, DescuentoGlobal, LineaCarrito, Pedido, Rol, SolicitudTienda } from '../domain/types';
 
 /** Carrito precargado (por ejemplo, al convertir una cotización en venta). */
 export interface PosPreset {
@@ -27,6 +27,8 @@ export type Modal =
   | { type: 'ticket'; invoice: ComprobanteSunat; vuelto?: number }
   | { type: 'devolucion'; invoice: ComprobanteSunat }
   | { type: 'pedido-nuevo' }
+  | { type: 'solicitud-pedido'; solicitud: SolicitudTienda }
+  | { type: 'producto'; sku?: string }
   | { type: 'cliente'; clienteId?: string }
   | { type: 'pedido-cobro'; pedido: Pedido }
   | { type: 'pedido-entrega'; pedido: Pedido };
@@ -37,6 +39,8 @@ interface UiValue {
   modal: Modal | null;
   open: (modal: Modal) => void;
   close: () => void;
+  menuMovil: boolean;
+  setMenuMovil: (abierto: boolean) => void;
 }
 
 const UiContext = createContext<UiValue | null>(null);
@@ -49,10 +53,12 @@ function tabFromHash(rol: Rol): TabId {
 export function UiProvider({ children, rol }: { children: ReactNode; rol: Rol }) {
   const [tab, setTabState] = useState<TabId>(() => tabFromHash(rol));
   const [modal, setModal] = useState<Modal | null>(null);
+  const [menuMovil, setMenuMovil] = useState(false); // menú lateral en pantallas chicas
 
   const setTab = useCallback((next: TabId) => {
     const permitida = puedeVer(rol, next) ? next : tabInicial(rol);
     setTabState(permitida);
+    setMenuMovil(false);
     if (window.location.hash !== `#${permitida}`) window.history.replaceState(null, '', `#${permitida}`);
   }, [rol]);
 
@@ -63,7 +69,7 @@ export function UiProvider({ children, rol }: { children: ReactNode; rol: Rol })
   }, [rol]);
 
   const close = useCallback(() => setModal(null), []);
-  const value = useMemo(() => ({ tab, setTab, modal, open: setModal, close }), [tab, setTab, modal, close]);
+  const value = useMemo(() => ({ tab, setTab, modal, open: setModal, close, menuMovil, setMenuMovil }), [tab, setTab, modal, close, menuMovil]);
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
 }
 

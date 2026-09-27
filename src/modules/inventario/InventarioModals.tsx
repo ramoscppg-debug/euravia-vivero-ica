@@ -38,49 +38,49 @@ export function CompraModal() {
   return (
     <ModalShell>
       <div className="flex justify-between items-center pb-3 border-b border-[#f0eae1]">
-        <h3 className="font-serif font-bold text-lg text-[#082017]">Registrar Compra Mayorista (Almacén)</h3>
-        <button onClick={close}><X className="w-5 h-5 text-[#5c7367]" /></button>
+        <h3 className="font-serif font-bold text-lg text-tinta">Registrar Compra Mayorista (Almacén)</h3>
+        <button onClick={close}><X className="w-5 h-5 text-tinta-suave" /></button>
       </div>
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="font-bold block mb-1">RUC Proveedor</label>
             <div className="flex gap-1.5">
-              <input type="text" value={ruc} onChange={(e) => setRuc(e.target.value)} className="flex-1 min-w-0 p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
-              <button type="button" disabled={busy} onClick={() => consultar(ruc, setProveedor)} className="shrink-0 px-3 rounded-xl bg-[#082017] text-[#d4af37] font-bold text-[10px] flex items-center gap-1 disabled:opacity-50">
+              <input type="text" value={ruc} onChange={(e) => setRuc(e.target.value)} className="flex-1 min-w-0 p-2.5 bg-crema border rounded-xl font-mono font-bold" />
+              <button type="button" disabled={busy} onClick={() => consultar(ruc, setProveedor)} className="shrink-0 px-3 rounded-xl bg-bosque-950 text-oro font-bold text-[10px] flex items-center gap-1 disabled:opacity-50">
                 <ScanLine className="w-3.5 h-3.5" /> {busy ? '...' : 'Consultar'}
               </button>
             </div>
           </div>
           <div>
             <label className="font-bold block mb-1">N° Factura</label>
-            <input type="text" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-mono font-bold" />
+            <input type="text" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl font-mono font-bold" />
           </div>
         </div>
         <div>
           <label className="font-bold block mb-1">Razón Social del Proveedor</label>
-          <input type="text" value={proveedor} onChange={(e) => setProveedor(e.target.value)} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" />
+          <input type="text" value={proveedor} onChange={(e) => setProveedor(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl font-bold" />
         </div>
         <div>
           <label className="font-bold block mb-1">Especie a Ingresar</label>
-          <select value={sku} onChange={(e) => setSku(e.target.value)} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-semibold">
+          <select value={sku} onChange={(e) => setSku(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl font-semibold">
             {products.map(p => <option key={p.sku} value={p.sku}>{p.name} (Stock Actual: {p.stock} u.)</option>)}
           </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="font-bold block mb-1">Cantidad Comprada</label>
-            <input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" />
+            <input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-full p-2.5 bg-crema border rounded-xl font-bold" />
           </div>
           <div>
             <label className="font-bold block mb-1">Costo Unitario (S/)</label>
-            <input type="number" step="0.01" value={costoUnitario} onChange={(e) => setCostoUnitario(Number(e.target.value))} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" />
+            <input type="number" step="0.01" value={costoUnitario} onChange={(e) => setCostoUnitario(Number(e.target.value))} className="w-full p-2.5 bg-crema border rounded-xl font-bold" />
           </div>
         </div>
       </div>
       <div className="flex gap-2 pt-3 border-t">
-        <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-[#5c7367]">Cancelar</button>
-        <button onClick={registrar} disabled={enviando} className="flex-1 py-3 rounded-2xl bg-[#082017] text-[#d4af37] font-bold shadow-lg disabled:opacity-60">Registrar e Incrementar Stock</button>
+        <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-tinta-suave">Cancelar</button>
+        <button onClick={registrar} disabled={enviando} className="flex-1 py-3 rounded-2xl bg-bosque-950 text-oro font-bold shadow-lg disabled:opacity-60">Registrar e Incrementar Stock</button>
       </div>
     </ModalShell>
   );
@@ -115,20 +115,20 @@ export function BajaModal() {
   return (
     <ModalShell>
       <div className="flex justify-between items-center pb-3 border-b border-[#f0eae1]">
-        <h3 className="font-serif font-bold text-lg text-[#082017]">Registrar Baja Biológica / Cuarentena</h3>
-        <button onClick={close}><X className="w-5 h-5 text-[#5c7367]" /></button>
+        <h3 className="font-serif font-bold text-lg text-tinta">Registrar Baja Biológica / Cuarentena</h3>
+        <button onClick={close}><X className="w-5 h-5 text-tinta-suave" /></button>
       </div>
       <div className="space-y-3">
         <div>
-          <label className="font-bold block mb-1 text-[#082017]">Especie Afectada</label>
-          <select value={sku} onChange={(e) => setSku(e.target.value)} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-semibold">
+          <label className="font-bold block mb-1 text-tinta">Especie Afectada</label>
+          <select value={sku} onChange={(e) => setSku(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl font-semibold">
             {products.map(p => <option key={p.sku} value={p.sku}>{p.name} (Stock: {p.stock} u.)</option>)}
           </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="font-bold block mb-1 text-[#082017]">Tipo de Evento Fitosanitario</label>
-            <select value={type} onChange={(e) => setType(e.target.value as BiologicalLoss['type'])} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold">
+            <label className="font-bold block mb-1 text-tinta">Tipo de Evento Fitosanitario</label>
+            <select value={type} onChange={(e) => setType(e.target.value as BiologicalLoss['type'])} className="w-full p-2.5 bg-crema border rounded-xl font-bold">
               <option value="MERMA_NATURAL">🍂 Merma Natural (Deshidratación)</option>
               <option value="DESMEDRO_PLAGA">🐛 Desmedro (Plaga / Inutilizable)</option>
               <option value="CUARENTENA_FITOSANITARIA">🧪 Cuarentena (Aislamiento)</option>
@@ -136,18 +136,18 @@ export function BajaModal() {
             </select>
           </div>
           <div>
-            <label className="font-bold block mb-1 text-[#082017]">Cantidad de Plantas</label>
-            <input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl font-bold" />
+            <label className="font-bold block mb-1 text-tinta">Cantidad de Plantas</label>
+            <input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value))} className="w-full p-2.5 bg-crema border rounded-xl font-bold" />
           </div>
         </div>
         <div>
-          <label className="font-bold block mb-1 text-[#082017]">Informe / Causa Detallada</label>
-          <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full p-2.5 bg-[#faf8f5] border rounded-xl" />
+          <label className="font-bold block mb-1 text-tinta">Informe / Causa Detallada</label>
+          <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl" />
         </div>
       </div>
       <div className="flex gap-2 pt-3 border-t">
-        <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-[#5c7367]">Cancelar</button>
-        <button onClick={registrar} disabled={enviando} className="flex-1 py-3 rounded-2xl bg-[#b91c1c] text-white font-bold shadow-lg disabled:opacity-60">Confirmar y Descontar Kardex</button>
+        <button onClick={close} className="flex-1 py-3 rounded-2xl border font-bold text-tinta-suave">Cancelar</button>
+        <button onClick={registrar} disabled={enviando} className="flex-1 py-3 rounded-2xl bg-error text-white font-bold shadow-lg disabled:opacity-60">Confirmar y Descontar Kardex</button>
       </div>
     </ModalShell>
   );

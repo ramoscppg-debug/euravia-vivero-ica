@@ -16,6 +16,9 @@ import type {
   GuiaRemisionSunat,
   KardexMovement,
   MovementType,
+  ConfigTienda,
+  ServicioPublico,
+  SolicitudTienda,
   Contrato,
   Cotizacion,
   Cupon,
@@ -77,11 +80,14 @@ export interface DatosNube {
   cupones: Cupon[];
   contratos: Contrato[];
   puntosSaldo: Record<string, number>;
+  solicitudes: SolicitudTienda[];
+  tiendaConfig: ConfigTienda;
+  serviciosPublicos: ServicioPublico[];
 }
 
 export async function cargarTodo(): Promise<DatosNube> {
   const sb = await db();
-  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos] = await Promise.all([
+  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos, solicitudes, tiendaCfg, serviciosTienda] = await Promise.all([
     sb.from('empresa_config').select('*').limit(1).maybeSingle(),
     sb.from('productos').select('*').eq('activo', true).order('sku'),
     sb.from('kardex_movimientos').select('*').order('id', { ascending: false }).limit(500),
@@ -99,7 +105,10 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('cotizaciones').select('*').order('created_at', { ascending: false }).limit(300),
     sb.from('cupones').select('*').order('created_at', { ascending: false }),
     sb.from('contratos').select('*').order('created_at'),
-    sb.from('puntos_saldos').select('*')
+    sb.from('puntos_saldos').select('*'),
+    sb.from('solicitudes_tienda').select('*').order('created_at', { ascending: false }).limit(200),
+    sb.from('tienda_config').select('*').eq('id', 1).maybeSingle(),
+    sb.from('servicios_publicos').select('*').order('orden')
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -126,7 +135,10 @@ export async function cargarTodo(): Promise<DatosNube> {
     cotizaciones: ok<Row[]>(cotizaciones).map(cotizacionDesdeFila),
     cupones: ok<Row[]>(cupones).map(cuponDesdeFila),
     contratos: ok<Row[]>(contratos).map(contratoDesdeFila),
-    puntosSaldo: Object.fromEntries(ok<Row[]>(puntos).map(r => [r.cliente_doc, r.saldo]))
+    puntosSaldo: Object.fromEntries(ok<Row[]>(puntos).map(r => [r.cliente_doc, r.saldo])),
+    solicitudes: ok<Row[]>(solicitudes).map(solicitudDesdeFila),
+    tiendaConfig: configTiendaDesdeFila(ok<Row | null>(tiendaCfg)),
+    serviciosPublicos: ok<Row[]>(serviciosTienda).map(servicioPublicoDesdeFila)
   };
 }
 
@@ -167,7 +179,9 @@ function productoDesdeFila(r: Row): CatalogProduct {
     fullImage: r.imagen_url ?? IMAGEN_POR_DEFECTO,
     description: r.descripcion ?? '',
     botanicalFamily: r.familia_botanica ?? '',
-    categoryName: r.categoria_nombre ?? r.categoria
+    categoryName: r.categoria_nombre ?? r.categoria,
+    visibleTienda: r.visible_tienda ?? true,
+    destacado: !!r.destacado
   };
 }
 
@@ -401,6 +415,23 @@ function contratoDesdeFila(r: Row): Contrato {
     inicio: r.inicio,
     activo: !!r.activo,
     ultimoPeriodo: r.ultimo_periodo ?? undefined
+  };
+}
+
+export function servicioPublicoDesdeFila(r: Row): ServicioPublico {
+  return { slug: r.slug, nombre: r.nombre, resumen: r.resumen, descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined, orden: r.orden ?? 0, visible: !!r.visible };
+}
+
+export function configTiendaDesdeFila(r: Row | null): ConfigTienda {
+  if (!r) return {};
+  return { whatsapp: r.whatsapp ?? undefined, email: r.email ?? undefined, direccion: r.direccion ?? undefined, horario: r.horario ?? undefined, mensajePortada: r.mensaje_portada ?? undefined };
+}
+
+function solicitudDesdeFila(r: Row): SolicitudTienda {
+  return {
+    id: String(r.id), tipo: r.tipo, nombre: r.nombre, telefono: r.telefono, email: r.email ?? undefined, distrito: r.distrito ?? undefined,
+    mensaje: r.mensaje ?? undefined, servicioSlug: r.servicio_slug ?? undefined, items: r.items ?? [], totalReferencial: num(r.total_referencial),
+    estado: r.estado, pedidoId: r.pedido_id ?? undefined, createdAt: r.created_at
   };
 }
 
@@ -872,4 +903,47 @@ export async function guardarContrato(c: Contrato, creadoPor: string) {
 export async function activarContrato(id: string, activo: boolean) {
   const sb = await db();
   ok(await sb.from('contratos').update({ activo }).eq('id', id));
+}
+
+// ---------------- TIENDA (gestión privada) ----------------
+
+export async function actualizarSolicitud(id: string, cambios: { estado?: SolicitudTienda['estado']; pedidoId?: string; atendidaPor?: string }) {
+  const sb = await db();
+  const fila: Row = {};
+  if (cambios.estado) fila.estado = cambios.estado;
+  if (cambios.pedidoId) fila.pedido_id = cambios.pedidoId;
+  if (cambios.atendidaPor) fila.atendida_por = cambios.atendidaPor;
+  ok(await sb.from('solicitudes_tienda').update(fila).eq('id', Number(id)));
+}
+
+export async function guardarConfigTienda(c: ConfigTienda) {
+  const sb = await db();
+  ok(await sb.from('tienda_config').update({
+    whatsapp: c.whatsapp || null, email: c.email || null, direccion: c.direccion || null, horario: c.horario || null,
+    mensaje_portada: c.mensajePortada || null, updated_at: new Date().toISOString()
+  }).eq('id', 1));
+}
+
+export async function guardarServicioPublico(sv: ServicioPublico) {
+  const sb = await db();
+  ok(await sb.from('servicios_publicos').upsert({
+    slug: sv.slug, nombre: sv.nombre, resumen: sv.resumen, descripcion: sv.descripcion || null, imagen_url: sv.imagen || null,
+    orden: sv.orden, visible: sv.visible, updated_at: new Date().toISOString()
+  }, { onConflict: 'slug' }));
+}
+
+/** Alta o edición de la ficha comercial de un producto (el stock sólo cambia por el Kardex). */
+export async function guardarProductoCatalogo(p: CatalogProduct, nuevo: boolean): Promise<CatalogProduct> {
+  const sb = await db();
+  const fila: Row = {
+    nombre: p.name, nombre_cientifico: p.scientificName || null, categoria: p.category, categoria_nombre: p.categoryName || null,
+    familia_botanica: p.botanicalFamily || null, descripcion: p.description || null, imagen_url: p.fullImage || null,
+    ubicacion_estante: p.location || null, costo_unitario: p.cost, precio_venta: p.price, stock_minimo: p.minStock,
+    cuidado_luz: p.careLight || null, cuidado_riego: p.careWater || null, es_planta_viva: p.isLivePlant,
+    visible_tienda: p.visibleTienda ?? true, destacado: !!p.destacado
+  };
+  const q = nuevo
+    ? sb.from('productos').insert({ ...fila, sku: p.sku, stock_actual: 0 }).select('*').single()
+    : sb.from('productos').update(fila).eq('sku', p.sku).select('*').single();
+  return productoDesdeFila(ok<Row>(await q));
 }
