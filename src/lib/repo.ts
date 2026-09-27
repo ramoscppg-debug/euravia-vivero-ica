@@ -431,7 +431,7 @@ function contratoDesdeFila(r: Row): Contrato {
 }
 
 export function servicioPublicoDesdeFila(r: Row): ServicioPublico {
-  return { slug: r.slug, nombre: r.nombre, resumen: r.resumen, descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined, orden: r.orden ?? 0, visible: !!r.visible };
+  return { slug: r.slug, nombre: r.nombre, resumen: r.resumen, descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined, orden: r.orden ?? 0, visible: !!r.visible, precioDesde: r.precio_desde != null ? num(r.precio_desde) : undefined };
 }
 
 export function configTiendaDesdeFila(r: Row | null): ConfigTienda {
@@ -946,8 +946,14 @@ export async function guardarServicioPublico(sv: ServicioPublico) {
   const sb = await db();
   ok(await sb.from('servicios_publicos').upsert({
     slug: sv.slug, nombre: sv.nombre, resumen: sv.resumen, descripcion: sv.descripcion || null, imagen_url: sv.imagen || null,
-    orden: sv.orden, visible: sv.visible, updated_at: new Date().toISOString()
+    orden: sv.orden, visible: sv.visible, precio_desde: sv.precioDesde ?? null, updated_at: new Date().toISOString()
   }, { onConflict: 'slug' }));
+}
+
+/** Quita un servicio de la tienda (las solicitudes antiguas conservan el texto del servicio). */
+export async function eliminarServicioPublico(slug: string) {
+  const sb = await db();
+  ok(await sb.from('servicios_publicos').delete().eq('slug', slug));
 }
 
 /** Sube una foto al catálogo público (sólo el dueño) y devuelve su enlace https. */

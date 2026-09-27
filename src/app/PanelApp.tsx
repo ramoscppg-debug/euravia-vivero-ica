@@ -28,6 +28,7 @@ import Estadisticas from '../modules/admin/Estadisticas';
 import Almacen from '../modules/inventario/Almacen';
 import Etiquetas from '../modules/inventario/Etiquetas';
 import Documentos from '../modules/ventas/Documentos';
+import ServiciosTienda from '../modules/ventas/ServiciosTienda';
 import { AuthProvider, useAuth } from '../store/AuthStore';
 import { ErpProvider, useErp } from '../store/ErpStore';
 import { UiProvider, useUi } from '../store/UiStore';
@@ -55,7 +56,8 @@ const SCREENS: Record<TabId, ComponentType> = {
   etiquetas: Etiquetas,
   almacen: Almacen,
   finanzas: Finanzas,
-  estadisticas: Estadisticas
+  estadisticas: Estadisticas,
+  'servicios-tienda': ServiciosTienda
 };
 
 function Shell() {

@@ -18,7 +18,8 @@ export type Modal =
   | { type: 'pos'; sku?: string; preset?: PosPreset }
   | { type: 'cotizacion' }
   | { type: 'contrato' }
-  | { type: 'compra' }
+  | { type: 'compra'; sku?: string }
+  | { type: 'importar-productos' }
   | { type: 'baja' }
   | { type: 'egreso' }
   | { type: 'qr'; sku: string }
@@ -28,7 +29,7 @@ export type Modal =
   | { type: 'devolucion'; invoice: ComprobanteSunat }
   | { type: 'pedido-nuevo' }
   | { type: 'solicitud-pedido'; solicitud: SolicitudTienda }
-  | { type: 'producto'; sku?: string }
+  | { type: 'producto'; sku?: string; duplicarDe?: string }
   | { type: 'cliente'; clienteId?: string }
   | { type: 'pedido-cobro'; pedido: Pedido }
   | { type: 'pedido-entrega'; pedido: Pedido };

@@ -1,172 +1,143 @@
 import { useState } from 'react';
-import { Droplets, EyeOff, MapPin, Pencil, PackagePlus, PlusCircle, QrCode, Receipt, ScanLine, Sun } from 'lucide-react';
-import { EstadoVacio } from '../../components/ui';
+import { Copy, Eye, EyeOff, FileSpreadsheet, ImageOff, PackagePlus, Pencil, PlusCircle, QrCode, Receipt, Search, Star } from 'lucide-react';
+import { Boton, EstadoVacio, Insignia } from '../../components/ui';
+import type { CatalogProduct } from '../../domain/types';
+import { CATEGORIAS, margenPct, pendientesDe } from '../../lib/catalogo';
+import { soles } from '../../lib/formato';
 import { useAuth } from '../../store/AuthStore';
-import { useScanner } from '../../components/shared';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 
-export default function Catalogo() {
-  const { state } = useErp();
-  const { open } = useUi();
-  const scan = useScanner();
-  const [scanInput, setScanInput] = useState('');
-  const { products } = state;
-  const esDueno = (useAuth().perfil?.rol ?? 'dueno') === 'dueno';
+type Filtro = 'todos' | 'incompletos' | 'sin-foto' | 'stock-bajo' | 'ocultos';
 
-  const handleScan = (code: string) => {
-    if (scan(code)) setScanInput('');
+/** Catálogo del panel: encontrar, completar y reponer productos rápido. */
+export default function Catalogo() {
+  const { state, actions } = useErp();
+  const { open } = useUi();
+  const { products } = state;
+  const rol = useAuth().perfil?.rol ?? 'dueno';
+  const esDueno = rol === 'dueno';
+  const [q, setQ] = useState('');
+  const [cat, setCat] = useState('');
+  const [filtro, setFiltro] = useState<Filtro>('todos');
+
+  const incompletos = products.filter(p => pendientesDe(p).length > 0);
+  const conteo: Record<Filtro, number> = {
+    todos: products.length,
+    incompletos: incompletos.length,
+    'sin-foto': products.filter(p => !p.fullImage).length,
+    'stock-bajo': products.filter(p => p.stock <= p.minStock).length,
+    ocultos: products.filter(p => p.visibleTienda === false).length
+  };
+  const texto = q.trim().toLowerCase();
+  const lista = products
+    .filter(p => !texto || p.name.toLowerCase().includes(texto) || p.sku.toLowerCase().includes(texto))
+    .filter(p => !cat || p.category === cat)
+    .filter(p => filtro === 'todos' || (filtro === 'incompletos' ? pendientesDe(p).length > 0 : filtro === 'sin-foto' ? !p.fullImage : filtro === 'stock-bajo' ? p.stock <= p.minStock : p.visibleTienda === false));
+
+  const alternarVisible = async (p: CatalogProduct) => {
+    const r = await actions.guardarProducto({ ...p, visibleTienda: p.visibleTienda === false }, false);
+    if (!r.ok) alert(r.error);
   };
 
+  const FILTROS: [Filtro, string][] = [['todos', 'Todos'], ['incompletos', 'Por completar'], ['sin-foto', 'Sin foto'], ['stock-bajo', 'Stock bajo'], ['ocultos', 'Ocultos en tienda']];
+
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-3xl border border-crema-300 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-5">
+      <div className="bg-white p-5 rounded-3xl border border-crema-300 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h3 className="font-serif text-xl font-bold text-tinta">Catálogo Botánico AUREVIA</h3>
-          <p className="text-xs text-tinta-suave">Plantas de interior, especies de ornato, macetería artesanal y sustratos especiales</p>
+          <h3 className="text-xl font-extrabold text-tinta">Catálogo de productos</h3>
+          <p className="text-xs text-tinta-suave">
+            {products.length} producto(s) · {products.reduce((a, p) => a + Math.max(0, p.stock), 0)} unidades en stock
+            {incompletos.length > 0 && <> · <b className="text-aviso">{incompletos.length} por completar</b></>}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {esDueno && (
-            <button onClick={() => open({ type: 'producto' })} className="px-4 py-2.5 rounded-2xl bg-terracota hover:bg-terracota-oscuro text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition">
-              <PackagePlus className="w-4 h-4" /> Nuevo producto
-            </button>
-          )}
-          <button
-            disabled={!products.length}
-            onClick={() => products[0] && open({ type: 'qr', sku: products[0].sku })}
-            className="px-4 py-2.5 rounded-2xl bg-crema-200 hover:bg-[#eae1d5] text-tinta font-bold text-xs border border-crema-400 flex items-center gap-1.5 transition"
-          >
-            <QrCode className="w-4 h-4 text-bosque-700" /> Imprimir Etiquetas QR / Tags
-          </button>
-          <button
-            onClick={() => open({ type: 'pos' })}
-            className="px-4 py-2.5 rounded-2xl bg-bosque-950 hover:bg-bosque-800 text-oro font-bold text-xs flex items-center gap-1.5 shadow-md transition"
-          >
-            <PlusCircle className="w-4 h-4" /> Venta Rápida (POS)
-          </button>
+          {esDueno && <Boton onClick={() => open({ type: 'producto' })}><PackagePlus className="w-4 h-4" aria-hidden /> Nuevo producto</Boton>}
+          {esDueno && <Boton variante="secundario" onClick={() => open({ type: 'importar-productos' })}><FileSpreadsheet className="w-4 h-4" aria-hidden /> Cargar desde Excel</Boton>}
+          <Boton variante="secundario" disabled={!products.length} onClick={() => products[0] && open({ type: 'qr', sku: products[0].sku })}><QrCode className="w-4 h-4" aria-hidden /> Etiquetas QR</Boton>
+          <Boton variante="secundario" onClick={() => open({ type: 'pos' })}><PlusCircle className="w-4 h-4" aria-hidden /> Venta rápida</Boton>
         </div>
       </div>
 
-      {/* Barra de Escaneo Rápido */}
-      <div className="bg-gradient-to-r from-bosque-950 to-bosque-800 text-white p-5 rounded-3xl shadow-lg space-y-3 border border-oro/30">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <ScanLine className="w-5 h-5 text-oro" />
-            <h4 className="font-serif font-bold text-sm text-crema-50">Escaneo Rápido de Etiquetas QR / Código de Barras USB / Bluetooth / Cámara</h4>
-          </div>
-          <span className="text-[10px] text-bosque-200">Escanea el sticker pegado en la maceta con tu lector de pistola y se abrirá el comprobante listo para emitir.</span>
-        </div>
-
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="📷 Escanea con la pistola o escribe el SKU (ej. AUR-001, AUR-002, MAC-001)..."
-            value={scanInput}
-            onChange={(e) => setScanInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleScan(scanInput); }}
-            className="flex-1 p-3 bg-white text-tinta rounded-2xl text-xs font-mono font-bold focus:ring-2 focus:ring-oro shadow-inner"
+      {!products.length ? (
+        <div className="bg-white rounded-3xl border border-crema-300">
+          <EstadoVacio
+            titulo="Tu catálogo está vacío"
+            detalle={esDueno ? 'Crea tus productos uno por uno (con su stock inicial) o cárgalos todos desde una hoja de Excel.' : 'Pide al dueño que registre los productos.'}
+            accion={esDueno && (
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                <Boton onClick={() => open({ type: 'producto' })}><PackagePlus className="w-4 h-4" aria-hidden /> Crear el primero</Boton>
+                <Boton variante="secundario" onClick={() => open({ type: 'importar-productos' })}><FileSpreadsheet className="w-4 h-4" aria-hidden /> Cargar desde Excel</Boton>
+              </div>
+            )}
           />
-          <button
-            onClick={() => handleScan(scanInput)}
-            className="px-5 py-3 bg-oro hover:bg-[#c49f27] text-tinta font-bold text-xs rounded-2xl shadow-md flex items-center gap-1.5"
-          >
-            <ScanLine className="w-4 h-4" /> Escanear Código
-          </button>
         </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-bosque-200">
-          <span className="text-oro font-bold">⚡ Prueba rápida:</span>
-          {products.map(p => (
-            <button
-              key={p.sku}
-              onClick={() => handleScan(p.sku)}
-              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-white font-mono transition"
-            >
-              {p.sku} ({p.name.split(' ')[0]})
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Grid de Productos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map(p => (
-          <div key={p.sku} className="bg-white rounded-3xl border border-crema-300 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group">
-            <div className="relative h-48 overflow-hidden bg-crema-300">
-              <img
-                src={p.fullImage}
-                alt={p.name}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              <div className="absolute top-3 left-3 bg-bosque-950/80 backdrop-blur-md text-oro text-[10px] font-bold px-3 py-1 rounded-full border border-oro/30">
-                {p.categoryName}
-                {p.visibleTienda === false && <span className="ml-1 inline-flex items-center gap-0.5"><EyeOff className="w-3 h-3" aria-hidden /> oculto en tienda</span>}
-              </div>
-              <div className={`absolute bottom-3 right-3 backdrop-blur-md text-xs font-bold px-3 py-1 rounded-xl shadow-md ${p.stock <= p.minStock ? 'bg-error-fondo/95 text-error' : 'bg-white/90 text-tinta'}`}>
-                Stock: {p.stock} u.
-              </div>
-              <button
-                onClick={() => open({ type: 'qr', sku: p.sku })}
-                title="Ver e Imprimir Etiqueta QR"
-                className="absolute top-3 right-3 p-2 rounded-xl bg-white/90 hover:bg-white text-tinta shadow-lg border border-crema-300 transition flex items-center gap-1 text-[10px] font-bold"
-              >
-                <QrCode className="w-4 h-4 text-bosque-700" />
-                <span>QR Tag</span>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-3 flex-1 flex flex-col justify-between">
-              <div className="space-y-1">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-serif text-lg font-bold text-tinta">{p.name}</h4>
-                  <span className="font-mono text-[10px] text-tinta-suave font-bold bg-crema px-2 py-0.5 rounded border">{p.sku}</span>
-                </div>
-                <p className="text-[11px] text-earth-500 italic font-serif">{p.scientificName}</p>
-                <p className="text-xs text-tinta-suave line-clamp-2 mt-1">{p.description}</p>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-[#f0eae1] text-xs">
-                <div className="flex items-center justify-between text-[11px] text-tinta-suave">
-                  <span className="flex items-center gap-1"><Sun className="w-3.5 h-3.5 text-oro" /> {p.careLight}</span>
-                  <span className="flex items-center gap-1"><Droplets className="w-3.5 h-3.5 text-bosque-700" /> {p.careWater}</span>
-                </div>
-                <p className="text-[11px] text-tinta-suave flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-tinta-suave" /> Ubicación: <strong className="text-tinta">{p.location}</strong>
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-[#f0eae1] flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] text-tinta-suave uppercase font-bold block">Precio Venta (Inc. IGV)</span>
-                  <span className="font-serif text-2xl font-bold text-tinta">S/ {p.price.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {esDueno && (
-                    <button onClick={() => open({ type: 'producto', sku: p.sku })} title="Editar ficha del producto" aria-label={`Editar ${p.name}`} className="p-2.5 rounded-2xl bg-crema-200 hover:bg-[#eae1d5] text-tinta border border-crema-400 transition">
-                      <Pencil className="w-4 h-4 text-terracota" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => open({ type: 'qr', sku: p.sku })}
-                    title="Imprimir Etiqueta para Maceta"
-                    className="p-2.5 rounded-2xl bg-crema-200 hover:bg-[#eae1d5] text-tinta font-bold text-xs border border-crema-400 transition"
-                  >
-                    <QrCode className="w-4 h-4 text-bosque-700" />
-                  </button>
-                  <button
-                    onClick={() => open({ type: 'pos', sku: p.sku })}
-                    className="px-4 py-2.5 rounded-2xl bg-bosque-950 hover:bg-bosque-800 text-oro font-bold text-xs shadow-md flex items-center gap-1.5 transition"
-                  >
-                    <Receipt className="w-3.5 h-3.5" /> Facturar
-                  </button>
-                </div>
-              </div>
-            </div>
+      ) : (
+        <>
+          <div className="flex flex-col md:flex-row gap-2">
+            <label className="flex-1 flex items-center gap-2 min-h-[42px] px-3 rounded-control bg-white border border-crema-300">
+              <Search className="w-4 h-4 text-tinta-suave" aria-hidden />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre o SKU" aria-label="Buscar en el catálogo" className="flex-1 bg-transparent outline-none text-sm" />
+            </label>
+            <select value={cat} onChange={e => setCat(e.target.value)} aria-label="Filtrar por categoría" className="min-h-[42px] px-3 rounded-control bg-white border border-crema-300 text-sm font-semibold">
+              <option value="">Todas las categorías</option>
+              {CATEGORIAS.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
           </div>
-        ))}
-      </div>
-      {!products.length && (
-        <EstadoVacio titulo="El catálogo está vacío" detalle={esDueno ? 'Crea tu primer producto con “Nuevo producto”.' : 'Pide al dueño que registre los productos.'} />
+          <div className="flex flex-wrap gap-1.5 text-xs" role="group" aria-label="Filtros">
+            {FILTROS.map(([id, t]) => (
+              <button key={id} aria-pressed={filtro === id} onClick={() => setFiltro(id)}
+                className={`px-3 py-1.5 rounded-full font-bold border ${filtro === id ? 'bg-bosque-950 text-white border-bosque-950' : 'bg-white text-tinta-suave border-crema-300'}`}>
+                {t} ({conteo[id]})
+              </button>
+            ))}
+          </div>
+
+          {lista.length ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {lista.map(p => {
+                const falta = pendientesDe(p);
+                const margen = margenPct(p.price, p.cost);
+                return (
+                  <article key={p.sku} className="bg-white rounded-3xl border border-crema-300 overflow-hidden flex flex-col">
+                    <div className="flex gap-3 p-4">
+                      <div className="w-20 h-20 rounded-2xl bg-crema overflow-hidden shrink-0 flex items-center justify-center">
+                        {p.fullImage ? <img src={p.fullImage} alt="" className="w-full h-full object-cover" /> : <ImageOff className="w-6 h-6 text-tinta-suave" aria-label="Sin foto" />}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold text-tinta leading-tight">{p.name}</h4>
+                          {p.destacado && <Star className="w-4 h-4 text-oro shrink-0 fill-oro" aria-label="Destacado" />}
+                        </div>
+                        <p className="text-[11px] font-mono text-tinta-suave">{p.sku} · {p.categoryName}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-extrabold text-tinta">{soles(p.price)}</span>
+                          <Insignia tono={p.stock <= 0 ? 'error' : p.stock <= p.minStock ? 'aviso' : 'exito'}>{p.stock} u.</Insignia>
+                          {margen !== null && <Insignia tono={margen < 20 ? 'error' : 'neutro'}>margen {margen}%</Insignia>}
+                          {p.visibleTienda === false && <Insignia><EyeOff className="w-3 h-3" aria-hidden /> oculto</Insignia>}
+                        </div>
+                      </div>
+                    </div>
+                    {falta.length > 0 && (
+                      <button onClick={() => esDueno && open({ type: 'producto', sku: p.sku })} className="mx-4 mb-3 text-left px-3 py-1.5 rounded-xl bg-aviso-fondo text-aviso text-[11px] font-bold">
+                        Falta: {falta.join(', ')}{esDueno ? ' · completar' : ''}
+                      </button>
+                    )}
+                    <div className="mt-auto flex flex-wrap gap-1.5 p-3 border-t border-crema-200 text-xs">
+                      {esDueno && <button onClick={() => open({ type: 'producto', sku: p.sku })} className="px-2.5 py-1.5 rounded-xl bg-crema-200 font-bold flex items-center gap-1" aria-label={`Editar ${p.name}`}><Pencil className="w-3.5 h-3.5" aria-hidden /> Editar</button>}
+                      <button onClick={() => open({ type: 'compra', sku: p.sku })} className="px-2.5 py-1.5 rounded-xl bg-crema-200 font-bold flex items-center gap-1" aria-label={`Sumar stock a ${p.name}`}><PackagePlus className="w-3.5 h-3.5" aria-hidden /> Stock</button>
+                      <button onClick={() => open({ type: 'qr', sku: p.sku })} className="px-2.5 py-1.5 rounded-xl bg-crema-200 font-bold flex items-center gap-1" aria-label={`Etiquetas QR de ${p.name}`}><QrCode className="w-3.5 h-3.5" aria-hidden /> QR Tag</button>
+                      {esDueno && <button onClick={() => open({ type: 'producto', duplicarDe: p.sku })} title="Duplicar" aria-label={`Duplicar ${p.name}`} className="px-2.5 py-1.5 rounded-xl bg-crema-200"><Copy className="w-3.5 h-3.5" /></button>}
+                      {esDueno && <button onClick={() => void alternarVisible(p)} title={p.visibleTienda === false ? 'Mostrar en la tienda' : 'Ocultar de la tienda'} aria-label={p.visibleTienda === false ? `Mostrar ${p.name} en la tienda` : `Ocultar ${p.name} de la tienda`} className="px-2.5 py-1.5 rounded-xl bg-crema-200">{p.visibleTienda === false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}</button>}
+                      <button onClick={() => open({ type: 'pos', sku: p.sku })} className="ml-auto px-3 py-1.5 rounded-xl bg-bosque-950 text-white font-bold flex items-center gap-1"><Receipt className="w-3.5 h-3.5" aria-hidden /> Vender</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : <EstadoVacio titulo="Sin coincidencias" detalle="Prueba con otra búsqueda o quita los filtros." />}
+        </>
       )}
     </div>
   );

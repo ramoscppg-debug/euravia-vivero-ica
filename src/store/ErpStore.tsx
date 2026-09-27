@@ -834,7 +834,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       },
 
       /** Alta o edición de la ficha comercial (precio, textos, foto, visibilidad). El stock sólo cambia por el Kardex. */
-      async guardarProducto(p: CatalogProduct, nuevo: boolean): Promise<Result> {
+      async guardarProducto(p: CatalogProduct, nuevo: boolean, stockInicial = 0): Promise<Result> {
         const sku = p.sku.trim().toUpperCase();
         if (!/^[A-Z0-9-]{3,30}$/.test(sku)) return { ok: false, error: 'El SKU debe tener de 3 a 30 letras, números o guiones.' };
         if (!p.name.trim()) return { ok: false, error: 'El producto necesita un nombre.' };
@@ -842,11 +842,40 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (p.fullImage && !/^https:\/\//.test(p.fullImage) && !(!nube && p.fullImage.startsWith('data:image/jpeg'))) return { ok: false, error: 'La foto debe ser un enlace https o una foto subida.' };
         const s = get();
         if (nuevo && s.products.some(x => x.sku === sku)) return { ok: false, error: `Ya existe el SKU ${sku}.` };
+        const inicial = nuevo ? Math.max(0, Math.floor(stockInicial || 0)) : 0;
+        if (inicial > 0 && !(p.cost > 0)) return { ok: false, error: 'Para registrar stock inicial indica el costo unitario (valoriza el inventario).' };
         const ficha: CatalogProduct = { ...p, sku, name: p.name.trim(), stock: nuevo ? 0 : p.stock };
         try {
           const guardado = nube ? await repo.guardarProductoCatalogo(ficha, nuevo) : ficha;
           const cur = get();
           commit({ ...cur, products: nuevo ? [...cur.products, guardado] : cur.products.map(x => (x.sku === sku ? { ...x, ...guardado, stock: x.stock } : x)) });
+          // El stock inicial entra por el Kardex (inventario inicial), igual que cualquier movimiento
+          if (inicial > 0) {
+            commit(await moverInventario([{ sku, qtyIn: inicial, qtyOut: 0, type: 'Ajuste Inventario', doc: 'INV-INICIAL', user: responsable('Almacén Aurevia'), unitCost: p.cost }]));
+          }
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Crea varios productos (carga desde Excel/CSV); sigue con los demás si uno falla. */
+      async importarProductos(filas: { producto: CatalogProduct; stockInicial: number }[]): Promise<Result<{ creados: number; errores: string[] }>> {
+        let creados = 0;
+        const errores: string[] = [];
+        for (const f of filas) {
+          const r = await acciones.guardarProducto(f.producto, true, f.stockInicial);
+          if (r.ok) creados++;
+          else errores.push(`${f.producto.sku} · ${f.producto.name}: ${r.error}`);
+        }
+        return { ok: true, creados, errores };
+      },
+
+      async eliminarServicioPublico(slug: string): Promise<Result> {
+        try {
+          if (nube) await repo.eliminarServicioPublico(slug);
+          const s = get();
+          commit({ ...s, serviciosPublicos: s.serviciosPublicos.filter(x => x.slug !== slug) });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };

@@ -3,6 +3,7 @@ import { NAV_BLOCKS, type NavBlock, type TabId } from '../../layout/navigation';
 import { useErp, type ErpState } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import CentroControl from './CentroControl';
+import PuestaEnMarcha from './PuestaEnMarcha';
 import { calcularPendientes } from '../../store/selectors';
 import { hoyLocal } from '../../lib/fechas';
 
@@ -41,6 +42,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <PuestaEnMarcha />
       <CentroControl />
 
       {/* Qué atender hoy */}

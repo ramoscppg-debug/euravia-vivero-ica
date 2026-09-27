@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import { AlertTriangle, ExternalLink, Store } from 'lucide-react';
-import { SubirFoto } from '../../components/SubirFoto';
-import { Boton, Insignia, Tarjeta } from '../../components/ui';
-import type { ConfigTienda, ServicioPublico } from '../../domain/types';
+import { Boton, Tarjeta } from '../../components/ui';
+import type { ConfigTienda } from '../../domain/types';
 import { useErp } from '../../store/ErpStore';
+import { useUi } from '../../store/UiStore';
 
 const campo = 'w-full min-h-[40px] px-3 rounded-control bg-crema border border-crema-300 font-semibold';
-const aSlug = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 
-/** Contacto y servicios que muestra la tienda pública (sólo el dueño). */
+/** Datos de contacto que muestra la tienda pública (sólo el dueño). */
 export default function TiendaAjustes() {
   const { state, actions } = useErp();
   const [cfg, setCfg] = useState<ConfigTienda>(state.tiendaConfig);
   const [guardado, setGuardado] = useState(false);
-  const [nuevo, setNuevo] = useState({ nombre: '', resumen: '' });
+  const { setTab } = useUi();
 
   const guardar = async () => {
     const r = await actions.guardarConfigTienda(cfg);
@@ -24,18 +23,6 @@ export default function TiendaAjustes() {
     }
   };
 
-  const guardarServicio = async (sv: ServicioPublico) => {
-    const r = await actions.guardarServicioPublico(sv);
-    if (!r.ok) alert(r.error);
-  };
-
-  const agregarServicio = async () => {
-    const slug = aSlug(nuevo.nombre);
-    if (!slug) return alert('Escribe el nombre del servicio.');
-    if (state.serviciosPublicos.some(s => s.slug === slug)) return alert('Ya existe un servicio con ese nombre.');
-    await guardarServicio({ slug, nombre: nuevo.nombre.trim(), resumen: nuevo.resumen.trim(), orden: state.serviciosPublicos.length + 1, visible: true });
-    setNuevo({ nombre: '', resumen: '' });
-  };
 
   return (
     <Tarjeta as="section" className="p-6 space-y-5 text-sm">
@@ -73,37 +60,10 @@ export default function TiendaAjustes() {
         {guardado && <span role="status" className="text-exito font-bold">Guardado ✓</span>}
       </div>
 
-      <div className="space-y-2 pt-2 border-t border-crema-300">
-        <p className="font-bold text-tinta">Servicios publicados</p>
-        {state.serviciosPublicos.map(sv => (
-          <details key={sv.slug} className="rounded-control border border-crema-300 bg-crema-50 px-3 py-2">
-            <summary className="cursor-pointer flex items-center gap-2 font-semibold">
-              {sv.nombre} <Insignia tono={sv.visible ? 'exito' : 'neutro'}>{sv.visible ? 'Visible' : 'Oculto'}</Insignia>
-              <span className="text-[11px] font-mono text-tinta-suave">/servicios/{sv.slug}</span>
-            </summary>
-            <ServicioEditor sv={sv} alGuardar={guardarServicio} />
-          </details>
-        ))}
-        <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto] pt-2">
-          <input aria-label="Nombre del nuevo servicio" value={nuevo.nombre} onChange={e => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nuevo servicio" className={campo} />
-          <input aria-label="Resumen del nuevo servicio" value={nuevo.resumen} onChange={e => setNuevo({ ...nuevo, resumen: e.target.value })} placeholder="Resumen de una línea" className={campo} />
-          <Boton variante="secundario" onClick={agregarServicio}>Agregar</Boton>
-        </div>
-      </div>
+      <p className="pt-2 border-t border-crema-300 text-xs text-tinta-suave">
+        Los servicios, productos y fotos se editan en <button onClick={() => setTab('servicios-tienda')} className="font-bold text-bosque-700 underline">Catálogo y almacén → Servicios de la tienda</button>.
+      </p>
     </Tarjeta>
   );
 }
 
-function ServicioEditor({ sv, alGuardar }: { sv: ServicioPublico; alGuardar: (s: ServicioPublico) => Promise<void> }) {
-  const [s, setS] = useState(sv);
-  return (
-    <div className="grid gap-2 sm:grid-cols-2 pt-3">
-      <label className="block text-xs font-bold">Nombre<input aria-label={`Nombre de ${sv.nombre}`} value={s.nombre} onChange={e => setS({ ...s, nombre: e.target.value })} className={`${campo} mt-1`} /></label>
-      <div><p className="text-xs font-bold mb-1">Foto (opcional)</p><SubirFoto valor={s.imagen} cambiar={url => setS({ ...s, imagen: url || undefined })} carpeta="servicios" nombre={s.slug} /></div>
-      <label className="block text-xs font-bold sm:col-span-2">Resumen<input aria-label={`Resumen de ${sv.nombre}`} value={s.resumen} onChange={e => setS({ ...s, resumen: e.target.value })} className={`${campo} mt-1`} /></label>
-      <label className="block text-xs font-bold sm:col-span-2">Descripción<textarea aria-label={`Descripción de ${sv.nombre}`} value={s.descripcion ?? ''} onChange={e => setS({ ...s, descripcion: e.target.value })} className={`${campo} mt-1 min-h-[64px] py-2`} /></label>
-      <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={s.visible} onChange={e => setS({ ...s, visible: e.target.checked })} /> Visible en la tienda</label>
-      <div className="flex justify-end"><Boton tamano="sm" onClick={() => void alGuardar(s)}>Guardar servicio</Boton></div>
-    </div>
-  );
-}

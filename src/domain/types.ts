@@ -369,6 +369,7 @@ export interface ServicioPublico {
   imagen?: string;
   orden: number;
   visible: boolean;
+  precioDesde?: number; // referencial, lo fija el dueño; vacío = "a cotizar"
 }
 
 /** Contacto que muestra la tienda. Vacío hasta que el dueño lo complete (no se inventan datos). */

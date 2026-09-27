@@ -6,6 +6,7 @@ import { NuevaCotizacionModal } from '../modules/servicios/Proyectos';
 import { NuevoContratoModal } from '../modules/servicios/Contratos';
 import { NuevaCotizacionProductosModal } from '../modules/ventas/Cotizaciones';
 import { FichaProductoModal } from '../modules/ventas/FichaProductoModal';
+import { ImportarProductosModal } from '../modules/ventas/ImportarProductosModal';
 import { SolicitudAPedidoModal } from '../modules/ventas/Solicitudes';
 import { CobroPedidoModal, EntregaPedidoModal, NuevoPedidoModal } from '../modules/ventas/Pedidos';
 import { EgresoModal, PosModal, QrModal, TicketModal } from '../modules/ventas/VentasModals';
@@ -23,7 +24,9 @@ export default function ModalHost() {
     case 'ticket':
       return <TicketModal invoice={modal.invoice} vuelto={modal.vuelto} />;
     case 'compra':
-      return <CompraModal />;
+      return <CompraModal key={modal.sku ?? 'compra'} presetSku={modal.sku} />;
+    case 'importar-productos':
+      return <ImportarProductosModal />;
     case 'baja':
       return <BajaModal />;
     case 'egreso':
@@ -41,7 +44,7 @@ export default function ModalHost() {
     case 'solicitud-pedido':
       return <SolicitudAPedidoModal key={modal.solicitud.id} solicitud={modal.solicitud} />;
     case 'producto':
-      return <FichaProductoModal key={modal.sku ?? 'nuevo'} sku={modal.sku} />;
+      return <FichaProductoModal key={modal.sku ?? modal.duplicarDe ?? 'nuevo'} sku={modal.sku} duplicarDe={modal.duplicarDe} />;
     case 'pedido-nuevo':
       return <NuevoPedidoModal />;
     case 'pedido-cobro':

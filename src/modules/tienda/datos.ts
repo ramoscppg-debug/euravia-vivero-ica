@@ -62,7 +62,7 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
   if (!sb) throw new Error('Sin conexión con la tienda.');
   const [catalogo, servicios, config] = await Promise.all([
     sb.rpc('catalogo_publico'),
-    sb.from('servicios_publicos').select('slug, nombre, resumen, descripcion, imagen_url, orden, visible').eq('visible', true).order('orden'),
+    sb.from('servicios_publicos').select('slug, nombre, resumen, descripcion, imagen_url, orden, visible, precio_desde').eq('visible', true).order('orden'),
     sb.from('tienda_config').select('whatsapp, email, direccion, horario, mensaje_portada').eq('id', 1).maybeSingle()
   ]);
   const error = catalogo.error ?? servicios.error ?? config.error;

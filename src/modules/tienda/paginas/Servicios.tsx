@@ -3,7 +3,7 @@ import { ArrowRight, ChevronLeft, ClipboardCheck, Shovel } from 'lucide-react';
 import { Enlace } from '../../../app/router';
 import { EstadoVacio, Esqueleto } from '../../../components/ui';
 import { url } from '../datos';
-import { BotonCompartir, Imagen, Titulo } from '../componentes';
+import { BotonCompartir, Imagen, soles, Titulo } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useTienda } from '../TiendaApp';
 
@@ -25,6 +25,7 @@ export function Servicios() {
                 {!s.imagen && <span className="w-12 h-12 rounded-2xl bg-hoja-50 text-hoja-700 flex items-center justify-center"><Shovel className="w-6 h-6" aria-hidden /></span>}
                 <span className="text-xl font-extrabold text-slate-900">{s.nombre}</span>
                 <span className="text-slate-600">{s.resumen}</span>
+                {s.precioDesde !== undefined && <span className="text-sm font-bold text-slate-900">Desde {soles(s.precioDesde)}</span>}
                 <span className="mt-auto pt-2 inline-flex items-center gap-1 font-bold text-hoja-700">Cotizar <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" aria-hidden /></span>
               </span>
             </Enlace>
@@ -57,6 +58,7 @@ export function ServicioDetalle({ slug }: { slug: string }) {
           {s.imagen && <Imagen src={s.imagen} alt={s.nombre} className="w-full aspect-[16/10] rounded-[2rem]" />}
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">{s.nombre}</h1>
           <p className="text-lg text-slate-700">{s.resumen}</p>
+          {s.precioDesde !== undefined && <p className="text-2xl font-extrabold text-slate-900">Desde {soles(s.precioDesde)} <span className="text-sm font-semibold text-slate-500">· precio final según tu espacio</span></p>}
           {s.descripcion && <p className="text-slate-600 leading-relaxed whitespace-pre-line">{s.descripcion}</p>}
           <BotonCompartir titulo={s.nombre} />
         </div>

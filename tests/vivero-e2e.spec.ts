@@ -648,6 +648,60 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('36. Producto nuevo en un paso: SKU automático, stock inicial al Kardex y "crear otro"', async ({ page }) => {
+    await ir(page, 'catalogo');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const m = page.locator('.fixed');
+    await expect(m.getByLabel('SKU')).toHaveValue('PLI-001'); // automático por categoría
+    await m.getByLabel('Categoría', { exact: true }).selectOption('macetas');
+    await expect(m.getByLabel('SKU')).toHaveValue('MAC-002'); // MAC-001 ya existe en el demo
+    await m.getByLabel('Nombre del producto').fill('Maceta de barro 20 cm');
+    await m.getByLabel('Precio de venta').fill('23.60');
+    await m.getByLabel('Costo unitario').fill('10');
+    await expect(m.getByText("50% · gana S/ 10.00 por unidad")).toBeVisible(); // 20 de base sin IGV − 10 de costo
+    await m.getByLabel('Stock inicial').fill('12');
+    await m.getByRole('button', { name: 'Guardar y crear otro' }).click();
+    await expect(m.getByText('✓ Maceta de barro 20 cm creado con 12 u.')).toBeVisible();
+    await expect(m.getByLabel('SKU')).toHaveValue('MAC-003');
+    await m.getByRole('button', { name: 'Listo' }).click();
+    const card = page.getByRole('article').filter({ hasText: 'Maceta de barro 20 cm' });
+    await expect(card.getByText('12 u.')).toBeVisible();
+    await ir(page, 'kardex');
+    await expect(page.getByText('INV-INICIAL').first()).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('37. Carga masiva desde Excel (CSV) con vista previa y errores por fila', async ({ page }) => {
+    await ir(page, 'catalogo');
+    await page.getByRole('button', { name: 'Cargar desde Excel' }).click();
+    const csv = 'sku;nombre;categoria;precio;costo;stock_inicial\n;Pothos dorado;interior;25;9;30\n;Cactus mini;suculentas;8,50;3;0\nAUR-001;Duplicado;interior;10;5;1\n;Sin precio;interior;;2;0\n';
+    await page.getByLabel('Archivo CSV de productos').setInputFiles({ name: 'productos.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await expect(page.getByText('2 listos')).toBeVisible();
+    await expect(page.getByText('2 con errores (no se importan)')).toBeVisible();
+    await expect(page.getByText('el SKU AUR-001 ya existe')).toBeVisible();
+    await page.getByRole('button', { name: 'Crear 2 producto(s)' }).click();
+    await expect(page.getByText('✓ 2 producto(s) creados con su stock inicial.')).toBeVisible();
+    await page.locator('.fixed button[aria-label="Cerrar"]').click();
+    await expect(page.getByRole('article').filter({ hasText: 'Pothos dorado' }).getByText('30 u.')).toBeVisible();
+    await expect(page.getByRole('article').filter({ hasText: 'Cactus mini' }).getByText('S/ 8.50')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('38. Servicios de la tienda: crear con precio "desde" y verlo en la tienda; guía de puesta en marcha', async ({ page }) => {
+    await expect(page.getByRole('region', { name: 'Pon en marcha tu negocio' })).toContainText('WhatsApp de ventas');
+    await ir(page, 'servicios-tienda');
+    await page.getByRole('button', { name: 'Nuevo servicio' }).click();
+    await page.getByLabel('Nombre del nuevo servicio').fill('Poda de árboles');
+    await page.getByLabel('Precio desde del nuevo servicio').fill('150');
+    await page.getByLabel('Resumen del nuevo servicio').fill('Poda de formación y limpieza de árboles.');
+    await page.getByRole('button', { name: 'Crear servicio' }).click();
+    await expect(page.getByText('desde S/ 150.00')).toBeVisible();
+    await page.goto('/tienda/servicios/poda-de-arboles');
+    await expect(page.getByRole('heading', { level: 1, name: 'Poda de árboles' })).toBeVisible();
+    await expect(page.getByText('Desde S/ 150.00')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

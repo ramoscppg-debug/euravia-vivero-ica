@@ -8,18 +8,20 @@ import { useUi } from '../../store/UiStore';
 // ============================================================
 // MODAL: COMPRA MAYORISTA
 // ============================================================
-export function CompraModal() {
-  const { state, actions } = useErp();
+export function CompraModal({ presetSku }: { presetSku?: string }) {
+  const { state, actions, nube } = useErp();
   const { close } = useUi();
   const { busy, consultar } = useDocLookup();
   const { products } = state;
+  // En la nube el formulario empieza vacío (nada de proveedores de ejemplo); el demo trae datos para probar
+  const inicial = products.find(p => p.sku === presetSku) ?? products[0];
 
-  const [proveedor, setProveedor] = useState('Viveros Mayoristas del Sur SAC');
-  const [ruc, setRuc] = useState('20556677884');
-  const [numeroFactura, setNumeroFactura] = useState('FC01-0009981');
-  const [sku, setSku] = useState(products[0]?.sku ?? '');
-  const [qty, setQty] = useState(20);
-  const [costoUnitario, setCostoUnitario] = useState(35);
+  const [proveedor, setProveedor] = useState(nube ? '' : 'Viveros Mayoristas del Sur SAC');
+  const [ruc, setRuc] = useState(nube ? '' : '20556677884');
+  const [numeroFactura, setNumeroFactura] = useState(nube ? '' : 'FC01-0009981');
+  const [sku, setSku] = useState(inicial?.sku ?? '');
+  const [qty, setQty] = useState(nube ? 1 : 20);
+  const [costoUnitario, setCostoUnitario] = useState(nube ? inicial?.cost ?? 0 : 35);
 
   const [enviando, setEnviando] = useState(false);
 
@@ -46,7 +48,7 @@ export function CompraModal() {
           <div>
             <label className="font-bold block mb-1">RUC Proveedor</label>
             <div className="flex gap-1.5">
-              <input type="text" value={ruc} onChange={(e) => setRuc(e.target.value)} className="flex-1 min-w-0 p-2.5 bg-crema border rounded-xl font-mono font-bold" />
+              <input type="text" inputMode="numeric" aria-label="RUC del proveedor" value={ruc} onChange={(e) => setRuc(e.target.value.trim())} placeholder="11 dígitos" className="flex-1 min-w-0 p-2.5 bg-crema border rounded-xl font-mono font-bold" />
               <button type="button" disabled={busy} onClick={() => consultar(ruc, setProveedor)} className="shrink-0 px-3 rounded-xl bg-bosque-950 text-oro font-bold text-[10px] flex items-center gap-1 disabled:opacity-50">
                 <ScanLine className="w-3.5 h-3.5" /> {busy ? '...' : 'Consultar'}
               </button>
@@ -54,7 +56,7 @@ export function CompraModal() {
           </div>
           <div>
             <label className="font-bold block mb-1">N° Factura</label>
-            <input type="text" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl font-mono font-bold" />
+            <input type="text" aria-label="Número de factura" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value.toUpperCase())} placeholder="F001-000123" className="w-full p-2.5 bg-crema border rounded-xl font-mono font-bold" />
           </div>
         </div>
         <div>
@@ -63,7 +65,7 @@ export function CompraModal() {
         </div>
         <div>
           <label className="font-bold block mb-1">Especie a Ingresar</label>
-          <select value={sku} onChange={(e) => setSku(e.target.value)} className="w-full p-2.5 bg-crema border rounded-xl font-semibold">
+          <select value={sku} onChange={(e) => { setSku(e.target.value); const pr = products.find(x => x.sku === e.target.value); if (pr?.cost) setCostoUnitario(pr.cost); }} className="w-full p-2.5 bg-crema border rounded-xl font-semibold">
             {products.map(p => <option key={p.sku} value={p.sku}>{p.name} (Stock Actual: {p.stock} u.)</option>)}
           </select>
         </div>

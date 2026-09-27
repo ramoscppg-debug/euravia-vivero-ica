@@ -89,12 +89,6 @@ export default function CentroControl() {
         </div>
       </div>
 
-      {rol === 'dueno' && !state.tiendaConfig.whatsapp && (
-        <p className="flex items-start gap-2 p-3 rounded-control bg-aviso-fondo text-aviso text-sm font-semibold">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
-          <span>La tienda pública aún no tiene WhatsApp de ventas: los clientes sólo pueden dejar una solicitud. <button onClick={ir('configuracion')} className="underline">Configurarlo en Ajustes</button>.</span>
-        </p>
-      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Metrica titulo="Ventas de hoy" valor={soles(rHoy.ventasNetas)} detalle={`${rHoy.tickets} ticket(s)`} periodo={hoy} />
