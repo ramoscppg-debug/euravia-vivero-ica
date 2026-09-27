@@ -29,6 +29,7 @@ import {
 } from './seed';
 import type { ErpState } from '../store/ErpStore';
 import type { SolicitudTienda } from '../domain/types';
+import { hoyLocal } from '../lib/fechas';
 
 export const STORAGE_KEY = 'aurevia.erp.v1';
 
@@ -57,7 +58,8 @@ export function seedState(): ErpState {
     puntosSaldo: INITIAL_PUNTOS,
     solicitudes: [],
     tiendaConfig: INITIAL_CONFIG_TIENDA,
-    serviciosPublicos: INITIAL_SERVICIOS_PUBLICOS
+    serviciosPublicos: INITIAL_SERVICIOS_PUBLICOS,
+    gastosCaja: INITIAL_CASH_REGISTER.egresos.map(e => ({ id: `${hoyLocal()}-${e.id}`, fecha: hoyLocal(), motivo: e.motivo, monto: e.monto, responsable: e.responsable }))
   };
 }
 

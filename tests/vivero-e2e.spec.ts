@@ -638,6 +638,16 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('35. Libro contable: ventas, compras y gastos de caja del periodo con resultado', async ({ page }) => {
+    await ir(page, 'finanzas');
+    const libro = page.getByRole('region', { name: 'Libro de ingresos y egresos' });
+    await expect(libro.getByText('Gasto de caja chica').first()).toBeVisible();
+    await expect(libro.getByText('Compra a proveedor').first()).toBeVisible();
+    await expect(libro.getByText('Venta de bienes').first()).toBeVisible();
+    await expect(page.getByText('Resultado', { exact: true })).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

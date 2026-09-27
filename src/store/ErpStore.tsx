@@ -12,6 +12,7 @@ import type {
   BiologicalLoss,
   CashRegisterState,
   CatalogProduct,
+  GastoCaja,
   ComprobanteSunat,
   CrmClient,
   DetraccionRecord,
@@ -81,6 +82,7 @@ export interface ErpState {
   solicitudes: SolicitudTienda[];
   tiendaConfig: ConfigTienda;
   serviciosPublicos: ServicioPublico[];
+  gastosCaja: GastoCaja[]; // gastos de caja chica de todos los días (el arqueo usa sólo los de hoy)
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -235,7 +237,8 @@ function nubeVacia(): ErpState {
     puntosSaldo: {},
     solicitudes: [],
     tiendaConfig: {},
-    serviciosPublicos: []
+    serviciosPublicos: [],
+    gastosCaja: []
   };
 }
 
@@ -1163,8 +1166,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           if (nube) await repo.guardarCaja({ tipo: 'EGRESO', monto, medioPago: 'Efectivo', concepto: motivo, responsable: usuario });
           const s = get();
           const caja = s.cashRegister;
+          const id = `EG-${String(caja.egresos.length + 1).padStart(2, '0')}`;
           commit({
             ...s,
+            gastosCaja: [{ id: `${today()}-${id}`, fecha: today(), motivo, monto, responsable: responsable('Administración') }, ...s.gastosCaja],
             cashRegister: {
               ...caja,
               egresos: [

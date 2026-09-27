@@ -8,6 +8,7 @@ import type {
   BiologicalLoss,
   CashRegisterState,
   CatalogProduct,
+  GastoCaja,
   ComprobanteSunat,
   CrmClient,
   DetraccionRecord,
@@ -34,6 +35,10 @@ import { EMPRESA_VACIA } from '../data/seed';
 import type { Rol } from '../domain/types';
 import { round2 } from './peru';
 import { getSupabase } from './supabase';
+import { hoyLocal } from './fechas';
+
+/** Fecha local (YYYY-MM-DD) de una marca de tiempo del servidor. */
+const hoyLima = (iso: string) => hoyLocal(new Date(iso));
 
 type Row = Record<string, any>;
 
@@ -83,11 +88,12 @@ export interface DatosNube {
   solicitudes: SolicitudTienda[];
   tiendaConfig: ConfigTienda;
   serviciosPublicos: ServicioPublico[];
+  gastosCaja: GastoCaja[];
 }
 
 export async function cargarTodo(): Promise<DatosNube> {
   const sb = await db();
-  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos, solicitudes, tiendaCfg, serviciosTienda] = await Promise.all([
+  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos, solicitudes, tiendaCfg, serviciosTienda, gastos] = await Promise.all([
     sb.from('empresa_config').select('*').limit(1).maybeSingle(),
     sb.from('productos').select('*').eq('activo', true).order('sku'),
     sb.from('kardex_movimientos').select('*').order('id', { ascending: false }).limit(500),
@@ -108,7 +114,10 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('puntos_saldos').select('*'),
     sb.from('solicitudes_tienda').select('*').order('created_at', { ascending: false }).limit(200),
     sb.from('tienda_config').select('*').eq('id', 1).maybeSingle(),
-    sb.from('servicios_publicos').select('*').order('orden')
+    sb.from('servicios_publicos').select('*').order('orden'),
+    // Gastos de caja chica de los últimos 13 meses (las devoluciones ya cuentan como notas de crédito)
+    sb.from('caja_movimientos').select('id, fecha, concepto, monto, responsable').eq('tipo', 'EGRESO').is('comprobante_id', null)
+      .gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString()).order('fecha', { ascending: false }).limit(2000)
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -138,7 +147,8 @@ export async function cargarTodo(): Promise<DatosNube> {
     puntosSaldo: Object.fromEntries(ok<Row[]>(puntos).map(r => [r.cliente_doc, r.saldo])),
     solicitudes: ok<Row[]>(solicitudes).map(solicitudDesdeFila),
     tiendaConfig: configTiendaDesdeFila(ok<Row | null>(tiendaCfg)),
-    serviciosPublicos: ok<Row[]>(serviciosTienda).map(servicioPublicoDesdeFila)
+    serviciosPublicos: ok<Row[]>(serviciosTienda).map(servicioPublicoDesdeFila),
+    gastosCaja: ok<Row[]>(gastos).map(r => ({ id: String(r.id), fecha: hoyLima(r.fecha), motivo: r.concepto ?? '', monto: num(r.monto), responsable: r.responsable ?? '' })),
   };
 }
 

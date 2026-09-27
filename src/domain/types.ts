@@ -131,6 +131,15 @@ export interface EgresoCajaChica {
   responsable: string;
 }
 
+/** Gasto menor pagado con efectivo de caja (historial para el libro de egresos). */
+export interface GastoCaja {
+  id: string;
+  fecha: string; // YYYY-MM-DD (hora de Lima)
+  motivo: string;
+  monto: number;
+  responsable: string;
+}
+
 export interface CashRegisterState {
   aperturaEfectivo: number;
   ventasEfectivo: number;

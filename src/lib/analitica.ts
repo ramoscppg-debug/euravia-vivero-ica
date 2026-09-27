@@ -40,10 +40,8 @@ export function libroFinanzas(s: ErpState, desde: string, hasta: string) {
     if (!dentro(c.fecha, desde, hasta)) continue;
     movs.push({ fecha: c.fecha, tipo: 'EGRESO', categoria: 'Compra a proveedor', documento: c.id, detalle: `${c.proveedor} · ${c.items}`, monto: c.total });
   }
-  // Gastos menores de caja: el panel carga los del día
-  const hoy = hoyLocal();
-  if (dentro(hoy, desde, hasta)) {
-    for (const e of s.cashRegister.egresos) movs.push({ fecha: hoy, tipo: 'EGRESO', categoria: 'Gasto de caja chica', documento: e.id, detalle: e.motivo, monto: e.monto });
+  for (const g of s.gastosCaja) {
+    if (dentro(g.fecha, desde, hasta)) movs.push({ fecha: g.fecha, tipo: 'EGRESO', categoria: 'Gasto de caja chica', documento: g.id, detalle: g.motivo, monto: g.monto });
   }
   movs.sort((a, b) => b.fecha.localeCompare(a.fecha));
   const ingresos = round2(movs.filter(m => m.tipo === 'INGRESO').reduce((a, m) => a + m.monto, 0));
