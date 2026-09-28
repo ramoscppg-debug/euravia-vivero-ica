@@ -27,6 +27,7 @@ import type {
   Cupon,
   NotaCliente,
   Tarea,
+  ParteProduccion,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -192,7 +193,7 @@ function productoDesdeFila(r: Row): CatalogProduct {
     category: r.categoria,
     price: num(r.precio_venta),
     cost: num(r.costo_unitario),
-    stock: r.stock_actual,
+    stock: num(r.stock_actual),
     minStock: r.stock_minimo,
     location: r.ubicacion_estante ?? '',
     careLight: r.cuidado_luz ?? undefined,
@@ -203,7 +204,11 @@ function productoDesdeFila(r: Row): CatalogProduct {
     botanicalFamily: r.familia_botanica ?? '',
     categoryName: r.categoria_nombre ?? r.categoria,
     visibleTienda: r.visible_tienda ?? true,
-    destacado: !!r.destacado
+    destacado: !!r.destacado,
+    valorInventario: r.valor_inventario != null ? num(r.valor_inventario) : undefined,
+    costoPromedio: r.costo_promedio != null ? num(r.costo_promedio) : undefined,
+    unidadMedida: r.unidad_medida ?? undefined,
+    tipoExistencia: r.tipo_existencia ?? undefined
   };
 }
 
@@ -214,12 +219,23 @@ function kardexDesdeFila(r: Row, nombres: Map<string, string>): KardexMovement {
     productSku: r.producto_sku,
     productName: nombres.get(r.producto_sku) ?? r.producto_sku,
     movementType: r.tipo_movimiento as MovementType,
-    quantityIn: r.cantidad_entrada ?? 0,
-    quantityOut: r.cantidad_salida ?? 0,
-    balance: r.saldo_resultante,
+    quantityIn: num(r.cantidad_entrada),
+    quantityOut: num(r.cantidad_salida),
+    balance: num(r.saldo_resultante),
     unitCost: num(r.costo_unitario),
     referenceDoc: r.documento_referencia ?? undefined,
-    responsibleUser: r.usuario_responsable
+    responsibleUser: r.usuario_responsable,
+    fechaEmision: r.fecha_emision ?? undefined,
+    tipoComprobante: r.sunat_tipo_comprobante ?? undefined,
+    comprobanteSerie: r.comprobante_serie ?? undefined,
+    comprobanteNumero: r.comprobante_numero ?? undefined,
+    tipoOperacion: r.sunat_tipo_operacion ?? undefined,
+    movimiento: r.movimiento ?? undefined,
+    cantidad: r.cantidad != null ? num(r.cantidad) : undefined,
+    costoTotal: r.costo_total != null ? num(r.costo_total) : undefined,
+    saldoCantidad: r.saldo_cantidad != null ? num(r.saldo_cantidad) : undefined,
+    saldoCostoUnitario: r.saldo_costo_unitario != null ? num(r.saldo_costo_unitario) : undefined,
+    saldoCostoTotal: r.saldo_costo_total != null ? num(r.saldo_costo_total) : undefined
   };
 }
 
@@ -1010,6 +1026,34 @@ export async function marcarComprobanteEnviado(id: string) {
 export async function registrarGuiaExterna(id: string, numero: string) {
   const sb = await db();
   ok(await sb.rpc('registrar_guia_externa', { p_id: id, p_numero: numero }));
+}
+
+// ---------------- PRODUCCIÓN PROPIA ----------------
+export async function registrarProduccion(p: { sku: string; cantidad: number; insumos: { sku: string; cantidad: number }[]; costoAdicional: number; notas?: string; responsable: string }) {
+  const sb = await db();
+  return ok<{ numero: string; costo_insumos: number; costo_unitario: number }>(await sb.rpc('registrar_produccion', {
+    p: { producto_sku: p.sku, cantidad: p.cantidad, insumos: p.insumos, costo_adicional: p.costoAdicional, notas: p.notas, responsable: p.responsable }
+  }));
+}
+
+export async function cargarPartesProduccion(): Promise<ParteProduccion[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('partes_produccion').select('*').order('created_at', { ascending: false }).limit(200)).map(r => ({
+    numero: r.numero, fecha: r.fecha, sku: r.producto_sku, cantidad: num(r.cantidad), costoInsumos: num(r.costo_insumos),
+    costoAdicional: num(r.costo_adicional), costoUnitario: num(r.costo_unitario), insumos: r.insumos ?? [], notas: r.notas ?? undefined, responsable: r.responsable
+  }));
+}
+
+/** Movimientos de un periodo para el libro 13.1 (sin el límite de la carga inicial). */
+export async function cargarKardexHasta(hasta: string, nombres: Map<string, string>): Promise<KardexMovement[]> {
+  const sb = await db();
+  const filas: Row[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const lote = ok<Row[]>(await sb.from('kardex_movimientos').select('*').lte('fecha_emision', hasta).order('id').range(desde, desde + 999));
+    filas.push(...lote);
+    if (lote.length < 1000) break;
+  }
+  return filas.map(r => kardexDesdeFila(r, nombres));
 }
 
 /** Quita un servicio de la tienda (las solicitudes antiguas conservan el texto del servicio). */

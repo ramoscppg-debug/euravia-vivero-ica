@@ -13,6 +13,7 @@ import type {
   CashRegisterState,
   CatalogProduct,
   GastoCaja,
+  ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
   ComprobanteSunat,
@@ -50,6 +51,7 @@ import { emisorDe } from '../domain/types';
 import { cargarEstadoDemo, guardarEstadoDemo, seedState, STORAGE_KEY } from '../data/estadoDemo';
 import { EMPRESA_VACIA } from '../data/seed';
 import { fotoComoJpeg } from '../lib/imagen';
+import { aplicarPromedio, codigosSunat, saldoDe } from '../lib/kardexValorado';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
@@ -87,6 +89,15 @@ export interface ErpState {
   gastosCaja: GastoCaja[]; // gastos de caja chica de todos los días (el arqueo usa sólo los de hoy)
   tarifasDelivery: TarifaDelivery[];
   avisos: AvisosWhatsapp; // sólo el dueño la carga
+  partesProduccion: ParteProduccion[];
+}
+
+export interface ProduccionInput {
+  sku: string;
+  cantidad: number;
+  insumos: { sku: string; cantidad: number }[];
+  costoAdicional: number; // mano de obra, agua, energía… (cálculo manual)
+  notas?: string;
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -256,15 +267,24 @@ function nubeVacia(): ErpState {
     serviciosPublicos: [],
     gastosCaja: [],
     tarifasDelivery: [],
-    avisos: { activo: false }
+    avisos: { activo: false },
+    partesProduccion: []
   };
 }
 
-/** Mueve stock de un producto y deja la huella en el Kardex (modo demo). Función pura. */
-function moverStock(s: ErpState, m: repo.MovimientoNuevo): ErpState {
+/**
+ * Mueve stock de un producto y deja la huella en el Kardex (modo demo). Función pura.
+ * Valoriza con costo promedio ponderado, igual que el trigger de la base (Formato 13.1).
+ */
+function moverStock(s: ErpState, m: repo.MovimientoNuevo, extra: { fecha?: string; codigos?: { tipoComprobante: string; serie: string; numero: string; tipoOperacion: string } } = {}): ErpState {
   const prod = s.products.find(p => p.sku === m.sku);
   if (!prod) return s;
   const balance = Math.max(0, prod.stock + m.qtyIn - m.qtyOut);
+  const entrada = m.qtyIn > 0;
+  const cantidad = entrada ? m.qtyIn : prod.stock - balance;
+  const tipoBaja = m.type === 'Baja por Perdida' ? s.losses.find(l => l.id === m.doc)?.type : undefined;
+  const cod = extra.codigos ?? codigosSunat(m.type, m.doc, tipoBaja);
+  const v = cantidad > 0 ? aplicarPromedio(saldoDe(prod), { movimiento: entrada ? 'ENTRADA' : 'SALIDA', cantidad, costoUnitario: entrada ? m.unitCost : undefined }) : null;
   const movement: KardexMovement = {
     id: `KDX-${String(s.kardex.length + 1).padStart(5, '0')}`,
     date: today(),
@@ -274,13 +294,24 @@ function moverStock(s: ErpState, m: repo.MovimientoNuevo): ErpState {
     quantityIn: m.qtyIn,
     quantityOut: prod.stock + m.qtyIn - balance,
     balance,
-    unitCost: m.unitCost,
+    unitCost: v?.costoUnitario ?? m.unitCost,
     referenceDoc: m.doc,
-    responsibleUser: m.user
+    responsibleUser: m.user,
+    fechaEmision: extra.fecha ?? today(),
+    tipoComprobante: cod.tipoComprobante,
+    comprobanteSerie: cod.serie,
+    comprobanteNumero: cod.numero,
+    tipoOperacion: cod.tipoOperacion,
+    movimiento: entrada ? 'ENTRADA' : 'SALIDA',
+    cantidad: v?.cantidad,
+    costoTotal: v?.costoTotal,
+    saldoCantidad: v?.saldo.cantidad,
+    saldoCostoUnitario: v?.saldo.costoUnitario,
+    saldoCostoTotal: v?.saldo.costoTotal
   };
   return {
     ...s,
-    products: s.products.map(p => (p.sku === m.sku ? { ...p, stock: balance } : p)),
+    products: s.products.map(p => (p.sku === m.sku ? { ...p, stock: balance, ...(v ? { valorInventario: v.saldo.costoTotal, costoPromedio: v.saldo.costoUnitario } : {}) } : p)),
     kardex: [movement, ...s.kardex]
   };
 }
@@ -424,7 +455,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
 
     /** Aplica movimientos de stock: en la nube los confirma el servidor, en demo se calculan aquí. */
     async function moverInventario(movs: repo.MovimientoNuevo[]): Promise<ErpState> {
-      if (!nube) return movs.reduce(moverStock, get());
+      if (!nube) return movs.reduce((st, mv) => moverStock(st, mv), get());
       const nombres = new Map(get().products.map(p => [p.sku, p.name]));
       const filas = await repo.insertarKardex(movs, nombres);
       const saldos = new Map<string, number>();
@@ -439,7 +470,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
 
     /** Guarda un comprobante con su stock, caja, guía y cliente. En la nube es una sola transacción. */
     async function persistirComprobante(c: repo.ComprobanteAtomico): Promise<ErpState> {
-      if (!nube) return c.movimientos.reduce(moverStock, get());
+      if (!nube) return c.movimientos.reduce((st, mv) => moverStock(st, mv), get());
       const nombres = new Map(get().products.map(p => [p.sku, p.name]));
       const filas = await repo.registrarComprobanteAtomico(c, nombres);
       const saldos = new Map<string, number>();
@@ -604,7 +635,8 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          commit({ ...get(), ...datos });
+          const partesProduccion = await repo.cargarPartesProduccion().catch(() => []); // sólo dueño y jardinero
+          commit({ ...get(), ...datos, partesProduccion });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -1330,6 +1362,59 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           }
         }
         return { ok: true, ajustes, bajas };
+      },
+
+      // ---------------- PRODUCCIÓN PROPIA (Formato 13.1: doc. 00, op. 10 → op. 19) ----------------
+      /**
+       * Consume insumos al costo promedio y da entrada al producto con costo = (insumos + costo adicional) / cantidad.
+       * En la nube es una sola transacción en la base: si falta un insumo, no se registra nada.
+       */
+      async registrarProduccion(p: ProduccionInput): Promise<Result<{ parte: ParteProduccion }>> {
+        const s = get();
+        const prod = s.products.find(x => x.sku === p.sku);
+        if (!prod) return { ok: false, error: 'Elige el producto que se produjo.' };
+        if (!(p.cantidad > 0)) return { ok: false, error: 'La cantidad producida debe ser mayor a cero.' };
+        if (p.costoAdicional < 0) return { ok: false, error: 'El costo adicional no puede ser negativo.' };
+        const insumos = p.insumos.filter(i => i.sku && i.cantidad > 0);
+        if (!insumos.length && !(p.costoAdicional > 0)) return { ok: false, error: 'Indica los insumos usados o el costo de producción.' };
+        if (insumos.some(i => i.sku === p.sku)) return { ok: false, error: 'Un producto no puede ser insumo de sí mismo.' };
+        if (new Set(insumos.map(i => i.sku)).size !== insumos.length) return { ok: false, error: 'Un insumo está repetido: suma sus cantidades en una sola línea.' };
+        for (const i of insumos) {
+          const ins = s.products.find(x => x.sku === i.sku);
+          if (!ins) return { ok: false, error: `Insumo ${i.sku} no encontrado.` };
+          if (ins.stock < i.cantidad) return { ok: false, error: `Stock insuficiente de ${ins.name}: hay ${ins.stock}, se necesitan ${i.cantidad}.` };
+        }
+        try {
+          if (nube) {
+            const r = await repo.registrarProduccion({ ...p, insumos, responsable: usuario });
+            const rec = await acciones.recargar();
+            if (!rec.ok) return rec;
+            const parte = get().partesProduccion.find(x => x.numero === r.numero)
+              ?? { numero: r.numero, fecha: today(), sku: p.sku, cantidad: p.cantidad, costoInsumos: Number(r.costo_insumos), costoAdicional: p.costoAdicional, costoUnitario: Number(r.costo_unitario), insumos, notas: p.notas, responsable: usuario };
+            return { ok: true, parte };
+          }
+          const numero = String(s.partesProduccion.length + 1).padStart(8, '0');
+          const codigos = (op: string) => ({ tipoComprobante: '00', serie: '0000', numero, tipoOperacion: op });
+          let next = s;
+          let costoInsumos = 0;
+          for (const i of insumos) {
+            next = moverStock(next, { sku: i.sku, qtyIn: 0, qtyOut: i.cantidad, type: 'Salida a Produccion', doc: `PP-${numero}`, user: responsable('Producción'), unitCost: 0 }, { codigos: codigos('10') });
+            costoInsumos += next.kardex[0].costoTotal ?? 0;
+          }
+          const costoUnitario = Math.round(((costoInsumos + p.costoAdicional) / p.cantidad) * 10000) / 10000;
+          next = moverStock(next, { sku: p.sku, qtyIn: p.cantidad, qtyOut: 0, type: 'Entrada por Produccion', doc: `PP-${numero}`, user: responsable('Producción'), unitCost: costoUnitario }, { codigos: codigos('19') });
+          const parte: ParteProduccion = { numero, fecha: today(), sku: p.sku, cantidad: p.cantidad, costoInsumos: Math.round(costoInsumos * 10000) / 10000, costoAdicional: p.costoAdicional, costoUnitario, insumos, notas: p.notas?.trim() || undefined, responsable: responsable('Producción') };
+          commit({ ...next, partesProduccion: [parte, ...next.partesProduccion] });
+          return { ok: true, parte };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Todos los movimientos hasta una fecha (para el libro 13.1); en demo ya están en memoria. */
+      async kardexHasta(hasta: string): Promise<KardexMovement[]> {
+        if (!nube) return get().kardex;
+        return repo.cargarKardexHasta(hasta, new Map(get().products.map(p => [p.sku, p.name])));
       },
 
       // ---------------- EMISIÓN EXTERNA ----------------

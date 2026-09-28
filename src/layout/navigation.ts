@@ -20,6 +20,7 @@ import {
   Scissors,
   Settings,
   Shovel,
+  Factory,
   ShoppingCart,
   Store,
   Truck,
@@ -42,6 +43,7 @@ export type TabId =
   | 'servicios-tienda'
   | 'kardex'
   | 'conteo'
+  | 'produccion'
   | 'bajas'
   | 'etiquetas'
   | 'guias'
@@ -99,6 +101,7 @@ export const NAV_BLOCKS: NavBlock[] = [
       { id: 'catalogo', label: 'Catálogo', icon: Store },
       { id: 'servicios-tienda', label: 'Servicios de la tienda', icon: Shovel },
       { id: 'kardex', label: 'Kardex y stock', icon: Boxes, badge: s => cuenta(s.products.filter(p => p.stock <= p.minStock).length) },
+      { id: 'produccion', label: 'Producción propia', icon: Factory },
       { id: 'conteo', label: 'Conteo físico', icon: ClipboardList },
       { id: 'bajas', label: 'Mermas y bajas', icon: Scissors },
       { id: 'etiquetas', label: 'Etiquetas QR', icon: QrCode },
@@ -173,6 +176,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   'servicios-tienda': DUENO,
   kardex: TODOS,
   conteo: DUENO,
+  produccion: ['dueno', 'jardinero'],
   bajas: TODOS,
   etiquetas: VENTAS,
   guias: VENTAS,

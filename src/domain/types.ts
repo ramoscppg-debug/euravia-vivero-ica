@@ -64,6 +64,10 @@ export interface CatalogProduct extends Product {
   botanicalFamily: string;
   categoryName: string;
   visibleTienda?: boolean; // por defecto se muestra en la tienda pública
+  valorInventario?: number; // saldo costo total (Kardex valorizado)
+  costoPromedio?: number; // saldo costo unitario (promedio ponderado)
+  unidadMedida?: string; // SUNAT Tabla 6
+  tipoExistencia?: string; // SUNAT Tabla 5
   destacado?: boolean; // aparece en la portada
 }
 
@@ -73,7 +77,9 @@ export type MovementType =
   | 'Servicio Jardineria'
   | 'Baja por Perdida'
   | 'Ajuste Inventario'
-  | 'Devolucion Cliente';
+  | 'Devolucion Cliente'
+  | 'Entrada por Produccion'
+  | 'Salida a Produccion';
 
 export interface KardexMovement {
   id: string;
@@ -87,6 +93,32 @@ export interface KardexMovement {
   unitCost: number;
   referenceDoc?: string;
   responsibleUser: string;
+  // Formato 13.1 (SUNAT): documento, operación y saldo valorizado al costo promedio ponderado
+  fechaEmision?: string;
+  tipoComprobante?: string; // Tabla 10
+  comprobanteSerie?: string;
+  comprobanteNumero?: string;
+  tipoOperacion?: string; // Tabla 12
+  movimiento?: 'ENTRADA' | 'SALIDA';
+  cantidad?: number;
+  costoTotal?: number;
+  saldoCantidad?: number;
+  saldoCostoUnitario?: number;
+  saldoCostoTotal?: number;
+}
+
+/** Parte de producción propia (doc. 00): insumos consumidos (op. 10) y producto obtenido (op. 19). */
+export interface ParteProduccion {
+  numero: string;
+  fecha: string;
+  sku: string;
+  cantidad: number;
+  costoInsumos: number;
+  costoAdicional: number;
+  costoUnitario: number;
+  insumos: { sku: string; cantidad: number }[];
+  notas?: string;
+  responsable: string;
 }
 
 export interface BiologicalLoss {

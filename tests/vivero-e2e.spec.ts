@@ -47,7 +47,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
     // 3. Kardex & Almacen
     await ir(page, 'kardex');
-    await expect(page.getByText('Control Físico de Kardex & Almacén')).toBeVisible();
+    await expect(page.getByText('Kardex valorizado (costo promedio ponderado)')).toBeVisible();
 
     // 4. Guías de Remisión
     await ir(page, 'guias');
@@ -319,7 +319,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await ir(page, 'kardex');
     await expect(page).toHaveURL(/#kardex$/);
     await page.reload();
-    await expect(page.getByText('Control Físico de Kardex & Almacén')).toBeVisible();
+    await expect(page.getByText('Kardex valorizado (costo promedio ponderado)')).toBeVisible();
     await expect(page.locator('tr', { hasText: 'FC01-0009981' })).toHaveCount(1);
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
@@ -785,6 +785,31 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     // La serie quedó al día: la próxima boleta sugiere el 503
     await ir(page, 'configuracion');
     await expect(page.getByText('B001-00000503')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('43. Producción propia (doc. 00 · op. 10/19) y Formato 13.1 con costo promedio ponderado', async ({ page }) => {
+    await ir(page, 'produccion');
+    await page.getByLabel('Producto obtenido').selectOption('AUR-002');
+    await page.getByLabel('Cantidad producida').fill('4');
+    await page.getByRole('button', { name: 'Agregar insumo' }).click();
+    await page.getByLabel('Insumo 1', { exact: true }).selectOption('SUB-001');
+    await page.getByLabel('Cantidad del insumo 1').fill('2');
+    await page.getByLabel('Costo adicional').fill('10');
+    await expect(page.getByLabel('Costo unitario estimado')).toHaveText('S/ 8.00'); // (2 × 11 + 10) / 4
+    await page.getByRole('button', { name: 'Registrar producción' }).click();
+    await expect(page.getByText('✓ Parte de producción N° 00000001: entraron 4 u. de Sansevieria Laurentii a S/ 8.00 c/u.')).toBeVisible();
+
+    await ir(page, 'kardex');
+    const libro = page.getByRole('region', { name: 'Formato 13.1' });
+    await libro.getByLabel('Existencia del libro').selectOption('AUR-002');
+    await libro.getByRole('button', { name: 'Generar' }).click();
+    const fila = libro.locator('tr', { hasText: '19' }).last();
+    await expect(fila).toContainText('00000001');
+    await expect(fila).toContainText('16.9744'); // (35 × 18 + 4 × 8) / 39
+    const insumo = page.locator('table').nth(1).locator('tr', { hasText: 'Salida a Produccion' });
+    await expect(insumo).toContainText('00 · 10');
+    await expect(insumo).toContainText('11.0000');
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
