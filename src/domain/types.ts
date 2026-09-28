@@ -187,7 +187,7 @@ export interface Gasto {
   descripcion: string;
   proveedorRuc?: string;
   proveedor?: string;
-  tipoComprobante: '00' | '01' | '02' | '03' | '12';
+  tipoComprobante: '00' | '01' | '02' | '03' | '12' | '14'; // 14: recibo por servicios públicos (luz, agua, teléfono)
   serie?: string;
   numero?: string;
   base: number;
@@ -195,6 +195,7 @@ export interface Gasto {
   total: number;
   medioPago?: string; // sin medio = por pagar
   operacion?: string;
+  fechaPago?: string;
 }
 
 export interface CashRegisterState {

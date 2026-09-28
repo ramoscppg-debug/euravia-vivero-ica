@@ -79,6 +79,8 @@ export default function Finanzas() {
         )}
       </Bloque>
 
+      <CuentasPorPagar />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SelectorPeriodo valor={periodo} cambiar={setPeriodo} />
         <span className="flex gap-2">
@@ -120,5 +122,41 @@ export default function Finanzas() {
         </Bloque>
       </div>
     </div>
+  );
+}
+
+/** Gastos registrados "por pagar" (cuenta 4212): se pagan aquí y generan el asiento 4212 a caja o bancos. */
+function CuentasPorPagar() {
+  const { state, actions } = useErp();
+  const pendientes = state.gastos.filter(g => !g.medioPago);
+  const [pago, setPago] = useState<Record<string, { medio: string; operacion: string }>>({});
+  const [error, setError] = useState<string | null>(null);
+  if (!pendientes.length) return null;
+  const pagar = async (id: string) => {
+    const p = pago[id] ?? { medio: 'Transferencia', operacion: '' };
+    setError(null);
+    const r = await actions.pagarGasto(id, p.medio, p.operacion);
+    if (!r.ok) setError(r.error);
+  };
+  return (
+    <Bloque titulo="Cuentas por pagar" accion={<span className="text-xs text-tinta-suave">{soles(pendientes.reduce((a, g) => a + g.total, 0))} pendiente(s) · cuenta 4212</span>}>
+      {error && <p role="alert" className="text-error font-bold text-xs">{error}</p>}
+      <ul className="divide-y divide-crema-200">
+        {pendientes.map(g => {
+          const p = pago[g.id] ?? { medio: 'Transferencia', operacion: '' };
+          return (
+            <li key={g.id} className="py-2.5 flex flex-wrap items-center gap-2">
+              <span className="flex-1 min-w-[200px]"><span className="font-bold text-tinta">{g.descripcion}</span><span className="block text-xs text-tinta-suave">{[g.proveedor, [g.serie, g.numero].filter(Boolean).join('-'), g.fecha].filter(Boolean).join(' · ')}</span></span>
+              <span className="font-extrabold w-24 text-right">{soles(g.total)}</span>
+              <select aria-label={`Medio de pago de ${g.descripcion}`} value={p.medio} onChange={e => setPago({ ...pago, [g.id]: { ...p, medio: e.target.value } })} className="min-h-[36px] px-2 rounded-control border border-crema-300 bg-white text-xs">
+                {['Transferencia', 'Yape', 'Plin', 'Tarjeta', 'Efectivo'].map(m => <option key={m} value={m}>{m === 'Efectivo' ? 'Efectivo de caja' : m}</option>)}
+              </select>
+              {p.medio !== 'Efectivo' && <input aria-label={`N° de operación de ${g.descripcion}`} value={p.operacion} onChange={e => setPago({ ...pago, [g.id]: { ...p, operacion: e.target.value } })} placeholder="N° operación" className="w-32 min-h-[36px] px-2 rounded-control border border-crema-300 text-xs" />}
+              <Boton tamano="sm" onClick={() => void pagar(g.id)}>Pagar</Boton>
+            </li>
+          );
+        })}
+      </ul>
+    </Bloque>
   );
 }

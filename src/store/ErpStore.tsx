@@ -53,6 +53,8 @@ import { cargarEstadoDemo, guardarEstadoDemo, seedState, STORAGE_KEY } from '../
 import { EMPRESA_VACIA } from '../data/seed';
 import { fotoComoJpeg } from '../lib/imagen';
 import { aplicarPromedio, codigosSunat, saldoDe } from '../lib/kardexValorado';
+import { lineasPlanilla, type Asiento } from '../lib/contabilidad';
+import { calcularPlanillaMes } from './selectors';
 import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
@@ -92,6 +94,7 @@ export interface ErpState {
   avisos: AvisosWhatsapp; // sólo el dueño la carga
   partesProduccion: ParteProduccion[];
   gastos: Gasto[]; // gastos con comprobante (luz, agua, alquiler…)
+  asientosExtra: Asiento[]; // modo demo: asientos que no nacen de otro registro (planilla)
 }
 
 export type GastoInput = Omit<Gasto, 'id' | 'base'>;
@@ -273,7 +276,8 @@ function nubeVacia(): ErpState {
     tarifasDelivery: [],
     avisos: { activo: false },
     partesProduccion: [],
-    gastos: []
+    gastos: [],
+    asientosExtra: []
   };
 }
 
@@ -1376,19 +1380,19 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       /** Registra el gasto; en la nube la base genera los asientos (provisión y pago) y la salida de caja en una transacción. */
       async registrarGasto(g: GastoInput): Promise<Result<{ gasto: Gasto }>> {
         const total = round2(g.total);
-        const igv = g.tipoComprobante === '01' ? round2(g.igv) : 0;
+        const igv = g.tipoComprobante === '01' || g.tipoComprobante === '14' ? round2(g.igv) : 0;
         if (!(total > 0)) return { ok: false, error: 'Indica el importe del gasto.' };
         if (igv < 0 || igv >= total) return { ok: false, error: 'El IGV no es válido.' };
         if (g.descripcion.trim().length < 3) return { ok: false, error: 'Describe el gasto.' };
         if (!/^6/.test(g.cuenta)) return { ok: false, error: 'Elige la categoría del gasto.' };
-        if (g.tipoComprobante === '01' && !validarRuc(g.proveedorRuc ?? '')) return { ok: false, error: 'La factura necesita el RUC válido del proveedor.' };
+        if ((g.tipoComprobante === '01' || g.tipoComprobante === '14') && !validarRuc(g.proveedorRuc ?? '')) return { ok: false, error: 'El comprobante necesita el RUC válido del proveedor.' };
         const s = get();
         if (g.medioPago === 'Efectivo' && total > s.cashRegister.conteoRealEfectivo) {
           return { ok: false, error: `⚠️ No hay suficiente efectivo en caja (S/ ${s.cashRegister.conteoRealEfectivo.toFixed(2)}). Elige otro medio o regístralo por pagar.` };
         }
         try {
           const id = nube ? await repo.registrarGasto({ ...g, total, igv, usuario }) : `GAS-${Date.now().toString(36).toUpperCase()}`;
-          const gasto: Gasto = { ...g, id, total, igv, base: round2(total - igv), descripcion: g.descripcion.trim() };
+          const gasto: Gasto = { ...g, id, total, igv, base: round2(total - igv), descripcion: g.descripcion.trim(), fechaPago: g.medioPago ? g.fecha : undefined };
           const cur = get();
           const caja = cur.cashRegister;
           commit({
@@ -1399,6 +1403,51 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
               : caja
           });
           return { ok: true, gasto };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Paga un gasto que quedó por pagar (4212 a caja o bancos). */
+      async pagarGasto(id: string, medioPago: string, operacion?: string, fecha = today()): Promise<Result> {
+        const s = get();
+        const g = s.gastos.find(x => x.id === id);
+        if (!g) return { ok: false, error: 'Gasto no encontrado.' };
+        if (g.medioPago) return { ok: false, error: 'Este gasto ya está pagado.' };
+        if (medioPago === 'Efectivo' && g.total > s.cashRegister.conteoRealEfectivo) {
+          return { ok: false, error: `⚠️ No hay suficiente efectivo en caja (S/ ${s.cashRegister.conteoRealEfectivo.toFixed(2)}).` };
+        }
+        try {
+          if (nube) await repo.pagarGasto({ id, medioPago, operacion, fecha, usuario });
+          const cur = get();
+          const caja = cur.cashRegister;
+          commit({
+            ...cur,
+            gastos: cur.gastos.map(x => (x.id === id ? { ...x, medioPago, operacion: operacion?.trim() || undefined, fechaPago: fecha } : x)),
+            cashRegister: medioPago === 'Efectivo'
+              ? { ...caja, egresos: [...caja.egresos, { id: `EG-${String(caja.egresos.length + 1).padStart(2, '0')}`, motivo: `Pago: ${g.descripcion}`, monto: g.total, hora: new Date().toTimeString().slice(0, 5), responsable: responsable('Administración') }], conteoRealEfectivo: round2(caja.conteoRealEfectivo - g.total) }
+              : caja
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Asiento de planilla del periodo con la planilla vigente (uno por mes). */
+      async contabilizarPlanilla(periodo: string): Promise<Result> {
+        const s = get();
+        if (!s.employees.length) return { ok: false, error: 'No hay trabajadores en la planilla.' };
+        const lineas = lineasPlanilla(calcularPlanillaMes(s.employees));
+        try {
+          if (nube) await repo.contabilizarPlanilla(periodo, lineas, usuario);
+          else {
+            if (s.asientosExtra.some(a => a.origen === 'PLANILLA' && a.origenId === periodo)) return { ok: false, error: `La planilla de ${periodo} ya está contabilizada.` };
+            const [y, m] = periodo.split('-').map(Number);
+            const fecha = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+            commit({ ...s, asientosExtra: [...s.asientosExtra, { id: `PL-${periodo}`, fecha, glosa: `Planilla de remuneraciones ${periodo}`, origen: 'PLANILLA', origenId: periodo, tipoComprobante: '00', lineas }] });
+          }
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

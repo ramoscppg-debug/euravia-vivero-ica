@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Download, Users } from 'lucide-react';
+import { lineasPlanilla } from '../../lib/contabilidad';
 import { descargarTxt, generarPlaprote } from '../../lib/exports';
 import { useErp } from '../../store/ErpStore';
 import { calcularPlanillaMes } from '../../store/selectors';
@@ -57,6 +59,46 @@ export default function Planilla() {
           <p className="text-[11px] text-bosque-700 font-bold mt-1">Renta 5ta retenida: S/ {planilla.totalRenta5ta.toFixed(2)}</p>
         </div>
       </div>
+
+      <AsientoPlanilla />
     </div>
+  );
+}
+
+/** Asiento contable del mes (PCGE 2026) con la planilla vigente. */
+function AsientoPlanilla() {
+  const { state, actions } = useErp();
+  const [periodo, setPeriodo] = useState(periodoLocal());
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const lineas = lineasPlanilla(calcularPlanillaMes(state.employees));
+  const plan: Record<string, string> = {
+    '6211': 'Sueldos y salarios', '6271': 'Régimen de prestaciones de salud', '4031': 'ESSALUD', '417': 'Administradoras de fondos de pensiones',
+    '4032': 'ONP', '40173': 'Renta de quinta categoría', '4111': 'Sueldos y salarios por pagar', '6291': 'Compensación por tiempo de servicio',
+    '4151': 'CTS por pagar', '6214': 'Gratificaciones', '4114': 'Gratificaciones por pagar', '6215': 'Vacaciones', '4115': 'Vacaciones por pagar'
+  };
+  const contabilizar = async () => {
+    const r = await actions.contabilizarPlanilla(periodo);
+    setAviso(r.ok ? { ok: true, texto: `✓ Planilla de ${periodo} contabilizada en el libro diario.` } : { ok: false, texto: r.error });
+  };
+  return (
+    <section aria-label="Asiento de planilla" className="bg-white rounded-3xl border border-crema-300 p-6 space-y-3 text-xs">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h4 className="font-serif font-bold text-base text-tinta">Asiento contable de la planilla (PCGE 2026)</h4>
+          <p className="text-tinta-suave">Remuneraciones y aportes (62) contra tributos y remuneraciones por pagar (40/41), con las provisiones del mes. Uno por periodo.</p>
+        </div>
+        <div className="flex items-end gap-2">
+          <label className="font-bold">Periodo<input type="month" aria-label="Periodo de la planilla" value={periodo} onChange={e => setPeriodo(e.target.value)} className="block mt-1 min-h-[36px] px-2 rounded-xl border border-crema-300" /></label>
+          <button onClick={() => void contabilizar()} disabled={!lineas.length} className="px-4 py-2.5 rounded-2xl bg-bosque-950 text-oro font-bold disabled:opacity-50">Contabilizar planilla del mes</button>
+        </div>
+      </div>
+      {aviso && <p role={aviso.ok ? 'status' : 'alert'} className={`font-bold ${aviso.ok ? 'text-exito' : 'text-error'}`}>{aviso.texto}</p>}
+      <table className="w-full">
+        <thead className="text-[10px] uppercase text-tinta-suave"><tr><th className="text-left py-1">Cuenta</th><th className="text-left">Denominación</th><th className="text-right">Debe</th><th className="text-right">Haber</th></tr></thead>
+        <tbody className="divide-y divide-crema-200">
+          {lineas.map(l => <tr key={l.cuenta}><td className={`py-1.5 font-mono font-bold ${l.haber ? 'pl-6' : ''}`}>{l.cuenta}</td><td>{plan[l.cuenta] ?? ''}</td><td className="text-right">{l.debe ? l.debe.toFixed(2) : ''}</td><td className="text-right">{l.haber ? l.haber.toFixed(2) : ''}</td></tr>)}
+        </tbody>
+      </table>
+    </section>
   );
 }

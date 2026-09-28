@@ -10,6 +10,7 @@ import { esc, imprimirHtml } from '../../lib/documentos';
 import { descargarTxt } from '../../lib/exports';
 import { hoyLocal } from '../../lib/fechas';
 import { TABLA_10 } from '../../lib/kardexValorado';
+import { descargar, generarPle51, generarPle53, nombrePle, zip } from '../../lib/librosSunat';
 import * as repo from '../../lib/repo';
 import { useErp } from '../../store/ErpStore';
 
@@ -107,6 +108,17 @@ function Diario({ asientos, nombre, periodo, plan, alGuardar }: { asientos: Asie
     ['', '', 'TOTALES', '', '', '', '', '', total.debe.toFixed(2), total.haber.toFixed(2)]
   ])}`);
 
+  const exportarPle = () => {
+    if (!/^\d{11}$/.test(state.company.ruc)) return alert('Configura el RUC de la empresa en Ajustes antes de generar el PLE.');
+    const mapa = new Map((plan ?? []).map(c => [c.codigo, c]));
+    const d = generarPle51(asientos, periodo);
+    const p = generarPle53(mapa, asientos, periodo);
+    descargar(`PLE_diario_${periodo.replace('-', '')}.zip`, zip([
+      { nombre: nombrePle(state.company.ruc, periodo, '050100', d.registros > 0), contenido: d.contenido },
+      { nombre: nombrePle(state.company.ruc, periodo, '050300', p.registros > 0), contenido: p.contenido }
+    ]));
+  };
+
   const imprimir = () => imprimirHtml(`Libro diario ${periodo}`, `<div class="hoja" style="max-width:none;padding:16px">
     <h1 style="font-size:13px;text-align:center">FORMATO 5.1: LIBRO DIARIO</h1>
     <p>PERIODO: <b>${periodo.replace('-', '')}</b> · RUC: <b>${esc(state.company.ruc)}</b> · ${esc(state.company.razonSocial)}</p>
@@ -124,6 +136,7 @@ function Diario({ asientos, nombre, periodo, plan, alGuardar }: { asientos: Asie
           {nube && <Boton tamano="sm" variante="secundario" onClick={() => setNuevo(v => !v)}><Plus className="w-3.5 h-3.5" aria-hidden /> Asiento manual</Boton>}
           <Boton tamano="sm" variante="secundario" disabled={!asientos.length} onClick={imprimir}><Printer className="w-3.5 h-3.5" aria-hidden /> Imprimir</Boton>
           <Boton tamano="sm" variante="secundario" disabled={!asientos.length} onClick={exportar}><Download className="w-3.5 h-3.5" aria-hidden /> CSV</Boton>
+          <Boton tamano="sm" variante="secundario" disabled={!asientos.length || !plan} onClick={exportarPle}><Download className="w-3.5 h-3.5" aria-hidden /> PLE 5.1 + 5.3</Boton>
         </div>
       </div>
       {nuevo && plan && <AsientoManual plan={plan} alGuardar={() => { setNuevo(false); alGuardar(); }} />}

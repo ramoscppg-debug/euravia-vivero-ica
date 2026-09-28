@@ -83,6 +83,7 @@ export const saldoDe = (p: CatalogProduct): Saldo => {
 
 // ---------------- Libro 13.1 por periodo ----------------
 export interface Fila131 {
+  id?: string; // movimiento de Kardex (CUO del asiento)
   fecha: string;
   tipoComprobante: string;
   serie: string;
@@ -139,7 +140,7 @@ export function libro131(productos: CatalogProduct[], kardex: KardexMovement[], 
       if (!saldoInicial) saldoInicial = saldo;
       const cod = m.tipoOperacion ? { tipoComprobante: m.tipoComprobante ?? '00', tipoOperacion: m.tipoOperacion, serie: m.comprobanteSerie ?? '0000', numero: m.comprobanteNumero ?? '' } : codigosSunat(m.movementType, m.referenceDoc);
       const mov = { cantidad: v.cantidad, costoUnitario: v.costoUnitario, costoTotal: v.costoTotal };
-      filas.push({ fecha, ...cod, entrada: entrada ? mov : undefined, salida: entrada ? undefined : mov, saldo: v.saldo });
+      filas.push({ id: m.id, fecha, ...cod, entrada: entrada ? mov : undefined, salida: entrada ? undefined : mov, saldo: v.saldo });
       saldo = v.saldo;
     }
     const suma = (k: 'entrada' | 'salida', c: 'cantidad' | 'costoTotal') => r4(filas.reduce((a, f) => a + (f[k]?.[c] ?? 0), 0));

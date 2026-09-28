@@ -9,7 +9,7 @@ import { round2 } from '../../lib/peru';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 
-const TIPOS: [Gasto['tipoComprobante'], string][] = [['01', 'Factura (con IGV)'], ['03', 'Boleta'], ['02', 'Recibo por honorarios'], ['12', 'Ticket'], ['00', 'Sin comprobante']];
+const TIPOS: [Gasto['tipoComprobante'], string][] = [['01', 'Factura (con IGV)'], ['14', 'Recibo de servicios públicos: luz, agua, teléfono (con IGV)'], ['03', 'Boleta'], ['12', 'Ticket'], ['00', 'Sin comprobante']];
 const MEDIOS = ['Efectivo', 'Yape', 'Plin', 'Transferencia', 'Tarjeta'];
 
 /** Gasto con comprobante: queda en el libro de egresos y genera su asiento PCGE (6x + 40111 a 4212; pago 4212 a caja/bancos). */
@@ -25,7 +25,7 @@ export function GastoModal() {
   const [error, setError] = useState<string | null>(null);
   const set = (c: Partial<typeof f>) => setF(prev => ({ ...prev, ...c }));
   const total = Number(f.total) || 0;
-  const factura = f.tipoComprobante === '01';
+  const factura = f.tipoComprobante === '01' || f.tipoComprobante === '14'; // dan crédito fiscal
   const igv = factura ? (f.igvManual ? Number(f.igv) || 0 : round2(total - total / 1.18)) : 0;
   const campo = 'w-full min-h-[40px] px-3 rounded-control bg-crema border border-crema-300 font-semibold';
 

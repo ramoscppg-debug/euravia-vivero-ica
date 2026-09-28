@@ -1065,8 +1065,23 @@ export async function cargarGastos(): Promise<Gasto[]> {
   return ok<Row[]>(await sb.from('gastos').select('*').gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10)).order('fecha', { ascending: false }).limit(2000)).map(r => ({
     id: String(r.id), fecha: r.fecha, cuenta: r.cuenta, descripcion: r.descripcion, proveedorRuc: r.proveedor_ruc ?? undefined, proveedor: r.proveedor ?? undefined,
     tipoComprobante: r.tipo_comprobante, serie: r.serie ?? undefined, numero: r.numero ?? undefined, base: num(r.base), igv: num(r.igv), total: num(r.total),
-    medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined
+    medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined, fechaPago: r.fecha_pago ?? undefined
   }));
+}
+
+export async function pagarGasto(p: { id: string; medioPago: string; operacion?: string; fecha: string; usuario: string }) {
+  const sb = await db();
+  ok(await sb.rpc('pagar_gasto', { p: { id: Number(p.id), medio_pago: p.medioPago, operacion: p.operacion, fecha: p.fecha, usuario: p.usuario } }));
+}
+
+export async function contabilizarPlanilla(periodo: string, lineas: LineaAsiento[], usuario: string) {
+  const sb = await db();
+  ok(await sb.rpc('contabilizar_planilla', { p: { periodo, lineas, usuario } }));
+}
+
+export async function planillaContabilizada(periodo: string): Promise<boolean> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('asientos').select('id').eq('origen', 'PLANILLA').eq('origen_id', periodo).limit(1)).length > 0;
 }
 
 export async function registrarGasto(g: Omit<Gasto, 'id' | 'base'> & { usuario: string }): Promise<string> {

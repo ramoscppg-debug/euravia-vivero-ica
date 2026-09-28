@@ -880,6 +880,68 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('46. Recibo de luz (tipo 14) por pagar se paga después; planilla del mes se contabiliza una vez', async ({ page }) => {
+    await ir(page, 'finanzas');
+    await page.getByRole('button', { name: 'Registrar gasto' }).click();
+    await page.getByLabel('Tipo de comprobante del gasto').selectOption('14');
+    await page.getByLabel('Descripción del gasto').fill('Luz agosto');
+    await page.getByLabel('Serie del comprobante del gasto').fill('S001');
+    await page.getByLabel('Número del comprobante del gasto').fill('123');
+    await page.getByLabel('RUC del proveedor del gasto').fill('20100070970');
+    await page.getByLabel('Total del gasto').fill('59');
+    await page.getByText('Aún por pagar').click();
+    await page.locator('.fixed').getByRole('button', { name: 'Registrar gasto' }).click();
+    const cxp = page.getByRole('region', { name: 'Cuentas por pagar' });
+    await expect(cxp.getByText('Luz agosto')).toBeVisible();
+    await cxp.getByLabel('N° de operación de Luz agosto').fill('445566');
+    await cxp.getByRole('button', { name: 'Pagar' }).click();
+    await expect(page.getByRole('region', { name: 'Cuentas por pagar' })).toHaveCount(0);
+
+    await ir(page, 'planilla');
+    await page.getByRole('button', { name: 'Contabilizar planilla del mes' }).click();
+    await expect(page.getByText(/Planilla de .* contabilizada en el libro diario/)).toBeVisible();
+    await page.getByRole('button', { name: 'Contabilizar planilla del mes' }).click();
+    await expect(page.getByText(/ya está contabilizada/)).toBeVisible();
+
+    await ir(page, 'libro-diario');
+    await expect(page.getByRole('listitem').filter({ hasText: 'Luz agosto' }).first().locator('tr').nth(1)).toContainText('40111');
+    await expect(page.getByRole('listitem').filter({ hasText: 'Pago de Luz agosto' }).locator('tr').nth(1)).toContainText('1041');
+    const planilla = page.getByRole('listitem').filter({ hasText: 'Planilla de remuneraciones' });
+    await expect(planilla).toContainText('6211');
+    await expect(planilla).toContainText('4111');
+    await expect(page.getByText('Todo cuadra')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('47. SIRE RVIE (Anexo 3) y PLE 5.1 / 13.1: nombres oficiales y número de campos', async ({ page }) => {
+    const leer = async (d: import('@playwright/test').Download) => fs.readFileSync((await d.path())!).toString('latin1');
+    await ir(page, 'contabilidad');
+    page.once('dialog', dl => dl.accept());
+    const [rvie] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("Exportar RVIE (SIRE)")')]);
+    expect(rvie.suggestedFilename()).toMatch(/^LE20609876541\d{6}00140400021[01]12\.zip$/);
+    const zipTexto = await leer(rvie);
+    const fila = zipTexto.split(/\r\n/).find(l => l.includes('|AUREVIA BOTANICAL S.A.C.|'))!;
+    expect(fila).toMatch(/20609876541\|AUREVIA BOTANICAL S\.A\.C\.\|\d{6}\|\|\d{2}\/\d{2}\/\d{4}\|/); // RUC|razón social|periodo|CAR vacío|fecha
+    expect(fila.slice(fila.indexOf('20609876541|')).split('|').length - 1).toBe(33); // 33 campos, cada uno cierra con "|"
+
+    await ir(page, 'kardex');
+    const libro = page.getByRole('region', { name: 'Formato 13.1' });
+    await libro.getByLabel('Existencia del libro').selectOption('AUR-001');
+    await libro.getByRole('button', { name: 'Generar' }).click();
+    const [ple131] = await Promise.all([page.waitForEvent('download'), libro.getByRole('button', { name: 'PLE 13.1' }).click()]);
+    expect(ple131.suggestedFilename()).toMatch(/^LE20609876541\d{6}00130100001[01]11\.txt$/);
+    const lineas131 = (await leer(ple131)).trim().split(/\r\n/);
+    expect(lineas131[0].split('|').length - 1).toBe(27);
+    expect(lineas131[0].split('|')[13]).toBe('16'); // la primera tupla es el saldo inicial
+
+    await ir(page, 'libro-diario');
+    const [diario] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PLE 5.1 + 5.3' }).click()]);
+    const contenido = await leer(diario);
+    expect(contenido).toMatch(/LE20609876541\d{6}00050100001[01]11\.txt/);
+    expect(contenido).toMatch(/LE20609876541\d{6}00050300001[01]11\.txt/);
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

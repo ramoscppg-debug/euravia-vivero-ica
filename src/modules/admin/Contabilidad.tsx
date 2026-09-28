@@ -1,6 +1,6 @@
 import { Building2, Download } from 'lucide-react';
 import type { RegimenTributario } from '../../domain/types';
-import { descargarTxt, generarSire } from '../../lib/exports';
+import { descargar, generarRce, generarRvie, nombreSire, zip } from '../../lib/librosSunat';
 import { useErp } from '../../store/ErpStore';
 import { calcularFinanzas, REGIMEN_LABELS } from '../../store/selectors';
 
@@ -12,8 +12,11 @@ export default function Contabilidad() {
   const f = calcularFinanzas(state);
 
   const exportar = (tipo: 'RVIE' | 'RCE') => {
-    descargarTxt(`SIRE_${tipo}_${company.ruc}_${f.periodo.replace('-', '')}.txt`, generarSire(tipo, company, f.invoicesPeriodo, f.purchasesPeriodo, f.periodo));
-    alert(`✅ Archivo oficial ${tipo} para el SIRE SUNAT descargado exitosamente.`);
+    if (!/^\d{11}$/.test(company.ruc)) return alert('Configura el RUC de la empresa en Ajustes antes de generar el SIRE.');
+    const r = tipo === 'RVIE' ? generarRvie(company, state.invoices, f.periodo) : generarRce(company, state.purchases, state.gastos, f.periodo);
+    const nombre = nombreSire(company.ruc, f.periodo, tipo === 'RVIE' ? '140400' : '080400', r.registros > 0);
+    descargar(nombre.replace(/\.TXT$/, '.zip'), zip([{ nombre, contenido: r.contenido }]));
+    alert(`✅ ${tipo} (reemplazo de propuesta SIRE): ${r.registros} comprobante(s) en ${nombre} (comprimido en ZIP para subirlo en SIRE → Reemplazar propuesta).${r.omitidos.length ? `\n\nNo incluidos (${r.omitidos.length}):\n• ${r.omitidos.slice(0, 12).join('\n• ')}` : ''}`);
   };
 
   return (

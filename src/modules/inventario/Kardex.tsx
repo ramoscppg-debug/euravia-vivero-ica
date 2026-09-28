@@ -8,6 +8,7 @@ import { descargarTxt } from '../../lib/exports';
 import { hoyLocal } from '../../lib/fechas';
 import { libro131, saldoDe, TABLA_10, TABLA_12, TABLA_5, TABLA_6, type Libro131 } from '../../lib/kardexValorado';
 import { useErp } from '../../store/ErpStore';
+import { descargar, generarPle131, nombrePle } from '../../lib/librosSunat';
 import { useUi } from '../../store/UiStore';
 
 const n2 = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -187,6 +188,13 @@ function Libro() {
     descargarTxt(`formato_13_1_${company.ruc || 'empresa'}_${periodo.replace('-', '')}.csv`, `﻿${csv(filas)}`);
   };
 
+  const exportarPle = () => {
+    if (!libros) return;
+    if (!/^\d{11}$/.test(company.ruc)) return alert('Configura el RUC de la empresa en Ajustes antes de generar el PLE.');
+    const r = generarPle131(company, libros, periodo);
+    descargar(nombrePle(company.ruc, periodo, '130100', r.registros > 0), r.contenido);
+  };
+
   const imprimir = () => {
     if (!libros) return;
     const td = (v: string | number, d = true) => `<td class="${d ? 'd' : ''}">${v}</td>`;
@@ -224,6 +232,7 @@ function Libro() {
           <Boton tamano="sm" cargando={cargando} onClick={() => void generar()}>Generar</Boton>
           <Boton tamano="sm" variante="secundario" disabled={!libros?.length} onClick={imprimir}><Printer className="w-3.5 h-3.5" aria-hidden /> Imprimir</Boton>
           <Boton tamano="sm" variante="secundario" disabled={!libros?.length} onClick={exportarCsv}><Download className="w-3.5 h-3.5" aria-hidden /> CSV</Boton>
+          <Boton tamano="sm" variante="secundario" disabled={!libros?.length} onClick={exportarPle}><Download className="w-3.5 h-3.5" aria-hidden /> PLE 13.1</Boton>
         </div>
       </div>
       {error && <p role="alert" className="text-error font-bold">{error}</p>}

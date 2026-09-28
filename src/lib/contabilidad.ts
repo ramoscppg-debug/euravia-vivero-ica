@@ -27,7 +27,7 @@ export interface Asiento {
   id: string;
   fecha: string;
   glosa: string;
-  origen: 'KARDEX' | 'VENTA' | 'COMPRA' | 'COBRO' | 'MANUAL' | 'GASTO' | 'PAGO' | 'CAJA';
+  origen: 'KARDEX' | 'VENTA' | 'COMPRA' | 'COBRO' | 'MANUAL' | 'GASTO' | 'PAGO' | 'CAJA' | 'PLANILLA';
   origenId?: string;
   tipoComprobante?: string;
   serie?: string;
@@ -214,7 +214,7 @@ export function asientosDeGasto(g: Gasto, cfg = CONFIG_CONTABLE): Asiento[] {
     tipoComprobante: g.tipoComprobante, serie: g.serie, numero: g.numero,
     lineas: [D(g.cuenta, g.base), ...(g.igv > 0 ? [D(cfg.IGV.cuenta, g.igv)] : []), H(cfg.CXP.cuenta, g.total)]
   }];
-  if (g.medioPago) a.push({ id: `GP-${g.id}`, fecha: g.fecha, glosa: `Pago de ${g.descripcion} · ${g.medioPago}${g.operacion ? ` op. ${g.operacion}` : ''}`, origen: 'PAGO', origenId: g.id,
+  if (g.medioPago) a.push({ id: `GP-${g.id}`, fecha: g.fechaPago ?? g.fecha, glosa: `Pago de ${g.descripcion} · ${g.medioPago}${g.operacion ? ` op. ${g.operacion}` : ''}`, origen: 'PAGO', origenId: g.id,
     lineas: [D(cfg.CXP.cuenta, g.total), H(g.medioPago === 'Efectivo' ? cfg.CAJA.cuenta : cfg.BANCOS.cuenta, g.total)] });
   return a;
 }
@@ -225,9 +225,29 @@ export function asientoDeCajaChica(g: GastoCaja, cfg = CONFIG_CONTABLE): Asiento
   return { id: `CC-${g.id}`, fecha: g.fecha, glosa: `Caja chica: ${g.motivo}`, origen: 'CAJA', origenId: g.id, tipoComprobante: '00', lineas: [D(g.cuenta, g.monto), H(cfg.CAJA.cuenta, g.monto)] };
 }
 
+/**
+ * Planilla del mes (PCGE 2026): 6211 remuneraciones y 6271 EsSalud contra 4031 EsSalud, 417 AFP, 4032 ONP,
+ * 40173 renta de 5ta y 4111 remuneraciones por pagar; provisiones de CTS (6291/4151), gratificaciones (6214/4114)
+ * y vacaciones (6215/4115).
+ */
+export function lineasPlanilla(p: { totalBruto: number; totalEssalud: number; totalAfpRetenido: number; totalOnpRetenido: number; totalRenta5ta: number; totalNetoTrabajadores: number; provCtsMensual: number; provGratiMensual: number; provVacacionesMensual: number }): LineaAsiento[] {
+  const lineas = [
+    D('6211', p.totalBruto), D('6271', p.totalEssalud), H('4031', p.totalEssalud),
+    H('417', p.totalAfpRetenido), H('4032', p.totalOnpRetenido), H('40173', p.totalRenta5ta), H('4111', p.totalNetoTrabajadores),
+    D('6291', p.provCtsMensual), H('4151', p.provCtsMensual),
+    D('6214', p.provGratiMensual), H('4114', p.provGratiMensual),
+    D('6215', p.provVacacionesMensual), H('4115', p.provVacacionesMensual)
+  ].filter(l => l.debe > 0 || l.haber > 0);
+  // Redondeo: el neto por pagar absorbe los céntimos para que cuadre
+  const dif = r4(lineas.reduce((a, l) => a + l.debe - l.haber, 0));
+  const neto = lineas.find(l => l.cuenta === '4111');
+  if (dif && neto) neto.haber = r4(neto.haber + dif);
+  return lineas;
+}
+
 /** Libro diario del modo demo, derivado de los hechos registrados. */
-export function diarioDemo(s: { kardex: KardexMovement[]; products: CatalogProduct[]; invoices: ComprobanteSunat[]; purchases: Purchase[]; gastos?: Gasto[]; gastosCaja?: GastoCaja[] }): Asiento[] {
-  const asientos: Asiento[] = [];
+export function diarioDemo(s: { kardex: KardexMovement[]; products: CatalogProduct[]; invoices: ComprobanteSunat[]; purchases: Purchase[]; gastos?: Gasto[]; gastosCaja?: GastoCaja[]; asientosExtra?: Asiento[] }): Asiento[] {
+  const asientos: Asiento[] = [...(s.asientosExtra ?? [])];
   (s.gastos ?? []).forEach(g => asientos.push(...asientosDeGasto(g)));
   (s.gastosCaja ?? []).forEach(g => { const a = asientoDeCajaChica(g); if (a) asientos.push(a); });
   s.invoices.forEach(inv => { const a = asientoDeComprobante(inv, s.products); if (a) asientos.push(a); const c = asientoDeCobro(inv); if (c) asientos.push(c); });

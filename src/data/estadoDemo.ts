@@ -63,6 +63,7 @@ export function seedState(): ErpState {
     avisos: { activo: false },
     partesProduccion: [],
     gastos: [],
+    asientosExtra: [],
     gastosCaja: INITIAL_CASH_REGISTER.egresos.map(e => ({ id: `${hoyLocal()}-${e.id}`, fecha: hoyLocal(), motivo: e.motivo, monto: e.monto, responsable: e.responsable }))
   };
 }

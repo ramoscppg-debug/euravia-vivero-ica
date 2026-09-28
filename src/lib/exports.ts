@@ -1,7 +1,6 @@
 // ==========================================
-// ARCHIVOS OFICIALES: SIRE (RVIE / RCE) y AFPnet (PLAPROTE)
+// ARCHIVOS OFICIALES: AFPnet (PLAPROTE). El SIRE y el PLE están en librosSunat.ts
 // ==========================================
-import type { ComprobanteSunat, EmpresaConfig, Purchase } from '../domain/types';
 import type { PlanillaMes } from '../store/selectors';
 
 export function descargarTxt(nombreArchivo: string, contenido: string) {
@@ -29,29 +28,4 @@ export function generarPlaprote(planilla: PlanillaMes): string {
     }
   });
   return txtContent;
-}
-
-export function generarSire(
-  tipo: 'RVIE' | 'RCE',
-  company: EmpresaConfig,
-  invoices: ComprobanteSunat[],
-  purchases: Purchase[],
-  periodo: string // YYYY-MM
-): string {
-  const per = periodo.replace('-', '');
-  let content = '';
-  if (tipo === 'RVIE') {
-    content = `LE${company.ruc}${per}00140400021111\n`;
-    invoices.filter(inv => ['01', '03', '07'].includes(inv.tipoComprobante)).forEach(inv => {
-      // Las notas de crédito van con importes negativos
-      const k = inv.tipoComprobante === '07' ? -1 : 1;
-      content += `${company.ruc}|${company.razonSocial}|${per}|${inv.fechaEmision}|${inv.tipoComprobante}|${inv.serie}|${inv.correlativo}|${inv.cliente.tipoDoc}|${inv.cliente.numDoc}|${inv.cliente.nombreRazonSocial}|${(k * inv.opGravadas).toFixed(2)}|${(k * inv.totalIgv).toFixed(2)}|${(k * inv.montoTotal).toFixed(2)}|PEN|${inv.estadoSunat}|${inv.referencia ?? ''}|\n`;
-    });
-  } else {
-    content = `LE${company.ruc}${per}00080400021111\n`;
-    purchases.forEach(pur => {
-      content += `${company.ruc}|${company.razonSocial}|${per}|${pur.fecha}|01|${pur.id.split('-')[0]}|${pur.id.split('-')[1] || '001'}|6|${pur.ruc}|${pur.proveedor}|${pur.gravada.toFixed(2)}|${pur.igv.toFixed(2)}|${pur.total.toFixed(2)}|PEN|1|\n`;
-    });
-  }
-  return content;
 }
