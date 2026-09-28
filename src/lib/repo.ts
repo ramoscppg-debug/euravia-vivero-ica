@@ -38,6 +38,7 @@ import { EMPRESA_VACIA } from '../data/seed';
 import type { Rol } from '../domain/types';
 import { round2 } from './peru';
 import { getSupabase } from './supabase';
+import type { Asiento, Cuenta, CuentasExistencia, LineaAsiento } from './contabilidad';
 import { hoyLocal } from './fechas';
 
 /** Fecha local (YYYY-MM-DD) de una marca de tiempo del servidor. */
@@ -1056,6 +1057,73 @@ export async function cargarKardexHasta(hasta: string, nombres: Map<string, stri
   return filas.map(r => kardexDesdeFila(r, nombres));
 }
 
+// ---------------- CONTABILIDAD PCGE 2026 ----------------
+/** Lee todas las filas de una consulta en lotes de 1 000 (límite por petición de la API). */
+async function todas(consulta: (desde: number, hasta: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>): Promise<Row[]> {
+  const filas: Row[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const lote = ok<Row[]>(await consulta(desde, desde + 999));
+    filas.push(...lote);
+    if (lote.length < 1000) return filas;
+  }
+}
+
+export async function cargarPlanCuentas(): Promise<Cuenta[]> {
+  const sb = await db();
+  const filas = await todas((a, b) => sb.from('plan_cuentas').select('*').order('codigo').range(a, b));
+  return filas.map(r => ({
+    codigo: r.codigo, nombre: r.nombre, elemento: r.elemento, padre: r.padre ?? undefined, nivel: r.nivel,
+    naturaleza: r.naturaleza, aceptaMovimiento: !!r.acepta_movimiento, personalizada: !!r.personalizada
+  }));
+}
+
+export async function cargarCuentasExistencia(): Promise<CuentasExistencia[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('cuentas_existencia').select('*').order('tipo_existencia')).map(r => ({
+    tipoExistencia: r.tipo_existencia, descripcion: r.descripcion, inventario: r.inventario, compra: r.compra ?? undefined, variacion: r.variacion ?? undefined,
+    costoVenta: r.costo_venta, venta: r.venta, devolucionVenta: r.devolucion_venta, deterioro: r.deterioro, variacionProduccion: r.variacion_produccion ?? undefined
+  }));
+}
+
+export async function cargarConfigContable(): Promise<Record<string, { cuenta: string; descripcion: string }>> {
+  const sb = await db();
+  return Object.fromEntries(ok<Row[]>(await sb.from('config_contable').select('*')).map(r => [r.clave, { cuenta: r.cuenta, descripcion: r.descripcion }]));
+}
+
+export async function cargarDiario(desde: string, hasta: string): Promise<Asiento[]> {
+  const sb = await db();
+  const filas = await todas((a, b) => sb.from('asientos').select('*, asiento_lineas(*)').gte('fecha', desde).lte('fecha', hasta).order('fecha').order('id').range(a, b));
+  return filas.map(r => ({
+    id: String(r.id), fecha: r.fecha, glosa: r.glosa, origen: r.origen, origenId: r.origen_id ?? undefined,
+    tipoComprobante: r.sunat_tipo_comprobante ?? undefined, serie: r.comprobante_serie ?? undefined, numero: r.comprobante_numero ?? undefined,
+    lineas: (r.asiento_lineas ?? []).sort((x: Row, y: Row) => x.id - y.id).map((l: Row) => ({ cuenta: l.cuenta, debe: num(l.debe), haber: num(l.haber), glosa: l.glosa ?? undefined }))
+  }));
+}
+
+export async function guardarCuentasExistencia(c: CuentasExistencia) {
+  const sb = await db();
+  ok(await sb.from('cuentas_existencia').update({
+    inventario: c.inventario, compra: c.compra || null, variacion: c.variacion || null, costo_venta: c.costoVenta, venta: c.venta,
+    devolucion_venta: c.devolucionVenta, deterioro: c.deterioro, variacion_produccion: c.variacionProduccion || null
+  }).eq('tipo_existencia', c.tipoExistencia));
+}
+
+export async function guardarConfigContable(clave: string, cuenta: string) {
+  const sb = await db();
+  ok(await sb.from('config_contable').update({ cuenta }).eq('clave', clave));
+}
+
+/** Divisionaria propia de la empresa (se cuelga de su prefijo; el padre deja de recibir movimientos). */
+export async function crearSubcuenta(codigo: string, nombre: string) {
+  const sb = await db();
+  ok(await sb.from('plan_cuentas').insert({ codigo, nombre, elemento: Number(codigo[0]), personalizada: true }));
+}
+
+export async function registrarAsientoManual(p: { fecha: string; glosa: string; lineas: LineaAsiento[]; usuario: string }) {
+  const sb = await db();
+  return ok<number>(await sb.rpc('registrar_asiento_manual', { p: { fecha: p.fecha, glosa: p.glosa, lineas: p.lineas, usuario: p.usuario } }));
+}
+
 /** Quita un servicio de la tienda (las solicitudes antiguas conservan el texto del servicio). */
 export async function eliminarServicioPublico(slug: string) {
   const sb = await db();
@@ -1078,7 +1146,9 @@ export async function guardarProductoCatalogo(p: CatalogProduct, nuevo: boolean)
     familia_botanica: p.botanicalFamily || null, descripcion: p.description || null, imagen_url: p.fullImage || null,
     ubicacion_estante: p.location || null, costo_unitario: p.cost, precio_venta: p.price, stock_minimo: p.minStock,
     cuidado_luz: p.careLight || null, cuidado_riego: p.careWater || null, es_planta_viva: p.isLivePlant,
-    visible_tienda: p.visibleTienda ?? true, destacado: !!p.destacado
+    visible_tienda: p.visibleTienda ?? true, destacado: !!p.destacado,
+    tipo_existencia: p.tipoExistencia ?? (['sustratos', 'fertilizantes'].includes(p.category) ? '03' : '01'),
+    unidad_medida: p.unidadMedida ?? 'NIU'
   };
   const q = nuevo
     ? sb.from('productos').insert({ ...fila, sku: p.sku, stock_actual: 0 }).select('*').single()

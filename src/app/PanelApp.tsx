@@ -24,6 +24,7 @@ import Cotizaciones from '../modules/ventas/Cotizaciones';
 import Contratos from '../modules/servicios/Contratos';
 import Reportes from '../modules/admin/Reportes';
 import Finanzas from '../modules/admin/Finanzas';
+import LibroDiario from '../modules/admin/LibroDiario';
 import Estadisticas from '../modules/admin/Estadisticas';
 import Almacen from '../modules/inventario/Almacen';
 import Etiquetas from '../modules/inventario/Etiquetas';
@@ -61,7 +62,8 @@ const SCREENS: Record<TabId, ComponentType> = {
   estadisticas: Estadisticas,
   'servicios-tienda': ServiciosTienda,
   conteo: Conteo,
-  produccion: Produccion
+  produccion: Produccion,
+  'libro-diario': LibroDiario
 };
 
 function Shell() {

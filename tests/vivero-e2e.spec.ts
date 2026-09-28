@@ -813,6 +813,38 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('44. PCGE 2026: la producción propia genera 61 a 24 (insumo) y 21 a 711 (cosecha), y todo cuadra', async ({ page }) => {
+    await ir(page, 'produccion');
+    await page.getByLabel('Producto obtenido').selectOption('AUR-002');
+    await page.getByLabel('Cantidad producida').fill('30');
+    await page.getByRole('button', { name: 'Agregar insumo' }).click();
+    await page.getByLabel('Insumo 1', { exact: true }).selectOption('SUB-001');
+    await page.getByLabel('Cantidad del insumo 1').fill('3');
+    await page.getByLabel('Costo adicional').fill('27');
+    await page.getByRole('button', { name: 'Registrar producción' }).click();
+    await expect(page.getByText(/Parte de producción N° 00000001/)).toBeVisible();
+
+    await ir(page, 'libro-diario');
+    const consumo = page.getByRole('listitem').filter({ hasText: 'Consumo de Sustrato Premium Orgánico 10L en producción' });
+    await expect(consumo.locator('tr').nth(0)).toContainText('6121');
+    await expect(consumo.locator('tr').nth(0)).toContainText('33.00'); // 3 × S/ 11 (costo promedio)
+    await expect(consumo.locator('tr').nth(1)).toContainText('24111');
+    const cosecha = page.getByRole('listitem').filter({ hasText: 'Producción propia de Sansevieria Laurentii' });
+    await expect(cosecha.locator('tr').nth(0)).toContainText('21111');
+    await expect(cosecha.locator('tr').nth(0)).toContainText('60.00'); // 33 insumos + 27 adicional
+    await expect(cosecha.locator('tr').nth(1)).toContainText('7111');
+    await expect(page.getByText('Todo cuadra')).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Libro mayor' }).click();
+    await expect(page.getByRole('table', { name: 'Mayor del elemento 7' })).toContainText('7111');
+
+    await page.getByRole('tab', { name: 'Plan de cuentas' }).click();
+    await page.getByLabel('Buscar cuenta').fill('2111');
+    await expect(page.getByText('1628 cuentas · PCGE 2026')).toBeVisible();
+    await expect(page.locator('li', { hasText: '21111' })).toContainText('Costo');
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

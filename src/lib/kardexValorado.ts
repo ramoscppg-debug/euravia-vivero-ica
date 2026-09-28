@@ -17,7 +17,7 @@ export const TABLA_12: Record<string, string> = {
 };
 
 /** SUNAT Tabla 5 (tipo de existencia) y Tabla 6 (unidad de medida), las que usa un vivero. */
-export const TABLA_5: Record<string, string> = { '01': 'Mercaderías', '02': 'Productos terminados', '03': 'Materias primas', '05': 'Materiales auxiliares, suministros y repuestos', '99': 'Otros' };
+export const TABLA_5: Record<string, string> = { '01': 'Mercaderías', '02': 'Productos terminados', '03': 'Materias primas y auxiliares', '04': 'Envases y embalajes', '05': 'Suministros diversos', '99': 'Otros' };
 export const TABLA_6: Record<string, string> = { NIU: 'Unidad', KGM: 'Kilogramo', LTR: 'Litro', BG: 'Bolsa', MTR: 'Metro' };
 
 const r4 = (n: number) => Math.round(n * 10000) / 10000;

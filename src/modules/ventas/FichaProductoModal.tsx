@@ -6,6 +6,8 @@ import { SubirFoto } from '../../components/SubirFoto';
 import type { CatalogProduct } from '../../domain/types';
 import { CATEGORIAS, categoriaDe, margenPct, siguienteSku } from '../../lib/catalogo';
 import { soles } from '../../lib/formato';
+import { tipoExistenciaDe } from '../../lib/contabilidad';
+import { TABLA_5, TABLA_6 } from '../../lib/kardexValorado';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 
@@ -106,6 +108,16 @@ export function FichaProductoModal({ sku, duplicarDe }: { sku?: string; duplicar
             <F label="Etiqueta visible"><input aria-label="Etiqueta de categoría" value={p.categoryName} onChange={e => set({ categoryName: e.target.value })} className={campo} /></F>
             <F label="Ubicación en almacén"><input aria-label="Ubicación" value={p.location} onChange={e => set({ location: e.target.value })} className={campo} placeholder="Zona B · estante 3" /></F>
             <F label="Nombre científico"><input aria-label="Nombre científico" value={p.scientificName ?? ''} onChange={e => set({ scientificName: e.target.value })} className={campo} /></F>
+            <F label="Tipo de existencia (contable)" span="sm:col-span-2" ayuda="Define sus cuentas del PCGE 2026 (20 mercaderías, 21 producción propia, 24 materia prima…) y el Formato 13.1.">
+              <select aria-label="Tipo de existencia" value={tipoExistenciaDe(p)} onChange={e => set({ tipoExistencia: e.target.value })} className={campo}>
+                {Object.entries(TABLA_5).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}
+              </select>
+            </F>
+            <F label="Unidad de medida" ayuda="SUNAT Tabla 6">
+              <select aria-label="Unidad de medida" value={p.unidadMedida ?? 'NIU'} onChange={e => set({ unidadMedida: e.target.value })} className={campo}>
+                {Object.entries(TABLA_6).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}
+              </select>
+            </F>
             {p.isLivePlant && (
               <>
                 <F label="Luz"><input aria-label="Luz" value={p.careLight ?? ''} onChange={e => set({ careLight: e.target.value })} className={campo} placeholder="Luz indirecta" /></F>

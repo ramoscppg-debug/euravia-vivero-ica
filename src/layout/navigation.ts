@@ -21,6 +21,7 @@ import {
   Settings,
   Shovel,
   Factory,
+  BookOpenCheck,
   ShoppingCart,
   Store,
   Truck,
@@ -52,6 +53,7 @@ export type TabId =
   | 'contratos'
   | 'crm'
   | 'finanzas'
+  | 'libro-diario'
   | 'sunat'
   | 'detracciones'
   | 'contabilidad'
@@ -133,6 +135,7 @@ export const NAV_BLOCKS: NavBlock[] = [
     icon: Calculator,
     items: [
       { id: 'finanzas', label: 'Ingresos, egresos y por emitir', icon: Wallet, badge: s => cuenta(s.pedidos.filter(p => p.estado === 'pendiente').length) },
+      { id: 'libro-diario', label: 'Libro diario PCGE', icon: BookOpenCheck },
       { id: 'sunat', label: 'Comprobantes SUNAT', icon: Receipt },
       { id: 'detracciones', label: 'Detracciones', icon: Landmark, badge: s => cuenta(s.detracciones.filter(d => d.estado === 'PENDIENTE').length) },
       { id: 'contabilidad', label: 'Impuestos y SIRE', icon: Calculator },
@@ -185,6 +188,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   contratos: TODOS,
   crm: TODOS,
   finanzas: DUENO,
+  'libro-diario': DUENO,
   sunat: VENTAS,
   detracciones: DUENO,
   contabilidad: DUENO,
