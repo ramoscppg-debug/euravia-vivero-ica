@@ -4,6 +4,7 @@ import { ModalShell, useDocLookup } from '../../components/shared';
 import { camaraDisponible, EscanerCamara } from '../../components/EscanerCamara';
 import { esc, imprimirTicket, qrSvg, skuDeLectura } from '../../lib/documentos';
 import { GeneradorEtiquetas } from '../inventario/Etiquetas';
+import { CATEGORIAS_GASTO } from '../../lib/contabilidad';
 import { AccionesEmision, porEmitir } from '../admin/Emision';
 import { MEDIOS_PAGO, type ComprobanteSunat, type DescuentoGlobal, type LineaCarrito, type MedioPago, type Pago } from '../../domain/types';
 import { round2 } from '../../lib/peru';
@@ -391,9 +392,10 @@ export function EgresoModal() {
   const { close } = useUi();
   const [motivo, setMotivo] = useState('');
   const [monto, setMonto] = useState(15);
+  const [cuenta, setCuenta] = useState('63112');
 
   const registrar = async () => {
-    const r = await actions.registrarEgreso(motivo, monto);
+    const r = await actions.registrarEgreso(motivo, monto, cuenta);
     if (!r.ok) {
       alert(r.error);
       return;
@@ -412,6 +414,12 @@ export function EgresoModal() {
         <div>
           <label className="font-bold block mb-1">Motivo / Concepto del Gasto</label>
           <input type="text" placeholder="Ej: Pasajes chofer, compra de bolsas..." value={motivo} onChange={(e) => setMotivo(e.target.value)} className="w-full p-2 bg-crema border rounded-xl font-semibold" />
+        </div>
+        <div>
+          <label className="font-bold block mb-1">Categoría (cuenta PCGE)</label>
+          <select aria-label="Categoría del vale" value={cuenta} onChange={e => setCuenta(e.target.value)} className="w-full p-2 bg-crema border rounded-xl font-semibold">
+            {CATEGORIAS_GASTO.map(c => <option key={c.cuenta} value={c.cuenta}>{c.nombre} · {c.cuenta}</option>)}
+          </select>
         </div>
         <div>
           <label className="font-bold block mb-1">Monto en Efectivo (S/)</label>

@@ -13,6 +13,7 @@ import type {
   CashRegisterState,
   CatalogProduct,
   GastoCaja,
+  Gasto,
   ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
@@ -90,7 +91,10 @@ export interface ErpState {
   tarifasDelivery: TarifaDelivery[];
   avisos: AvisosWhatsapp; // sólo el dueño la carga
   partesProduccion: ParteProduccion[];
+  gastos: Gasto[]; // gastos con comprobante (luz, agua, alquiler…)
 }
+
+export type GastoInput = Omit<Gasto, 'id' | 'base'>;
 
 export interface ProduccionInput {
   sku: string;
@@ -268,7 +272,8 @@ function nubeVacia(): ErpState {
     gastosCaja: [],
     tarifasDelivery: [],
     avisos: { activo: false },
-    partesProduccion: []
+    partesProduccion: [],
+    gastos: []
   };
 }
 
@@ -635,8 +640,11 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const partesProduccion = await repo.cargarPartesProduccion().catch(() => []); // sólo dueño y jardinero
-          commit({ ...get(), ...datos, partesProduccion });
+          const [partesProduccion, gastos] = await Promise.all([
+            repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
+            repo.cargarGastos().catch(() => [])
+          ]);
+          commit({ ...get(), ...datos, partesProduccion, gastos });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -1251,19 +1259,19 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         }
       },
 
-      async registrarEgreso(motivo: string, monto: number): Promise<Result> {
+      async registrarEgreso(motivo: string, monto: number, cuenta?: string): Promise<Result> {
         if (!motivo || monto <= 0) return { ok: false, error: 'Indica el motivo y un monto mayor a cero.' };
         if (monto > get().cashRegister.conteoRealEfectivo) {
           return { ok: false, error: `⚠️ No hay suficiente efectivo en gaveta (S/ ${get().cashRegister.conteoRealEfectivo.toFixed(2)}) para ese gasto.` };
         }
         try {
-          if (nube) await repo.guardarCaja({ tipo: 'EGRESO', monto, medioPago: 'Efectivo', concepto: motivo, responsable: usuario });
+          if (nube) await repo.guardarCaja({ tipo: 'EGRESO', monto, medioPago: 'Efectivo', concepto: motivo, responsable: usuario, cuentaGasto: cuenta });
           const s = get();
           const caja = s.cashRegister;
           const id = `EG-${String(caja.egresos.length + 1).padStart(2, '0')}`;
           commit({
             ...s,
-            gastosCaja: [{ id: `${today()}-${id}`, fecha: today(), motivo, monto, responsable: responsable('Administración') }, ...s.gastosCaja],
+            gastosCaja: [{ id: `${today()}-${id}`, fecha: today(), motivo, monto, responsable: responsable('Administración'), cuenta }, ...s.gastosCaja],
             cashRegister: {
               ...caja,
               egresos: [
@@ -1362,6 +1370,38 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           }
         }
         return { ok: true, ajustes, bajas };
+      },
+
+      // ---------------- GASTOS CON COMPROBANTE ----------------
+      /** Registra el gasto; en la nube la base genera los asientos (provisión y pago) y la salida de caja en una transacción. */
+      async registrarGasto(g: GastoInput): Promise<Result<{ gasto: Gasto }>> {
+        const total = round2(g.total);
+        const igv = g.tipoComprobante === '01' ? round2(g.igv) : 0;
+        if (!(total > 0)) return { ok: false, error: 'Indica el importe del gasto.' };
+        if (igv < 0 || igv >= total) return { ok: false, error: 'El IGV no es válido.' };
+        if (g.descripcion.trim().length < 3) return { ok: false, error: 'Describe el gasto.' };
+        if (!/^6/.test(g.cuenta)) return { ok: false, error: 'Elige la categoría del gasto.' };
+        if (g.tipoComprobante === '01' && !validarRuc(g.proveedorRuc ?? '')) return { ok: false, error: 'La factura necesita el RUC válido del proveedor.' };
+        const s = get();
+        if (g.medioPago === 'Efectivo' && total > s.cashRegister.conteoRealEfectivo) {
+          return { ok: false, error: `⚠️ No hay suficiente efectivo en caja (S/ ${s.cashRegister.conteoRealEfectivo.toFixed(2)}). Elige otro medio o regístralo por pagar.` };
+        }
+        try {
+          const id = nube ? await repo.registrarGasto({ ...g, total, igv, usuario }) : `GAS-${Date.now().toString(36).toUpperCase()}`;
+          const gasto: Gasto = { ...g, id, total, igv, base: round2(total - igv), descripcion: g.descripcion.trim() };
+          const cur = get();
+          const caja = cur.cashRegister;
+          commit({
+            ...cur,
+            gastos: [gasto, ...cur.gastos],
+            cashRegister: g.medioPago === 'Efectivo'
+              ? { ...caja, egresos: [...caja.egresos, { id: `EG-${String(caja.egresos.length + 1).padStart(2, '0')}`, motivo: gasto.descripcion, monto: total, hora: new Date().toTimeString().slice(0, 5), responsable: responsable('Administración') }], conteoRealEfectivo: round2(caja.conteoRealEfectivo - total) }
+              : caja
+          });
+          return { ok: true, gasto };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
       },
 
       // ---------------- PRODUCCIÓN PROPIA (Formato 13.1: doc. 00, op. 10 → op. 19) ----------------

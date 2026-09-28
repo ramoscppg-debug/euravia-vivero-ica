@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, FileCheck2 } from 'lucide-react';
+import { Download, FileCheck2, Receipt } from 'lucide-react';
 import { Boton, EstadoVacio, Insignia } from '../../components/ui';
 import { csv, libroFinanzas } from '../../lib/analitica';
 import { descargarTxt } from '../../lib/exports';
@@ -81,7 +81,10 @@ export default function Finanzas() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SelectorPeriodo valor={periodo} cambiar={setPeriodo} />
-        <Boton tamano="sm" variante="secundario" onClick={exportar} disabled={!libro.movs.length}><Download className="w-4 h-4" aria-hidden /> Exportar CSV</Boton>
+        <span className="flex gap-2">
+          <Boton tamano="sm" onClick={() => open({ type: 'gasto' })}><Receipt className="w-4 h-4" aria-hidden /> Registrar gasto</Boton>
+          <Boton tamano="sm" variante="secundario" onClick={exportar} disabled={!libro.movs.length}><Download className="w-4 h-4" aria-hidden /> Exportar CSV</Boton>
+        </span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -28,6 +28,7 @@ import type {
   NotaCliente,
   Tarea,
   ParteProduccion,
+  Gasto,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -122,7 +123,7 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('tienda_config').select('*').eq('id', 1).maybeSingle(),
     sb.from('servicios_publicos').select('*').order('orden'),
     // Gastos de caja chica de los últimos 13 meses (las devoluciones ya cuentan como notas de crédito)
-    sb.from('caja_movimientos').select('id, fecha, concepto, monto, responsable').eq('tipo', 'EGRESO').is('comprobante_id', null)
+    sb.from('caja_movimientos').select('id, fecha, concepto, monto, responsable, cuenta_gasto').eq('tipo', 'EGRESO').is('comprobante_id', null).is('gasto_id', null)
       .gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString()).order('fecha', { ascending: false }).limit(2000),
     sb.from('tarifas_delivery').select('*').order('distrito'),
     sb.from('notificaciones_config').select('whatsapp, apikey, activo, ultimo_envio').eq('id', 1).maybeSingle() // sólo el dueño la ve (RLS)
@@ -156,7 +157,7 @@ export async function cargarTodo(): Promise<DatosNube> {
     solicitudes: ok<Row[]>(solicitudes).map(solicitudDesdeFila),
     tiendaConfig: configTiendaDesdeFila(ok<Row | null>(tiendaCfg)),
     serviciosPublicos: ok<Row[]>(serviciosTienda).map(servicioPublicoDesdeFila),
-    gastosCaja: ok<Row[]>(gastos).map(r => ({ id: String(r.id), fecha: hoyLima(r.fecha), motivo: r.concepto ?? '', monto: num(r.monto), responsable: r.responsable ?? '' })),
+    gastosCaja: ok<Row[]>(gastos).map(r => ({ id: String(r.id), fecha: hoyLima(r.fecha), motivo: r.concepto ?? '', monto: num(r.monto), responsable: r.responsable ?? '', cuenta: r.cuenta_gasto ?? undefined })),
     tarifasDelivery: ok<Row[]>(tarifas).map(tarifaDesdeFila),
     avisos: avisosDesdeFila(ok<Row | null>(avisos)),
   };
@@ -646,9 +647,10 @@ export async function guardarCliente(c: { nombre: string; tipoDoc: string; numDo
   ok(await sb.from('clientes').upsert(fila, { onConflict: 'num_doc' }));
 }
 
-export async function guardarCaja(m: { tipo: 'APERTURA' | 'INGRESO' | 'EGRESO' | 'CIERRE'; monto: number; medioPago?: string; concepto?: string; comprobanteId?: string; responsable: string }) {
+export async function guardarCaja(m: { tipo: 'APERTURA' | 'INGRESO' | 'EGRESO' | 'CIERRE'; monto: number; medioPago?: string; concepto?: string; comprobanteId?: string; responsable: string; cuentaGasto?: string }) {
   const sb = await db();
   ok(await sb.from('caja_movimientos').insert({
+    cuenta_gasto: m.cuentaGasto ?? null,
     tipo: m.tipo,
     monto: m.monto,
     medio_pago: m.medioPago ?? null,
@@ -1055,6 +1057,25 @@ export async function cargarKardexHasta(hasta: string, nombres: Map<string, stri
     if (lote.length < 1000) break;
   }
   return filas.map(r => kardexDesdeFila(r, nombres));
+}
+
+// ---------------- GASTOS ----------------
+export async function cargarGastos(): Promise<Gasto[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('gastos').select('*').gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10)).order('fecha', { ascending: false }).limit(2000)).map(r => ({
+    id: String(r.id), fecha: r.fecha, cuenta: r.cuenta, descripcion: r.descripcion, proveedorRuc: r.proveedor_ruc ?? undefined, proveedor: r.proveedor ?? undefined,
+    tipoComprobante: r.tipo_comprobante, serie: r.serie ?? undefined, numero: r.numero ?? undefined, base: num(r.base), igv: num(r.igv), total: num(r.total),
+    medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined
+  }));
+}
+
+export async function registrarGasto(g: Omit<Gasto, 'id' | 'base'> & { usuario: string }): Promise<string> {
+  const sb = await db();
+  const id = ok<number>(await sb.rpc('registrar_gasto', { p: {
+    fecha: g.fecha, cuenta: g.cuenta, descripcion: g.descripcion, proveedor_ruc: g.proveedorRuc, proveedor: g.proveedor, tipo_comprobante: g.tipoComprobante,
+    serie: g.serie, numero: g.numero, total: g.total, igv: g.igv, medio_pago: g.medioPago, operacion: g.operacion, usuario: g.usuario
+  } }));
+  return String(id);
 }
 
 // ---------------- CONTABILIDAD PCGE 2026 ----------------

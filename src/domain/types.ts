@@ -176,6 +176,25 @@ export interface GastoCaja {
   motivo: string;
   monto: number;
   responsable: string;
+  cuenta?: string; // cuenta PCGE del gasto (Elemento 6)
+}
+
+/** Gasto con comprobante (luz, agua, alquiler, contador…): provisión 6x (+ IGV) a 4212 y, si se pagó, 4212 a caja/bancos. */
+export interface Gasto {
+  id: string;
+  fecha: string;
+  cuenta: string;
+  descripcion: string;
+  proveedorRuc?: string;
+  proveedor?: string;
+  tipoComprobante: '00' | '01' | '02' | '03' | '12';
+  serie?: string;
+  numero?: string;
+  base: number;
+  igv: number;
+  total: number;
+  medioPago?: string; // sin medio = por pagar
+  operacion?: string;
 }
 
 export interface CashRegisterState {

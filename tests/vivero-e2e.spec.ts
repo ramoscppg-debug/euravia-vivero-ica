@@ -845,6 +845,41 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('45. Gasto con factura (luz): 6361 + 40111 a 4212 y pago 4212 a 1041; vale de caja chica 63112 a 101', async ({ page }) => {
+    await ir(page, 'finanzas');
+    await page.getByRole('button', { name: 'Registrar gasto' }).click();
+    await page.getByLabel('Descripción del gasto').fill('Recibo de luz setiembre');
+    await page.getByLabel('RUC del proveedor del gasto').fill('20100070970');
+    await page.getByLabel('Nombre del proveedor del gasto').fill('Electro Sur');
+    await page.getByLabel('Total del gasto').fill('118');
+    await expect(page.getByLabel('IGV del gasto')).toHaveValue('18.00');
+    await page.getByLabel('N° de operación del pago del gasto').fill('778899');
+    await page.locator('.fixed').getByRole('button', { name: 'Registrar gasto' }).click();
+    const libro = page.getByRole('region', { name: 'Libro de ingresos y egresos' });
+    await expect(libro.getByText('Gasto: Luz (energía eléctrica)')).toBeVisible();
+
+    await ir(page, 'caja');
+    await page.click('button:has-text("Registrar Gasto")');
+    await page.getByPlaceholder('Ej: Pasajes chofer, compra de bolsas...').fill('Pasajes al mercado');
+    await page.getByLabel('Categoría del vale').selectOption('63112');
+    page.once('dialog', d => d.accept());
+    await page.click('button:has-text("Registrar Egreso")');
+
+    await ir(page, 'libro-diario');
+    const luz = page.getByRole('listitem').filter({ hasText: 'Recibo de luz setiembre · Electro Sur' });
+    await expect(luz.locator('tr').nth(0)).toContainText('6361');
+    await expect(luz.locator('tr').nth(0)).toContainText('100.00');
+    await expect(luz.locator('tr').nth(1)).toContainText('40111');
+    await expect(luz.locator('tr').nth(2)).toContainText('4212');
+    const pago = page.getByRole('listitem').filter({ hasText: 'Pago de Recibo de luz setiembre' });
+    await expect(pago.locator('tr').nth(1)).toContainText('1041');
+    const vale = page.getByRole('listitem').filter({ hasText: 'Caja chica: Pasajes al mercado' });
+    await expect(vale.locator('tr').nth(0)).toContainText('63112');
+    await expect(vale.locator('tr').nth(1)).toContainText('101');
+    await expect(page.getByText('Todo cuadra')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

@@ -8,6 +8,7 @@ import { NuevaCotizacionProductosModal } from '../modules/ventas/Cotizaciones';
 import { FichaProductoModal } from '../modules/ventas/FichaProductoModal';
 import { ImportarProductosModal } from '../modules/ventas/ImportarProductosModal';
 import { SolicitudAPedidoModal } from '../modules/ventas/Solicitudes';
+import { GastoModal } from '../modules/admin/GastoModal';
 import { CobroPedidoModal, EntregaPedidoModal, NuevoPedidoModal } from '../modules/ventas/Pedidos';
 import { EgresoModal, PosModal, QrModal, TicketModal } from '../modules/ventas/VentasModals';
 import { useUi } from '../store/UiStore';
@@ -31,6 +32,8 @@ export default function ModalHost() {
       return <BajaModal />;
     case 'egreso':
       return <EgresoModal />;
+    case 'gasto':
+      return <GastoModal />;
     case 'gre':
       return <GreModal />;
     case 'proyecto':

@@ -22,6 +22,7 @@ export type Modal =
   | { type: 'importar-productos' }
   | { type: 'baja' }
   | { type: 'egreso' }
+  | { type: 'gasto' }
   | { type: 'qr'; sku: string }
   | { type: 'gre' }
   | { type: 'proyecto' }

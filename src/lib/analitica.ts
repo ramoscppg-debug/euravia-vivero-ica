@@ -6,6 +6,7 @@
 // - Reportes de almacén: valorización, rotación, movimientos y mermas.
 // ==========================================
 import type { ErpState } from '../store/ErpStore';
+import { nombreCategoria } from './contabilidad';
 import { round2 } from './peru';
 import { hoyLocal, sumarDias } from './fechas';
 
@@ -41,7 +42,10 @@ export function libroFinanzas(s: ErpState, desde: string, hasta: string) {
     movs.push({ fecha: c.fecha, tipo: 'EGRESO', categoria: 'Compra a proveedor', documento: c.id, detalle: `${c.proveedor} · ${c.items}`, monto: c.total });
   }
   for (const g of s.gastosCaja) {
-    if (dentro(g.fecha, desde, hasta)) movs.push({ fecha: g.fecha, tipo: 'EGRESO', categoria: 'Gasto de caja chica', documento: g.id, detalle: g.motivo, monto: g.monto });
+    if (dentro(g.fecha, desde, hasta)) movs.push({ fecha: g.fecha, tipo: 'EGRESO', categoria: g.cuenta ? `Gasto: ${nombreCategoria(g.cuenta)}` : 'Gasto de caja chica', documento: g.id, detalle: g.motivo, monto: g.monto });
+  }
+  for (const g of s.gastos ?? []) {
+    if (dentro(g.fecha, desde, hasta)) movs.push({ fecha: g.fecha, tipo: 'EGRESO', categoria: `Gasto: ${nombreCategoria(g.cuenta)}`, documento: [g.serie, g.numero].filter(Boolean).join('-') || `GASTO-${g.id}`, detalle: [g.descripcion, g.proveedor].filter(Boolean).join(' · '), monto: g.total });
   }
   movs.sort((a, b) => b.fecha.localeCompare(a.fecha));
   const ingresos = round2(movs.filter(m => m.tipo === 'INGRESO').reduce((a, m) => a + m.monto, 0));

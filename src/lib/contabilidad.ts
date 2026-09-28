@@ -3,7 +3,7 @@
 // En la nube el libro diario lo escribe la base con disparadores, en la misma transacción de cada hecho.
 // Aquí vive la misma dinámica para el modo demo y las utilidades del plan, el diario y el mayor.
 // ==========================================
-import type { CatalogProduct, ComprobanteSunat, KardexMovement, Purchase } from '../domain/types';
+import type { CatalogProduct, ComprobanteSunat, Gasto, GastoCaja, KardexMovement, Purchase } from '../domain/types';
 
 export interface Cuenta {
   codigo: string;
@@ -27,7 +27,7 @@ export interface Asiento {
   id: string;
   fecha: string;
   glosa: string;
-  origen: 'KARDEX' | 'VENTA' | 'COMPRA' | 'COBRO' | 'MANUAL';
+  origen: 'KARDEX' | 'VENTA' | 'COMPRA' | 'COBRO' | 'MANUAL' | 'GASTO' | 'PAGO' | 'CAJA';
   origenId?: string;
   tipoComprobante?: string;
   serie?: string;
@@ -48,6 +48,32 @@ export interface CuentasExistencia {
   deterioro: string;
   variacionProduccion?: string;
 }
+
+/** Categorías de gasto frecuentes en un vivero, con su cuenta de último nivel del PCGE 2026. */
+export const CATEGORIAS_GASTO: { cuenta: string; nombre: string }[] = [
+  { cuenta: '6361', nombre: 'Luz (energía eléctrica)' },
+  { cuenta: '6363', nombre: 'Agua' },
+  { cuenta: '6364', nombre: 'Teléfono' },
+  { cuenta: '6365', nombre: 'Internet' },
+  { cuenta: '6362', nombre: 'Gas' },
+  { cuenta: '63111', nombre: 'Fletes y transporte de carga' },
+  { cuenta: '63112', nombre: 'Pasajes y movilidad' },
+  { cuenta: '6314', nombre: 'Alimentación (viajes y jornadas)' },
+  { cuenta: '6352', nombre: 'Alquiler del local' },
+  { cuenta: '6343', nombre: 'Mantenimiento y reparaciones' },
+  { cuenta: '6371', nombre: 'Publicidad' },
+  { cuenta: '6323', nombre: 'Asesoría contable' },
+  { cuenta: '6322', nombre: 'Asesoría legal y tributaria' },
+  { cuenta: '638', nombre: 'Servicios de contratistas' },
+  { cuenta: '6391', nombre: 'Comisiones y gastos bancarios' },
+  { cuenta: '656', nombre: 'Útiles, combustible y suministros' },
+  { cuenta: '651', nombre: 'Seguros' },
+  { cuenta: '6431', nombre: 'Impuesto predial' },
+  { cuenta: '6432', nombre: 'Arbitrios municipales' },
+  { cuenta: '6434', nombre: 'Licencia de funcionamiento' },
+  { cuenta: '6593', nombre: 'Otros gastos de gestión' }
+];
+export const nombreCategoria = (cuenta?: string) => CATEGORIAS_GASTO.find(c => c.cuenta === cuenta)?.nombre ?? (cuenta ? `Cuenta ${cuenta}` : 'Sin categoría');
 
 export const ELEMENTOS: Record<number, string> = {
   1: 'Activo disponible y exigible', 2: 'Activo realizable', 3: 'Activo inmovilizado', 4: 'Pasivo', 5: 'Patrimonio',
@@ -180,9 +206,30 @@ export function asientoDeCobro(inv: ComprobanteSunat, cfg = CONFIG_CONTABLE): As
   return { id: `P-${inv.id}`, fecha: inv.fechaEmision, glosa: `${nc ? 'Reembolso' : 'Cobro'} ${inv.id} · ${pagos.map(p => p.medio).join(' + ')}`, origen: 'COBRO', origenId: inv.id, lineas };
 }
 
+/** Gasto con comprobante: 6x (+ 40111) a 4212; si se pagó, 4212 a caja o bancos. */
+export function asientosDeGasto(g: Gasto, cfg = CONFIG_CONTABLE): Asiento[] {
+  const doc = [g.serie, g.numero].filter(Boolean).join('-');
+  const a: Asiento[] = [{
+    id: `G-${g.id}`, fecha: g.fecha, glosa: `${g.descripcion}${g.proveedor ? ` · ${g.proveedor}` : ''}${doc ? ` (${doc})` : ''}`, origen: 'GASTO', origenId: g.id,
+    tipoComprobante: g.tipoComprobante, serie: g.serie, numero: g.numero,
+    lineas: [D(g.cuenta, g.base), ...(g.igv > 0 ? [D(cfg.IGV.cuenta, g.igv)] : []), H(cfg.CXP.cuenta, g.total)]
+  }];
+  if (g.medioPago) a.push({ id: `GP-${g.id}`, fecha: g.fecha, glosa: `Pago de ${g.descripcion} · ${g.medioPago}${g.operacion ? ` op. ${g.operacion}` : ''}`, origen: 'PAGO', origenId: g.id,
+    lineas: [D(cfg.CXP.cuenta, g.total), H(g.medioPago === 'Efectivo' ? cfg.CAJA.cuenta : cfg.BANCOS.cuenta, g.total)] });
+  return a;
+}
+
+/** Vale de caja chica con categoría: 6x a 101 Caja. */
+export function asientoDeCajaChica(g: GastoCaja, cfg = CONFIG_CONTABLE): Asiento | null {
+  if (!g.cuenta || !(g.monto > 0)) return null;
+  return { id: `CC-${g.id}`, fecha: g.fecha, glosa: `Caja chica: ${g.motivo}`, origen: 'CAJA', origenId: g.id, tipoComprobante: '00', lineas: [D(g.cuenta, g.monto), H(cfg.CAJA.cuenta, g.monto)] };
+}
+
 /** Libro diario del modo demo, derivado de los hechos registrados. */
-export function diarioDemo(s: { kardex: KardexMovement[]; products: CatalogProduct[]; invoices: ComprobanteSunat[]; purchases: Purchase[] }): Asiento[] {
+export function diarioDemo(s: { kardex: KardexMovement[]; products: CatalogProduct[]; invoices: ComprobanteSunat[]; purchases: Purchase[]; gastos?: Gasto[]; gastosCaja?: GastoCaja[] }): Asiento[] {
   const asientos: Asiento[] = [];
+  (s.gastos ?? []).forEach(g => asientos.push(...asientosDeGasto(g)));
+  (s.gastosCaja ?? []).forEach(g => { const a = asientoDeCajaChica(g); if (a) asientos.push(a); });
   s.invoices.forEach(inv => { const a = asientoDeComprobante(inv, s.products); if (a) asientos.push(a); const c = asientoDeCobro(inv); if (c) asientos.push(c); });
   s.purchases.forEach(p => { const a = asientoDeCompra(p); if (a) asientos.push(a); });
   s.kardex.forEach(m => { const a = asientoDeKardex(m, s.products.find(p => p.sku === m.productSku)); if (a) asientos.push(a); });
