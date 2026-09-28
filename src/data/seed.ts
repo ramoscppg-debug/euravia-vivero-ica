@@ -56,7 +56,11 @@ export const INITIAL_COMPANY_CONFIG: EmpresaConfig = {
   cuentaDetraccionesBn: '00-068-091823',
   cuentaBcpSoles: '193-9821456-0-12',
   cuentaBbvaSoles: '0011-0182-0200847291',
-  tasaDetraccionServicios: SPOT_TASA_SERVICIOS // 12% — "Demás servicios gravados con IGV" (Anexo 3, cód. 037)
+  tasaDetraccionServicios: SPOT_TASA_SERVICIOS, // 12% — "Demás servicios gravados con IGV" (Anexo 3, cód. 037)
+  modoEmision: 'EXTERNA',
+  ultimosNumeros: {},
+  serieNcBoleta: 'BC01',
+  serieNcFactura: 'FC01'
 };
 
 /** Empresa en la nube antes de que el dueño la configure: sin datos inventados (RUC, cuentas, dirección). */
@@ -66,7 +70,8 @@ export const EMPRESA_VACIA: EmpresaConfig = {
   usuarioSol: '', claveSol: '', certificadoCdtNombre: '', certificadoVencimiento: '',
   serieBoleta: 'B001', serieFactura: 'F001', serieGre: 'T001', formatoTicket: '80mm', pieDePaginaTicket: '',
   afpnetUsuario: '', afpnetCodigoEmpresa: '', cuentaDetraccionesBn: '', cuentaBcpSoles: '', cuentaBbvaSoles: '',
-  tasaDetraccionServicios: SPOT_TASA_SERVICIOS
+  tasaDetraccionServicios: SPOT_TASA_SERVICIOS,
+  modoEmision: 'EXTERNA', ultimosNumeros: {}, serieNcBoleta: 'BC01', serieNcFactura: 'FC01'
 };
 
 // ============================================================================

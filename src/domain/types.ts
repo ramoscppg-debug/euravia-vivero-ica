@@ -30,6 +30,12 @@ export interface EmpresaConfig extends EmisorSunat {
   cuentaBcpSoles: string;
   cuentaBbvaSoles: string;
   tasaDetraccionServicios: number; // e.g. 0.12 (12%)
+  /** EXTERNA: el sistema prepara el modelo y se emite en el portal SOL u otra plataforma. DIRECTA: API (pendiente). */
+  modoEmision: 'EXTERNA' | 'DIRECTA';
+  /** Último número usado por serie, para seguir la numeración donde se quedó en SUNAT. */
+  ultimosNumeros: Record<string, number>;
+  serieNcBoleta: string;
+  serieNcFactura: string;
 }
 
 // ---------- Catálogo & Kardex ----------

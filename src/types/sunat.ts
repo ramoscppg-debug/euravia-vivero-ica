@@ -98,6 +98,10 @@ export interface ComprobanteSunat {
   puntosCanjeados?: number;
   cotizacionId?: string;
   contratoId?: string;
+  // Emisión externa (portal SOL u otra plataforma): número real que dio SUNAT y envío al cliente
+  numeroSunat?: string;
+  emitidoAt?: string;
+  enviadoClienteAt?: string;
 }
 
 // GUÍA DE REMISIÓN REMITENTE ELECTRÓNICA (GRE - SUNAT)
@@ -111,6 +115,7 @@ export interface GuiaRemisionItem {
 
 export interface GuiaRemisionSunat {
   id: string; // 'T001-0000045'
+  numeroSunat?: string; // número con el que se emitió fuera del sistema
   serie: string; // 'T001'
   correlativo: number;
   fechaEmision: string;

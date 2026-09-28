@@ -4,6 +4,7 @@ import { ModalShell, useDocLookup } from '../../components/shared';
 import { camaraDisponible, EscanerCamara } from '../../components/EscanerCamara';
 import { esc, imprimirTicket, qrSvg, skuDeLectura } from '../../lib/documentos';
 import { GeneradorEtiquetas } from '../inventario/Etiquetas';
+import { AccionesEmision, porEmitir } from '../admin/Emision';
 import { MEDIOS_PAGO, type ComprobanteSunat, type DescuentoGlobal, type LineaCarrito, type MedioPago, type Pago } from '../../domain/types';
 import { round2 } from '../../lib/peru';
 import { VALOR_PUNTO } from '../../lib/fidelidad';
@@ -323,7 +324,7 @@ export function TicketModal({ invoice, vuelto }: { invoice: ComprobanteSunat; vu
   return (
     <ModalShell size="max-w-sm" padding="p-6" overlay="bg-bosque-950/80" className="space-y-4 font-mono text-center">
       <div className="flex justify-between items-center pb-2 border-b">
-        <span className="text-[10px] font-bold text-tinta-suave">COMPROBANTE ELECTRÓNICO</span>
+        <span className="text-[10px] font-bold text-tinta-suave">COMPROBANTE ELECTRÓNICO{porEmitir(invoice) ? ' · POR EMITIR EN SUNAT' : ''}</span>
         <button onClick={close} aria-label="Cerrar"><X className="w-4 h-4" /></button>
       </div>
       <div className="space-y-1">
@@ -333,7 +334,7 @@ export function TicketModal({ invoice, vuelto }: { invoice: ComprobanteSunat; vu
       </div>
       <div className="border-t border-b border-dashed py-2 text-left space-y-1">
         <p className="font-bold text-center text-sm">{titulo}</p>
-        <p className="text-center font-bold">{invoice.id}</p>
+        <p className="text-center font-bold">{invoice.numeroSunat ?? invoice.id}{porEmitir(invoice) && <span className="block text-[9px] font-normal text-aviso">N° sugerido · emítelo en SUNAT y anota el número real</span>}</p>
         {invoice.referencia && <p className="text-[10px] text-center">Modifica a: {invoice.referencia} · {invoice.motivo}</p>}
         <p className="text-[10px]">Cliente: {invoice.cliente.nombreRazonSocial}{invoice.cliente.numDoc ? ` (${invoice.cliente.numDoc})` : ''}</p>
         <div className="pt-1 space-y-0.5">
@@ -353,8 +354,14 @@ export function TicketModal({ invoice, vuelto }: { invoice: ComprobanteSunat; vu
         {!!invoice.puntosCanjeados && <p className="text-[10px] text-right">Puntos canjeados: {invoice.puntosCanjeados}</p>}
         {!!invoice.puntosGanados && invoice.puntosGanados > 0 && <p className="text-[10px] text-right">Puntos ganados: {invoice.puntosGanados}</p>}
       </div>
+      {invoice.tipoComprobante !== 'NV' && (
+        <div className="p-3 rounded-2xl bg-crema text-left font-sans">
+          <p className="text-[11px] font-bold text-tinta mb-2">{porEmitir(invoice) ? 'Emítelo en SUNAT y envíaselo al cliente por WhatsApp' : 'Comprobante emitido'}</p>
+          <AccionesEmision inv={invoice} />
+        </div>
+      )}
       <button onClick={() => { imprimirTicket(ticketHtml(invoice, company, titulo, vuelto), invoice.id); close(); }} className="w-full py-2.5 rounded-2xl bg-bosque-950 text-oro font-bold">
-        Imprimir Ticket
+        {porEmitir(invoice) ? 'Imprimir nota de venta' : 'Imprimir Ticket'}
       </button>
     </ModalShell>
   );
@@ -421,17 +428,19 @@ export function EgresoModal() {
 
 /** Representación impresa del comprobante (80 mm) con el QR de SUNAT: RUC|tipo|serie|número|IGV|total|fecha|tipo doc|n° doc. */
 function ticketHtml(inv: ComprobanteSunat, company: { razonSocial: string; ruc: string; direccion: string; pieDePaginaTicket: string }, titulo: string, vuelto?: number): string {
-  const [serie, numero] = inv.id.split('-');
-  const qr = qrSvg([company.ruc, inv.tipoComprobante, serie, numero, inv.totalIgv.toFixed(2), inv.montoTotal.toFixed(2), inv.fechaEmision, inv.cliente.tipoDoc, inv.cliente.numDoc].join('|'));
+  const pendiente = !inv.numeroSunat && inv.estadoSunat === 'PENDIENTE';
+  if (pendiente) titulo = 'NOTA DE VENTA';
+  const [serie, numero] = (inv.numeroSunat ?? inv.id).split('-');
+  const qr = pendiente ? '' : qrSvg([company.ruc, inv.tipoComprobante, serie, numero, inv.totalIgv.toFixed(2), inv.montoTotal.toFixed(2), inv.fechaEmision, inv.cliente.tipoDoc, inv.cliente.numDoc].join('|'));
   const fila = (a: string, b: string, fuerte = false) => `<div style="display:flex;justify-content:space-between;gap:6px${fuerte ? ';font-weight:800' : ''}"><span>${a}</span><span>${b}</span></div>`;
   return `<div style="text-align:center"><b style="font-size:13px">${esc(company.razonSocial)}</b><div>RUC ${esc(company.ruc)}</div><div>${esc(company.direccion)}</div></div>
-    <hr style="border:0;border-top:1px dashed #000"><div style="text-align:center;font-weight:800">${esc(titulo)}<br>${esc(inv.id)}</div>
+    <hr style="border:0;border-top:1px dashed #000"><div style="text-align:center;font-weight:800">${esc(titulo)}<br>${pendiente ? `Venta ${esc(inv.id)}` : esc(inv.numeroSunat ?? inv.id)}</div>
     <div>Fecha: ${esc(inv.fechaEmision)} ${esc(inv.horaEmision ?? '')}</div><div>Cliente: ${esc(inv.cliente.nombreRazonSocial)}${inv.cliente.numDoc ? ` (${esc(inv.cliente.numDoc)})` : ''}</div>
     ${inv.referencia ? `<div>Modifica a: ${esc(inv.referencia)} · ${esc(inv.motivo ?? '')}</div>` : ''}
     <hr style="border:0;border-top:1px dashed #000">${inv.items.map(it => fila(`${it.cantidad} x ${esc(it.descripcion)}`, it.total.toFixed(2))).join('')}
     <hr style="border:0;border-top:1px dashed #000">
     ${inv.descuentoTotal ? fila('Descuento', `-${inv.descuentoTotal.toFixed(2)}`) : ''}${fila('Op. gravada', inv.opGravadas.toFixed(2))}${fila('IGV 18%', inv.totalIgv.toFixed(2))}${fila('TOTAL S/', inv.montoTotal.toFixed(2), true)}
     ${(inv.pagos ?? []).map(p => fila(`${inv.tipoComprobante === '07' ? 'Reembolso' : 'Pago'} ${esc(p.medio)}`, p.monto.toFixed(2))).join('')}${vuelto ? fila('Vuelto', vuelto.toFixed(2), true) : ''}
-    <div style="width:30mm;margin:8px auto">${qr}</div><div style="text-align:center;font-size:9px">Representación impresa de la ${esc(titulo.toLowerCase())}</div>
+    ${pendiente ? '<div style="text-align:center;margin-top:8px;font-weight:700">Su comprobante electrónico se le enviará por WhatsApp en el transcurso del día.</div>' : `<div style="width:30mm;margin:8px auto">${qr}</div><div style="text-align:center;font-size:9px">Representación impresa de la ${esc(titulo.toLowerCase())}</div>`}
     ${company.pieDePaginaTicket ? `<div style="text-align:center;margin-top:6px">${esc(company.pieDePaginaTicket)}</div>` : ''}`;
 }

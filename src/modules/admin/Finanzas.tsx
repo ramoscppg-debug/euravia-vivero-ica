@@ -8,6 +8,7 @@ import { rangoDe, type Periodo } from '../../lib/reportes';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { Bloque, Cifra, SelectorPeriodo } from './comunes';
+import { porEmitir } from './Emision';
 
 /**
  * Área contable: lo que falta emitir (pedidos con el comprobante que pidió el cliente)
@@ -20,10 +21,11 @@ export default function Finanzas() {
   const { desde, hasta } = rangoDe(periodo);
   const libro = libroFinanzas(state, desde, hasta);
 
-  const porEmitir = state.pedidos.filter(p => p.estado === 'pendiente');
+  const pedidosPorCobrar = state.pedidos.filter(p => p.estado === 'pendiente');
   const serviciosPorCotizar = state.solicitudes.filter(s => s.tipo === 'SERVICIO' && (s.estado === 'NUEVA' || s.estado === 'EN_PROCESO'));
   const proyectosPorFacturar = state.projects.filter(p => !p.invoiceId && p.status !== 'COTIZADO');
-  const hayPendientes = porEmitir.length + serviciosPorCotizar.length + proyectosPorFacturar.length > 0;
+  const cpePorEmitir = state.invoices.filter(porEmitir);
+  const hayPendientes = pedidosPorCobrar.length + serviciosPorCotizar.length + proyectosPorFacturar.length + cpePorEmitir.length > 0;
 
   const exportar = () => {
     const filas = [['Fecha', 'Tipo', 'Categoría', 'Documento', 'Detalle', 'Monto'], ...libro.movs.map(m => [m.fecha, m.tipo, m.categoria, m.documento, m.detalle, (m.tipo === 'EGRESO' ? -m.monto : m.monto).toFixed(2)]),
@@ -39,7 +41,15 @@ export default function Finanzas() {
           <p className="text-tinta-suave">No hay comprobantes pendientes.</p>
         ) : (
           <ul className="divide-y divide-crema-200">
-            {porEmitir.map(p => (
+            {cpePorEmitir.length > 0 && (
+              <li className="py-2.5 flex flex-wrap items-center gap-3">
+                <span className="flex-1 min-w-[200px]"><span className="font-bold text-tinta">{cpePorEmitir.length} comprobante(s) por emitir en SUNAT</span><span className="block text-xs text-tinta-suave">Ventas ya cobradas: emítelas en el portal SOL con su modelo y anota el número.</span></span>
+                <Insignia tono="aviso">SUNAT</Insignia>
+                <span className="font-extrabold text-tinta w-24 text-right">{soles(cpePorEmitir.reduce((a, i) => a + (i.tipoComprobante === '07' ? -i.montoTotal : i.montoTotal), 0))}</span>
+                <Boton tamano="sm" onClick={() => setTab('sunat')}>Emitir ahora</Boton>
+              </li>
+            )}
+            {pedidosPorCobrar.map(p => (
               <li key={p.id} className="py-2.5 flex flex-wrap items-center gap-3">
                 <span className="flex-1 min-w-[200px]">
                   <span className="font-bold text-tinta">{p.razonSocial || p.cliente.nombre}</span>

@@ -67,7 +67,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
     // 8. Ajustes Empresa
     await ir(page, 'configuracion');
-    await expect(page.getByRole('heading', { name: 'Datos Fiscales, SUNAT SOL & Cuentas Bancarias' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Datos Fiscales, Series & Cuentas Bancarias' })).toBeVisible();
 
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
@@ -159,6 +159,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     
     const rucInput = page.locator('input[value="20609876541"]');
     await expect(rucInput).toBeVisible();
+    await page.getByText('Para la conexión directa con SUNAT (opcional, más adelante)').click();
     await expect(page.getByText('CDT_AUREVIA_2026_2029.pfx')).toBeVisible();
 
     await page.click('button:has-text("Guardar Todos los Cambios")');
@@ -241,7 +242,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('16. Botón "Consultar RUC" ejecuta la validación módulo 11 (offline)', async ({ page }) => {
     await ir(page, 'configuracion');
-    await expect(page.getByRole('heading', { name: 'Datos Fiscales, SUNAT SOL & Cuentas Bancarias' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Datos Fiscales, Series & Cuentas Bancarias' })).toBeVisible();
 
     // El RUC de demo (20609876541) no cumple el dígito verificador -> aviso módulo 11
     let dialogMsg = '';
@@ -374,6 +375,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.locator('button:has(svg.lucide-x)').first().click();
 
     await ir(page, 'sunat');
+    await page.getByRole('button', { name: /^Todos/ }).click();
     await page.locator('button:has-text("Devolución")').first().click();
     const modal = page.locator('.fixed');
     await modal.getByLabel('Devolver AUR-001').fill('1');
@@ -752,6 +754,37 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.getByText('Enviarme un aviso por cada pedido web').click();
     await page.getByRole('button', { name: 'Guardar avisos' }).click();
     await expect(page.getByText(/indica tu WhatsApp y la clave \(apikey\) de CallMeBot/)).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('42. Emisión externa: la serie sigue donde se quedó, modelo, número real y envío por WhatsApp', async ({ page }) => {
+    // El dueño indica el último número que ya emitió en SUNAT
+    await ir(page, 'configuracion');
+    await page.getByLabel('Último número de Boleta de venta').fill('500');
+    await expect(page.getByText('B001-00000501')).toBeVisible();
+    await page.click('button:has-text("Guardar Todos los Cambios")');
+
+    // La venta queda por emitir con el número siguiente
+    await page.click('button:has-text("Nueva venta")');
+    await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO · POR EMITIR EN SUNAT')).toBeVisible();
+    await expect(page.getByText('B001-00000501').first()).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+
+    // Se emite en SUNAT (otro número) y se anota; luego se envía al cliente
+    await ir(page, 'sunat');
+    await expect(page.getByRole('button', { name: 'Por emitir en SUNAT (1)' })).toBeVisible();
+    await page.getByLabel('N° emitido en SUNAT de B001-00000501').fill('B001-502');
+    await page.getByRole('button', { name: 'Ya lo emití' }).click();
+    await page.getByRole('button', { name: /^Todos/ }).click();
+    await expect(page.getByText('Emitido · B001-502')).toBeVisible();
+    await page.getByLabel('WhatsApp del cliente').first().fill('987 654 321');
+    await expect(page.getByRole('link', { name: 'Enviar al cliente por WhatsApp' }).first()).toHaveAttribute('href', /^https:\/\/wa\.me\/51987654321\?text=.*B001-502/);
+
+    // La serie quedó al día: la próxima boleta sugiere el 503
+    await ir(page, 'configuracion');
+    await expect(page.getByText('B001-00000503')).toBeVisible();
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 

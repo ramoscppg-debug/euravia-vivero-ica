@@ -345,7 +345,12 @@ function errorNube(e: unknown): string {
   return `No se pudo guardar en la nube: ${msg}`;
 }
 
-/** Emite el CPE en SUNAT y sella la CDR de respuesta. */
+export const EMISION_PENDIENTE = 'Por emitir en SUNAT (portal SOL u otra plataforma). Anota aquí el número cuando lo emitas.';
+
+/**
+ * Arma el comprobante. En modo EXTERNA (hasta conectar la API) no se envía a ningún lado:
+ * queda "por emitir" y el sistema entrega el modelo con los datos. En modo DIRECTA se envía a SUNAT.
+ */
 async function emitirCpe(
   company: EmpresaConfig,
   tipo: '01' | '03' | '07' | 'NV',
@@ -362,6 +367,12 @@ async function emitirCpe(
     items
   });
   inv.emisor = emisorDe(company);
+  if (company.modoEmision !== 'DIRECTA') {
+    inv.estadoSunat = 'PENDIENTE';
+    inv.descripcionRespuestaSunat = EMISION_PENDIENTE;
+    inv.hashCpe = undefined;
+    return inv;
+  }
   const cdr = await sunatClient.sendCpeToSunat(inv);
   inv.estadoSunat = cdr.estado;
   inv.codigoRespuestaSunat = cdr.cdrCode;
@@ -375,7 +386,7 @@ async function emitirGre(
   guias: GuiaRemisionSunat[],
   data: { tipoDoc: '1' | '6'; numDoc: string; nombre: string; direccionLlegada: string; placa: string; motivo: string; items: { sku: string; descripcion: string; cantidad: number }[] }
 ): Promise<GuiaRemisionSunat> {
-  const correlativo = Math.max(0, ...guias.filter(g => g.serie === company.serieGre).map(g => g.correlativo)) + 1;
+  const correlativo = Math.max(0, company.ultimosNumeros?.[company.serieGre] ?? 0, ...guias.filter(g => g.serie === company.serieGre).map(g => g.correlativo)) + 1;
   const gre: GuiaRemisionSunat = {
     id: `${company.serieGre}-${String(correlativo).padStart(8, '0')}`,
     serie: company.serieGre,
@@ -386,20 +397,21 @@ async function emitirGre(
     emisor: emisorDe(company),
     destinatario: { tipoDoc: data.tipoDoc, numDoc: data.numDoc, nombreRazonSocial: data.nombre },
     puntoPartida: { ubigeo: company.ubigeo, direccion: `Vivero ${company.nombreComercial}, ${company.direccion}` },
-    puntoLlegada: { ubigeo: '150122', direccion: data.direccionLlegada },
+    puntoLlegada: { ubigeo: '', direccion: data.direccionLlegada },
     datosEnvio: {
       pesoBrutoTotal: data.items.reduce((a, it) => a + it.cantidad, 0) * 4.5,
       unidadMedidaPeso: 'KGM',
       modalidadTraslado: '02',
       fechaInicioTraslado: today(),
       placaVehiculo: data.placa,
-      conductorDni: '71234567',
-      conductorNombre: 'Raúl Morales Alva'
+      conductorDni: '', // se completa al emitir la guía en SUNAT
+      conductorNombre: ''
     },
     items: data.items.map((it, i) => ({ item: i + 1, sku: it.sku, descripcion: it.descripcion, cantidad: it.cantidad, unidadMedida: 'NIU' })),
-    estadoSunat: 'ACEPTADO',
-    hashGre: 'R1JFLUF1cmV2aWEtQVBJ'
+    estadoSunat: 'PENDIENTE',
+    hashGre: ''
   };
+  if (company.modoEmision !== 'DIRECTA') return gre; // se emite fuera del sistema con el modelo
   const resp = await sunatClient.sendGreToSunat(gre);
   gre.estadoSunat = resp.estado;
   gre.hashGre = resp.ticketGre;
@@ -440,9 +452,12 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       };
     }
 
+    /** Siguiente número de la serie: continúa desde el último usado en SUNAT (Ajustes) o desde lo registrado. */
     async function correlativo(serie: string): Promise<number> {
-      if (nube) return repo.siguienteCorrelativo(serie);
-      return get().invoices.filter(i => i.serie === serie).length + 101;
+      const ultimo = get().company.ultimosNumeros?.[serie] ?? 0;
+      if (nube) return Math.max(await repo.siguienteCorrelativo(serie), ultimo + 1);
+      const registrados = get().invoices.filter(i => i.serie === serie);
+      return Math.max(registrados.length + 101, ...registrados.map(i => i.correlativo + 1), ultimo + 1);
     }
 
     /** La ficha del cliente se crea sola al vender o cotizar (sólo con DNI/RUC válido). */
@@ -1142,7 +1157,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         }
 
         // Serie de nota de crédito: BC01 para boletas, FC01 para facturas
-        const serie = `${original.serie.charAt(0)}C01`;
+        const serie = (original.tipoComprobante === '01' ? s.company.serieNcFactura : s.company.serieNcBoleta) || `${original.serie.charAt(0)}C01`;
         try {
           const nota = await emitirCpe(
             s.company,
@@ -1315,6 +1330,61 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           }
         }
         return { ok: true, ajustes, bajas };
+      },
+
+      // ---------------- EMISIÓN EXTERNA ----------------
+      /** Anota el número que dio SUNAT (portal SOL u otra plataforma) y deja la serie al día. */
+      async registrarEmisionExterna(invoiceId: string, numero: string): Promise<Result> {
+        const num = numero.trim().toUpperCase();
+        const m = num.match(/^([A-Z0-9]{4})-(\d{1,8})$/);
+        if (!m) return { ok: false, error: 'Escribe el número tal como lo dio SUNAT: SERIE-NÚMERO, ej. B001-245.' };
+        const s = get();
+        if (s.invoices.some(i => i.id !== invoiceId && i.numeroSunat === num)) return { ok: false, error: `El número ${num} ya está anotado en otro comprobante.` };
+        try {
+          if (nube) await repo.registrarEmisionExterna(invoiceId, num);
+          const cur = get();
+          const [, serie, n] = m;
+          commit({
+            ...cur,
+            company: { ...cur.company, ultimosNumeros: { ...(cur.company.ultimosNumeros ?? {}), [serie]: Math.max(cur.company.ultimosNumeros?.[serie] ?? 0, Number(n)) } },
+            invoices: cur.invoices.map(i => (i.id === invoiceId
+              ? { ...i, numeroSunat: num, estadoSunat: 'ACEPTADO', emitidoAt: new Date().toISOString(), descripcionRespuestaSunat: `Emitido fuera del sistema con el N° ${num}` }
+              : i))
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async marcarComprobanteEnviado(invoiceId: string): Promise<Result> {
+        try {
+          if (nube) await repo.marcarComprobanteEnviado(invoiceId);
+          const cur = get();
+          commit({ ...cur, invoices: cur.invoices.map(i => (i.id === invoiceId ? { ...i, enviadoClienteAt: new Date().toISOString() } : i)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async registrarGuiaExterna(guiaId: string, numero: string): Promise<Result> {
+        const num = numero.trim().toUpperCase();
+        const m = num.match(/^([A-Z0-9]{4})-(\d{1,8})$/);
+        if (!m) return { ok: false, error: 'Escribe el número tal como lo dio SUNAT: SERIE-NÚMERO, ej. T001-12.' };
+        try {
+          if (nube) await repo.registrarGuiaExterna(guiaId, num);
+          const cur = get();
+          const [, serie, n] = m;
+          commit({
+            ...cur,
+            company: { ...cur.company, ultimosNumeros: { ...(cur.company.ultimosNumeros ?? {}), [serie]: Math.max(cur.company.ultimosNumeros?.[serie] ?? 0, Number(n)) } },
+            guiasRemision: cur.guiasRemision.map(g => (g.id === guiaId ? { ...g, numeroSunat: num, estadoSunat: 'ACEPTADO' } : g))
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
       },
 
       // ---------------- DELIVERY Y AVISOS ----------------
@@ -1607,6 +1677,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
 
       async guardarEmpresa(): Promise<Result> {
         const { company, regimenTributario } = get();
+        if (!/^\d{11}$/.test(company.ruc)) return { ok: false, error: 'El RUC debe tener 11 dígitos.' };
+        if (!company.razonSocial.trim()) return { ok: false, error: 'Indica la razón social.' };
+        const series = [company.serieBoleta, company.serieFactura, company.serieNcBoleta, company.serieNcFactura, company.serieGre];
+        if (series.some(x => !/^[A-Z0-9]{4}$/.test(x ?? ''))) return { ok: false, error: 'Cada serie debe tener 4 caracteres (letras o números), ej. B001, F001, BC01.' };
         // Propagar credenciales al conector SUNAT sin recargar la app
         sunatClient.updateConfig({
           ruc: company.ruc,

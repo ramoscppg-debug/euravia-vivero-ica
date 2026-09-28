@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Check, PlusCircle, Printer, X } from 'lucide-react';
+import { Check, FileText, PlusCircle, X } from 'lucide-react';
+import { Boton, Insignia } from '../../components/ui';
+import type { GuiaRemisionSunat } from '../../domain/types';
+import { imprimirModeloGuia } from '../../lib/modelos';
 import { ModalShell } from '../../components/shared';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
@@ -26,10 +29,10 @@ export default function Guias() {
           <div key={gre.id} className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-4 text-xs">
             <div className="flex justify-between items-center pb-3 border-b border-[#f0eae1]">
               <div className="flex items-center gap-3">
-                <span className="font-mono font-bold text-base text-tinta">{gre.id}</span>
+                <span className="font-mono font-bold text-base text-tinta">{gre.numeroSunat ?? gre.id}</span>
                 <span className="bg-bosque-700 text-oro font-bold text-[10px] px-2.5 py-0.5 rounded-full">GRE Remitente</span>
               </div>
-              <span className="text-xs text-bosque-700 font-bold flex items-center gap-1"><Check className="w-3.5 h-3.5" /> QR SUNAT Activo</span>
+              {gre.estadoSunat === 'PENDIENTE' && !gre.numeroSunat ? <Insignia tono="aviso">Por emitir en SUNAT</Insignia> : <Insignia tono="exito">Emitida</Insignia>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -44,20 +47,34 @@ export default function Guias() {
               </div>
               <div>
                 <span className="text-[10px] text-tinta-suave uppercase font-bold block">Vehículo & Chofer</span>
-                <p className="font-semibold text-tinta">Placa: {gre.datosEnvio?.placaVehiculo || 'BZF-412'}</p>
-                <p className="text-[11px] text-tinta-suave">{gre.datosEnvio?.conductorNombre || 'Raúl Morales'} (DNI {gre.datosEnvio?.conductorDni || '71234567'})</p>
+                <p className="font-semibold text-tinta">Placa: {gre.datosEnvio?.placaVehiculo || 'por indicar'}</p>
+                <p className="text-[11px] text-tinta-suave">{gre.datosEnvio?.conductorNombre ? `${gre.datosEnvio.conductorNombre} (DNI ${gre.datosEnvio.conductorDni})` : 'Conductor: se indica al emitir'}</p>
               </div>
             </div>
 
             <div className="flex justify-between items-center pt-2">
-              <span className="text-tinta-suave">Bultos: {(gre.items || []).map(it => `${it.cantidad}x ${it.descripcion}`).join(', ')} | Peso: {gre.datosEnvio?.pesoBrutoTotal || 25} kg</span>
-              <button onClick={() => alert(`Imprimiendo Guía de Remisión ${gre.id} con Código QR para control en ruta`)} className="px-3 py-1.5 bg-bosque-950 text-oro rounded-xl font-bold text-[10px] flex items-center gap-1">
-                <Printer className="w-3 h-3" /> Imprimir GRE
-              </button>
+              <span className="text-tinta-suave">Bultos: {(gre.items || []).map(it => `${it.cantidad}x ${it.descripcion}`).join(', ')}{gre.datosEnvio?.pesoBrutoTotal ? ` | Peso aprox.: ${gre.datosEnvio.pesoBrutoTotal} kg` : ''}</span>
+              <Boton tamano="sm" variante="secundario" onClick={() => imprimirModeloGuia(gre, company)}><FileText className="w-3.5 h-3.5" aria-hidden /> Ver modelo</Boton>
             </div>
+            {gre.estadoSunat === 'PENDIENTE' && !gre.numeroSunat && <RegistrarGuia gre={gre} />}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Anota el número con el que se emitió la guía en SUNAT. */
+function RegistrarGuia({ gre }: { gre: GuiaRemisionSunat }) {
+  const { actions } = useErp();
+  const [numero, setNumero] = useState(gre.id);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl bg-aviso-fondo">
+      <span className="font-bold text-aviso">Emítela en SUNAT con el modelo y anota el número:</span>
+      <input aria-label={`N° emitido en SUNAT de la guía ${gre.id}`} value={numero} onChange={e => setNumero(e.target.value.toUpperCase())} className="w-36 min-h-[36px] px-2 rounded-control border border-crema-300 font-mono font-bold bg-white" />
+      <Boton tamano="sm" onClick={async () => { const r = await actions.registrarGuiaExterna(gre.id, numero); setError(r.ok ? null : r.error); }}><Check className="w-3.5 h-3.5" aria-hidden /> Ya la emití</Boton>
+      {error && <span role="alert" className="text-error font-bold">{error}</span>}
     </div>
   );
 }
@@ -66,14 +83,14 @@ export default function Guias() {
 // MODAL: GUÍA DE REMISIÓN ELECTRÓNICA GRE
 // ============================================================
 export function GreModal() {
-  const { state, actions } = useErp();
+  const { state, actions, nube } = useErp();
   const { close } = useUi();
   const { company, products } = state;
 
-  const [destinatario, setDestinatario] = useState('Valeria Benavides');
-  const [docDestinatario, setDocDestinatario] = useState('47891234');
-  const [placa, setPlaca] = useState('BZF-412');
-  const [direccionLlegada, setDireccionLlegada] = useState('Calle Las Orquídeas 340, Miraflores');
+  const [destinatario, setDestinatario] = useState(nube ? '' : 'Valeria Benavides');
+  const [docDestinatario, setDocDestinatario] = useState(nube ? '' : '47891234');
+  const [placa, setPlaca] = useState(nube ? '' : 'BZF-412');
+  const [direccionLlegada, setDireccionLlegada] = useState(nube ? '' : 'Calle Las Orquídeas 340, Miraflores');
   const [sku, setSku] = useState(products[0]?.sku ?? '');
   const [qty, setQty] = useState(1);
   const [sending, setSending] = useState(false);

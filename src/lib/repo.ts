@@ -176,7 +176,11 @@ function empresaDesdeFila(r: Row | null): EmpresaConfig {
     serieGre: r.serie_gre ?? base.serieGre,
     cuentaDetraccionesBn: r.cuenta_detracciones_bn ?? base.cuentaDetraccionesBn,
     cuentaBcpSoles: r.cuenta_bcp_soles ?? base.cuentaBcpSoles,
-    tasaDetraccionServicios: r.tasa_detraccion != null ? num(r.tasa_detraccion) : base.tasaDetraccionServicios
+    tasaDetraccionServicios: r.tasa_detraccion != null ? num(r.tasa_detraccion) : base.tasaDetraccionServicios,
+    modoEmision: r.modo_emision ?? base.modoEmision,
+    ultimosNumeros: r.ultimos_numeros ?? {},
+    serieNcBoleta: r.serie_nc_boleta ?? base.serieNcBoleta,
+    serieNcFactura: r.serie_nc_factura ?? base.serieNcFactura
   };
 }
 
@@ -250,6 +254,9 @@ function comprobanteDesdeFila(r: Row, company: EmpresaConfig): ComprobanteSunat 
     puntosGanados: r.puntos_ganados ?? 0,
     puntosCanjeados: r.puntos_canjeados ?? 0,
     cotizacionId: r.cotizacion_id ?? undefined,
+    numeroSunat: r.numero_sunat ?? undefined,
+    emitidoAt: r.emitido_at ?? undefined,
+    enviadoClienteAt: r.enviado_cliente_at ?? undefined,
     contratoId: r.contrato_id ?? undefined
   };
 }
@@ -740,6 +747,10 @@ export async function guardarEmpresa(c: EmpresaConfig, regimen: RegimenTributari
     cuenta_bcp_soles: c.cuentaBcpSoles,
     tasa_detraccion: c.tasaDetraccionServicios,
     regimen_tributario: regimen,
+    modo_emision: c.modoEmision,
+    ultimos_numeros: c.ultimosNumeros,
+    serie_nc_boleta: c.serieNcBoleta,
+    serie_nc_factura: c.serieNcFactura,
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' }));
   // La fila se identifica por el RUC: si el RUC cambió, se retira la anterior para no tener dos empresas
@@ -983,6 +994,22 @@ export async function guardarTarifa(t: TarifaDelivery) {
 export async function eliminarTarifa(distrito: string) {
   const sb = await db();
   ok(await sb.from('tarifas_delivery').delete().eq('distrito', distrito));
+}
+
+// ---------------- EMISIÓN EXTERNA ----------------
+export async function registrarEmisionExterna(id: string, numero: string) {
+  const sb = await db();
+  ok(await sb.rpc('registrar_emision_externa', { p_id: id, p_numero: numero }));
+}
+
+export async function marcarComprobanteEnviado(id: string) {
+  const sb = await db();
+  ok(await sb.rpc('marcar_comprobante_enviado', { p_id: id }));
+}
+
+export async function registrarGuiaExterna(id: string, numero: string) {
+  const sb = await db();
+  ok(await sb.rpc('registrar_guia_externa', { p_id: id, p_numero: numero }));
 }
 
 /** Quita un servicio de la tienda (las solicitudes antiguas conservan el texto del servicio). */
