@@ -59,6 +59,8 @@ export function seedState(): ErpState {
     solicitudes: [],
     tiendaConfig: INITIAL_CONFIG_TIENDA,
     serviciosPublicos: INITIAL_SERVICIOS_PUBLICOS,
+    tarifasDelivery: [],
+    avisos: { activo: false },
     gastosCaja: INITIAL_CASH_REGISTER.egresos.map(e => ({ id: `${hoyLocal()}-${e.id}`, fecha: hoyLocal(), motivo: e.motivo, monto: e.monto, responsable: e.responsable }))
   };
 }

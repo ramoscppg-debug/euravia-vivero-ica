@@ -69,7 +69,7 @@ export default function Solicitudes() {
                   </div>
                 </div>
                 {(s.docCliente || s.razonSocial) && <p className="text-xs text-tinta"><b>{s.comprobante === 'FACTURA' ? 'RUC' : 'DNI'} {s.docCliente}</b>{s.razonSocial ? ` · ${s.razonSocial}` : ''}</p>}
-                {s.tipo === 'PEDIDO' && <p className="text-xs text-tinta-suave">Entrega: <b className="text-tinta">{s.entrega === 'DELIVERY' ? `Delivery · ${[s.direccion, s.distrito].filter(Boolean).join(', ')}` : 'Recojo en vivero'}</b></p>}
+                {s.tipo === 'PEDIDO' && <p className="text-xs text-tinta-suave">Entrega: <b className="text-tinta">{s.entrega === 'DELIVERY' ? `Delivery · ${[s.direccion, s.distrito].filter(Boolean).join(', ')} · ${s.costoDelivery !== undefined ? soles(s.costoDelivery) : 'costo a coordinar'}` : 'Recojo en vivero'}</b></p>}
                 {s.requiereAsesor && <p className="flex items-center gap-1.5 p-2 rounded-control bg-aviso-fondo text-aviso text-xs font-bold"><UserRound className="w-4 h-4" aria-hidden /> Pide más que el stock: coordinar cantidades y fecha con el cliente.</p>}
                 {servicio && <p className="font-semibold text-tinta">Servicio: {servicio.nombre}</p>}
                 {!!s.items.length && (
@@ -112,7 +112,7 @@ export function SolicitudAPedidoModal({ solicitud }: { solicitud: SolicitudTiend
   const [direccion, setDireccion] = useState(solicitud.direccion ?? '');
   const [distrito, setDistrito] = useState(solicitud.distrito ?? '');
   const [fechaEntrega, setFechaEntrega] = useState(hoyLocal());
-  const [costoDelivery, setCostoDelivery] = useState(0);
+  const [costoDelivery, setCostoDelivery] = useState(solicitud.costoDelivery ?? 0); // tarifa del distrito, si la hay
   const [enviando, setEnviando] = useState(false);
   const campo = 'w-full min-h-[44px] px-3 rounded-control bg-crema border border-crema-300 font-semibold';
 

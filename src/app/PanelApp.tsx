@@ -27,6 +27,7 @@ import Finanzas from '../modules/admin/Finanzas';
 import Estadisticas from '../modules/admin/Estadisticas';
 import Almacen from '../modules/inventario/Almacen';
 import Etiquetas from '../modules/inventario/Etiquetas';
+import Conteo from '../modules/inventario/Conteo';
 import Documentos from '../modules/ventas/Documentos';
 import ServiciosTienda from '../modules/ventas/ServiciosTienda';
 import { AuthProvider, useAuth } from '../store/AuthStore';
@@ -57,7 +58,8 @@ const SCREENS: Record<TabId, ComponentType> = {
   almacen: Almacen,
   finanzas: Finanzas,
   estadisticas: Estadisticas,
-  'servicios-tienda': ServiciosTienda
+  'servicios-tienda': ServiciosTienda,
+  conteo: Conteo
 };
 
 function Shell() {

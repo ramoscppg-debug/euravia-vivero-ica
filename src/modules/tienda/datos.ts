@@ -11,17 +11,23 @@ import {
   type ConfigTienda,
   type ProductoPublico,
   type ServicioPublico,
-  type SolicitudTienda
+  type SolicitudTienda,
+  type TarifaDelivery
 } from '../../domain/types';
 import { soles } from '../../lib/formato';
-import { configTiendaDesdeFila, servicioPublicoDesdeFila } from '../../lib/repo';
+import { configTiendaDesdeFila, servicioPublicoDesdeFila, tarifaDesdeFila } from '../../lib/repo';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export interface DatosTienda {
   productos: ProductoPublico[];
   servicios: ServicioPublico[];
   config: ConfigTienda;
+  tarifas: TarifaDelivery[];
 }
+
+/** Costo de delivery del distrito (sin tarifa = a coordinar). El servidor aplica la misma regla. */
+export const tarifaDe = (tarifas: TarifaDelivery[], distrito?: string) =>
+  distrito ? tarifas.find(t => t.activo && t.distrito.toLowerCase() === distrito.trim().toLowerCase()) : undefined;
 
 /** Todas las rutas públicas cuelgan de /tienda (el enlace principal es del equipo). */
 export const BASE = '/tienda';
@@ -54,18 +60,20 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
         }))
         .sort((a, b) => Number(b.destacado) - Number(a.destacado) || a.nombre.localeCompare(b.nombre)),
       servicios: s.serviciosPublicos.filter(x => x.visible).sort((a, b) => a.orden - b.orden),
-      config: s.tiendaConfig
+      config: s.tiendaConfig,
+      tarifas: (s.tarifasDelivery ?? []).filter(t => t.activo)
     };
   }
 
   const sb = await getSupabase();
   if (!sb) throw new Error('Sin conexión con la tienda.');
-  const [catalogo, servicios, config] = await Promise.all([
+  const [catalogo, servicios, config, tarifas] = await Promise.all([
     sb.rpc('catalogo_publico'),
     sb.from('servicios_publicos').select('slug, nombre, resumen, descripcion, imagen_url, orden, visible, precio_desde').eq('visible', true).order('orden'),
-    sb.from('tienda_config').select('whatsapp, email, direccion, horario, mensaje_portada').eq('id', 1).maybeSingle()
+    sb.from('tienda_config').select('whatsapp, email, direccion, horario, mensaje_portada').eq('id', 1).maybeSingle(),
+    sb.from('tarifas_delivery').select('distrito, costo, activo').eq('activo', true).order('distrito')
   ]);
-  const error = catalogo.error ?? servicios.error ?? config.error;
+  const error = catalogo.error ?? servicios.error ?? config.error ?? tarifas.error;
   if (error) throw new Error(error.message);
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,7 +95,8 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
       destacado: !!r.destacado
     })),
     servicios: (servicios.data ?? []).map(servicioPublicoDesdeFila),
-    config: configTiendaDesdeFila(config.data)
+    config: configTiendaDesdeFila(config.data),
+    tarifas: (tarifas.data ?? []).map(tarifaDesdeFila)
   };
 }
 
@@ -128,7 +137,7 @@ export function validarSolicitud(s: NuevaSolicitud): string | null {
 }
 
 /** Envía la solicitud. En la nube el servidor valida todo y toma los precios de la base. */
-export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPublico[]): Promise<string> {
+export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPublico[], tarifas: TarifaDelivery[] = []): Promise<string> {
   const error = validarSolicitud(s);
   if (error) throw new Error(error);
   const nombre = s.nombre.trim();
@@ -148,7 +157,8 @@ export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPubli
       id, tipo: s.tipo, nombre, telefono, email: s.email || undefined, distrito: s.distrito || undefined, mensaje: s.mensaje || undefined,
       servicioSlug: s.servicio, items, totalReferencial: items.reduce((a, it) => a + it.cantidad * it.precio, 0), estado: 'NUEVA', createdAt: new Date().toISOString(),
       comprobante, docCliente: doc, razonSocial: s.razonSocial?.trim() || undefined, entrega, direccion: s.direccion?.trim() || undefined,
-      requiereAsesor: items.some(it => it.cantidad > it.stock)
+      requiereAsesor: items.some(it => it.cantidad > it.stock),
+      costoDelivery: s.tipo === 'PEDIDO' && entrega === 'DELIVERY' ? tarifaDe(tarifas, s.distrito)?.costo : undefined
     });
     return id;
   }
@@ -173,8 +183,8 @@ export function enlaceWhatsapp(config: ConfigTienda, texto: string): string | nu
 }
 
 /** Mensaje que el cliente envía por WhatsApp con su pedido ya registrado. */
-export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombre: string; cantidad: number; precio: number; stock: number }[], servicio?: string): string {
-  const total = lineas.reduce((a, l) => a + l.cantidad * l.precio, 0);
+export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombre: string; cantidad: number; precio: number; stock: number }[], servicio?: string, delivery?: number): string {
+  const total = lineas.reduce((a, l) => a + l.cantidad * l.precio, 0) + (delivery ?? 0);
   const doc = (s.doc ?? '').replace(/[^0-9]/g, '');
   const partes = [
     `*${s.tipo === 'SERVICIO' ? 'Cotización de servicio' : 'Pedido'} AUREVIA N° ${numero}*`,
@@ -183,7 +193,7 @@ export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombr
       ? `Comprobante: Factura · RUC ${doc} · ${s.razonSocial?.trim()}`
       : `Comprobante: Boleta${doc ? ` · DNI ${doc}` : ''}`,
     servicio ? `Servicio: ${servicio}` : '',
-    s.entrega === 'DELIVERY' ? `Entrega: delivery a ${[s.direccion, s.distrito].filter(Boolean).join(', ')}` : s.tipo === 'PEDIDO' ? 'Entrega: recojo en el vivero' : '',
+    s.entrega === 'DELIVERY' ? `Entrega: delivery a ${[s.direccion, s.distrito].filter(Boolean).join(', ')} · ${delivery !== undefined ? soles(delivery) : 'costo a coordinar'}` : s.tipo === 'PEDIDO' ? 'Entrega: recojo en el vivero' : '',
     ...(lineas.length ? ['', ...lineas.map(l => `• ${l.cantidad} × ${l.nombre} (${soles(l.precio)})${l.cantidad > l.stock ? ` — hay ${l.stock}, el resto lo coordina un asesor` : ''}`), `Total referencial: ${soles(total)}`] : []),
     s.mensaje?.trim() ? `\nNota: ${s.mensaje.trim()}` : '',
     '',

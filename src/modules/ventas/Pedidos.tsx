@@ -317,7 +317,7 @@ export function CobroPedidoModal({ pedido }: { pedido: Pedido }) {
     <ModalShell>
       <div className="flex justify-between items-center pb-3 border-b border-[#f0eae1]">
         <div>
-          <h3 className="font-serif font-bold text-lg text-tinta">Cobrar pedido {pedido.id}</h3>
+          <h3 className="font-serif font-bold text-lg text-tinta">Confirmar pago del pedido {pedido.id}</h3>
           <p className="text-[11px] text-tinta-suave">{pedido.cliente.nombre} · S/ {pedido.total.toFixed(2)}{pedido.costoDelivery > 0 ? ` (incluye delivery S/ ${pedido.costoDelivery.toFixed(2)})` : ''}</p>
         </div>
         <button onClick={close} aria-label="Cerrar"><X className="w-5 h-5 text-tinta-suave" /></button>
@@ -337,14 +337,18 @@ export function CobroPedidoModal({ pedido }: { pedido: Pedido }) {
 
       <div className="p-3 bg-crema rounded-2xl border border-[#eae4dc] space-y-2">
         {pagos.map((p, i) => (
-          <div key={i} className="flex gap-2">
+          <div key={i} className="flex flex-wrap gap-2">
             <select aria-label={`Medio de pago ${i + 1}`} value={p.medio} onChange={e => setPagos(pagos.map((x, j) => (j === i ? { ...x, medio: e.target.value as MedioPago } : x)))} className={`${input} bg-white`}>
               {MEDIOS_PAGO.map(m => <option key={m}>{m}</option>)}
             </select>
             <input aria-label={`Monto ${i + 1}`} type="number" min={0} step="0.1" value={p.monto} onChange={e => setPagos(pagos.map((x, j) => (j === i ? { ...x, monto: Math.max(0, Number(e.target.value) || 0) } : x)))} className={`${input} bg-white w-28 font-mono`} />
+            {p.medio !== 'Efectivo' && (
+              <input aria-label={`N° de operación ${i + 1}`} value={p.operacion ?? ''} onChange={e => setPagos(pagos.map((x, j) => (j === i ? { ...x, operacion: e.target.value.trim().slice(0, 30) || undefined } : x)))} placeholder="N° de operación" className={`${input} bg-white flex-1 min-w-[120px] font-mono`} />
+            )}
             {pagos.length > 1 && <button type="button" onClick={() => setPagos(pagos.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4 text-error" /></button>}
           </div>
         ))}
+        <p className="text-[11px] text-tinta-suave">Confirma el pago sólo cuando lo veas en tu Yape, Plin o cuenta. El N° de operación queda en el comprobante y en el pedido.</p>
         <div className="flex justify-between items-center">
           <button type="button" onClick={() => setPagos([...pagos, { medio: 'Efectivo', monto: resumen.falta }])} className="text-[10px] font-bold underline text-bosque-700">+ otro medio de pago</button>
           <span className={`font-bold ${resumen.error ? 'text-error' : 'text-bosque-700'}`}>{resumen.error ?? (resumen.vuelto > 0 ? `Vuelto S/ ${resumen.vuelto.toFixed(2)}` : 'Cobro completo ✓')}</span>

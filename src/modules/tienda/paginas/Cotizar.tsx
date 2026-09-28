@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, MessageCircle, St
 import { Enlace, useUbicacion } from '../../../app/router';
 import { Esqueleto } from '../../../components/ui';
 import type { SolicitudTienda } from '../../../domain/types';
-import { enlaceWhatsapp, enviarSolicitud, mensajePedido, url, validarSolicitud, type NuevaSolicitud } from '../datos';
+import { enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
 import { Contador, Imagen, NotaStock, soles } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useLineas, useTienda } from '../TiendaApp';
@@ -64,11 +64,13 @@ export default function Cotizar() {
     nombre: f.nombre, telefono: f.telefono, email: f.email || undefined,
     comprobante: f.comprobante, doc: f.doc, razonSocial: f.comprobante === 'FACTURA' ? f.razonSocial : undefined,
     entrega: modoServicio ? 'RECOJO' : f.entrega, direccion: modoServicio || f.entrega === 'DELIVERY' ? f.direccion : undefined,
-    distrito: f.distrito, mensaje: f.mensaje,
+    distrito: f.distrito.trim(), mensaje: f.mensaje,
     items: modoServicio ? [] : lineas.map(l => ({ sku: l.sku, cantidad: l.cantidad }))
   }), [modoServicio, servicio, f, lineas]);
 
   if (!datos) return <Pagina className="py-10"><Esqueleto className="h-72 !rounded-3xl" /></Pagina>;
+  const tarifa = !modoServicio && f.entrega === 'DELIVERY' ? tarifaDe(datos.tarifas, f.distrito) : undefined;
+  const totalConDelivery = total + (tarifa?.costo ?? 0);
   if (enviado) return <Exito enviado={enviado} modoServicio={modoServicio} />;
 
   if (modoServicio && !servicio) {
@@ -92,6 +94,7 @@ export default function Cotizar() {
     if (paso === 1) {
       const e = validarSolicitud(solicitud);
       if (e) return setError(e);
+      if (!modoServicio && f.entrega === 'DELIVERY' && datos.tarifas.length && !f.distrito.trim()) return setError('Elige tu distrito para calcular el delivery.');
     }
     setPaso(p => p + 1);
   };
@@ -100,8 +103,8 @@ export default function Cotizar() {
     setEnviando(true);
     setError(null);
     try {
-      const numero = await enviarSolicitud(solicitud, datos.productos);
-      const texto = mensajePedido(numero, solicitud, lineas.map(l => ({ nombre: l.p.nombre, cantidad: l.cantidad, precio: l.p.precio, stock: l.p.stock })), servicio?.nombre);
+      const numero = await enviarSolicitud(solicitud, datos.productos, datos.tarifas);
+      const texto = mensajePedido(numero, solicitud, lineas.map(l => ({ nombre: l.p.nombre, cantidad: l.cantidad, precio: l.p.precio, stock: l.p.stock })), servicio?.nombre, tarifa?.costo);
       try { localStorage.setItem(CLAVE_DATOS, JSON.stringify({ nombre: f.nombre, telefono: f.telefono, email: f.email })); } catch { /* sin almacenamiento */ }
       setEnviado({ numero, whatsapp: enlaceWhatsapp(datos.config, texto), telefono: f.telefono });
       if (!modoServicio) vaciar();
@@ -203,16 +206,29 @@ export default function Cotizar() {
                   <legend className="text-sm font-bold text-slate-700 mb-2">¿Cómo lo recibes? *</legend>
                   <div className="grid grid-cols-2 gap-3">
                     <Opcion activa={f.entrega === 'RECOJO'} onClick={() => set({ entrega: 'RECOJO' })} titulo="Recojo" detalle="En el vivero" icono={<Store className="w-5 h-5" aria-hidden />} />
-                    <Opcion activa={f.entrega === 'DELIVERY'} onClick={() => set({ entrega: 'DELIVERY' })} titulo="Delivery" detalle="Costo a coordinar" icono={<Truck className="w-5 h-5" aria-hidden />} />
+                    <Opcion activa={f.entrega === 'DELIVERY'} onClick={() => set({ entrega: 'DELIVERY' })} titulo="Delivery" detalle={datos.tarifas.length ? `Desde ${soles(Math.min(...datos.tarifas.map(t => t.costo)))} según distrito` : 'Costo a coordinar'} icono={<Truck className="w-5 h-5" aria-hidden />} />
                   </div>
                   {f.entrega === 'DELIVERY' && (
                     <div className="grid sm:grid-cols-[1fr_200px] gap-3">
                       <label className="block text-sm font-bold text-slate-700">Dirección *
                         <input autoComplete="street-address" value={f.direccion} onChange={e => set({ direccion: e.target.value })} maxLength={250} className={`${campo} mt-1`} />
                       </label>
-                      <label className="block text-sm font-bold text-slate-700">Distrito
-                        <input autoComplete="address-level3" value={f.distrito} onChange={e => set({ distrito: e.target.value })} maxLength={80} className={`${campo} mt-1`} />
-                      </label>
+                      {datos.tarifas.length ? (
+                        <label className="block text-sm font-bold text-slate-700">Distrito *
+                          <select value={tarifaDe(datos.tarifas, f.distrito) || !f.distrito ? f.distrito : '__otro'} onChange={e => set({ distrito: e.target.value === '__otro' ? ' ' : e.target.value })} className={`${campo} mt-1`}>
+                            <option value="">Elige tu distrito</option>
+                            {datos.tarifas.map(t => <option key={t.distrito} value={t.distrito}>{t.distrito} · delivery {soles(t.costo)}</option>)}
+                            <option value="__otro">Otro distrito (costo a coordinar)</option>
+                          </select>
+                          {!!f.distrito && !tarifaDe(datos.tarifas, f.distrito) && (
+                            <input aria-label="Tu distrito" autoFocus value={f.distrito.trim()} onChange={e => set({ distrito: e.target.value || ' ' })} maxLength={80} placeholder="Escribe tu distrito" className={`${campo} mt-2`} />
+                          )}
+                        </label>
+                      ) : (
+                        <label className="block text-sm font-bold text-slate-700">Distrito
+                          <input autoComplete="address-level3" value={f.distrito} onChange={e => set({ distrito: e.target.value })} maxLength={80} className={`${campo} mt-1`} />
+                        </label>
+                      )}
                     </div>
                   )}
                   <label className="block text-sm font-bold text-slate-700">Nota para el asesor (opcional)
@@ -236,7 +252,7 @@ export default function Cotizar() {
                   <Dato t="Cliente" v={f.nombre} />
                   <Dato t="WhatsApp" v={f.telefono} />
                   {f.comprobante === 'FACTURA' ? <><Dato t="RUC" v={f.doc} /><Dato t="Razón social" v={f.razonSocial} /></> : f.doc ? <Dato t="DNI" v={f.doc} /> : null}
-                  {modoServicio ? <Dato t="Servicio" v={servicio?.nombre ?? ''} /> : <Dato t="Entrega" v={f.entrega === 'DELIVERY' ? `Delivery · ${[f.direccion, f.distrito].filter(Boolean).join(', ')}` : 'Recojo en el vivero'} />}
+                  {modoServicio ? <Dato t="Servicio" v={servicio?.nombre ?? ''} /> : <Dato t="Entrega" v={f.entrega === 'DELIVERY' ? `Delivery · ${[f.direccion, f.distrito.trim()].filter(Boolean).join(', ')} · ${tarifa ? soles(tarifa.costo) : 'costo a coordinar'}` : 'Recojo en el vivero'} />}
                 </dl>
                 {!modoServicio && (
                   <table className="w-full text-sm border-t border-slate-200">
@@ -246,7 +262,10 @@ export default function Cotizar() {
                         <tr key={l.sku}><td className="px-5 py-2">{l.p.nombre}{l.cantidad > l.p.stock && <span className="block text-[11px] font-bold text-amber-800">Con asesor: hay {l.p.stock}</span>}</td><td className="text-right px-2">{l.cantidad}</td><td className="text-right px-5 font-semibold">{soles(l.cantidad * l.p.precio)}</td></tr>
                       ))}
                     </tbody>
-                    <tfoot><tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial (IGV incluido)</td><td className="text-right px-5 font-extrabold text-lg">{soles(total)}</td></tr></tfoot>
+                    <tfoot>
+                      {tarifa && <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Delivery a {tarifa.distrito}</td><td className="text-right px-5 font-semibold">{soles(tarifa.costo)}</td></tr>}
+                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial (IGV incluido)</td><td className="text-right px-5 font-extrabold text-lg">{soles(totalConDelivery)}</td></tr>
+                    </tfoot>
                   </table>
                 )}
                 {f.mensaje.trim() && <p className="px-5 py-3 border-t border-slate-200 text-sm text-slate-600 italic">“{f.mensaje.trim()}”</p>}
@@ -279,8 +298,8 @@ export default function Cotizar() {
           ) : (
             <>
               <p className="flex justify-between"><span className="text-slate-600">{lineas.length} producto(s)</span><span className="font-bold">{soles(total)}</span></p>
-              <p className="flex justify-between"><span className="text-slate-600">Delivery</span><span className="font-bold">{f.entrega === 'DELIVERY' ? 'A coordinar' : '—'}</span></p>
-              <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(total)}</span></p>
+              <p className="flex justify-between"><span className="text-slate-600">Delivery</span><span className="font-bold">{f.entrega !== 'DELIVERY' ? '—' : tarifa ? soles(tarifa.costo) : 'A coordinar'}</span></p>
+              <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(totalConDelivery)}</span></p>
               {hayAsesor && <p className="p-2.5 rounded-xl bg-amber-50 text-amber-900 text-xs font-semibold">Parte de tu pedido supera el stock: un asesor de ventas lo coordina contigo.</p>}
             </>
           )}

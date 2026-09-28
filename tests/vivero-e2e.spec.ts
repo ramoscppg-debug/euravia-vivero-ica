@@ -111,7 +111,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
 
   test('5. Inventory & Warehouse Purchases (Kardex + SIRE RCE)', async ({ page }) => {
     await page.click('button:has-text("Ingreso a almacén")');
-    await expect(page.getByText('Registrar Compra Mayorista (Almacén)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Registrar compra a proveedor' })).toBeVisible();
 
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Ingreso registrado con éxito');
@@ -702,6 +702,59 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('39. Una factura de compra con varios productos suma stock a cada uno', async ({ page }) => {
+    await ir(page, 'catalogo');
+    await page.click('button:has-text("Ingreso a almacén")');
+    const m = page.locator('.fixed');
+    await m.getByLabel('Número de factura').fill('F001-555');
+    await m.getByLabel('Producto de la línea 1').selectOption('AUR-001');
+    await m.getByLabel('Cantidad de la línea 1').fill('5');
+    await m.getByRole('button', { name: '+ Agregar otro producto' }).click();
+    await m.getByLabel('Producto de la línea 2').selectOption('MAC-001');
+    await m.getByLabel('Cantidad de la línea 2').fill('10');
+    await m.getByLabel('Costo unitario de la línea 2').fill('20');
+    page.once('dialog', d => d.accept());
+    await m.getByRole('button', { name: 'Registrar e Incrementar Stock' }).click();
+    await expect(page.getByRole('article').filter({ hasText: 'Monstera Deliciosa' }).getByText('33 u.')).toBeVisible(); // 28 + 5
+    await expect(page.getByRole('article').filter({ hasText: 'Maceta Cerámica' }).getByText('34 u.')).toBeVisible(); // 24 + 10
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('40. Conteo físico: plantas con plaga salen como merma y el sobrante como ajuste', async ({ page }) => {
+    await ir(page, 'conteo');
+    await page.getByLabel('Contado de Monstera Deliciosa').fill('25');
+    await page.getByLabel('Motivo de Monstera Deliciosa').selectOption('PLAGA');
+    await page.getByLabel('Contado de Sansevieria Laurentii').fill('36');
+    page.once('dialog', d => d.accept());
+    await page.getByRole('button', { name: 'Aplicar conteo' }).click();
+    await expect(page.getByText('✓ Conteo aplicado: 1 baja(s) por merma y 1 ajuste(s) de inventario.')).toBeVisible();
+    await ir(page, 'bajas');
+    await expect(page.getByText(/plaga o enfermedad/i).first()).toBeVisible();
+    await ir(page, 'catalogo');
+    await expect(page.getByRole('article').filter({ hasText: 'Monstera Deliciosa' }).getByText('25 u.')).toBeVisible();
+    await expect(page.getByRole('article').filter({ hasText: 'Sansevieria' }).getByText('36 u.')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('41. Pago confirmado a mano con N° de operación; avisos no se activan sin clave', async ({ page }) => {
+    await ir(page, 'pedidos');
+    const tarjeta = page.getByRole('article', { name: /Pedido PED-2026-000101/ });
+    await tarjeta.locator('button:has-text("Cobrar")').click();
+    await expect(page.getByRole('heading', { name: /Confirmar pago del pedido/ })).toBeVisible();
+    await page.getByLabel('N° de operación 1').fill('00123456');
+    await page.locator('.fixed button:has-text("Cobrar y emitir")').click();
+    await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await expect(page.getByText(/Yape \(op\. 00123456\)/)).toBeVisible();
+
+    await ir(page, 'configuracion');
+    await page.getByLabel('WhatsApp para avisos').fill('+51 987 111 222');
+    await page.getByText('Enviarme un aviso por cada pedido web').click();
+    await page.getByRole('button', { name: 'Guardar avisos' }).click();
+    await expect(page.getByText(/indica tu WhatsApp y la clave \(apikey\) de CallMeBot/)).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();
@@ -869,5 +922,35 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     await page.getByRole('button', { name: 'Contabilidad' }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Ingresos, egresos y por emitir' })).toBeVisible();
     await ctx.close();
+  });
+  test('T8. Delivery por distrito: el cliente ve la tarifa y el pedido llega con ese costo', async ({ page }) => {
+    await page.goto('/#configuracion');
+    await page.getByLabel('Distrito nuevo', { exact: true }).fill('Parcona');
+    await page.getByLabel('Costo del distrito nuevo').fill('12');
+    await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+    await expect(page.getByLabel('Costo de delivery a Parcona')).toHaveValue('12');
+
+    await page.goto('/tienda/producto/AUR-002');
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirmar pedido' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByLabel('Nombre *').fill('Rosa Quispe');
+    await page.getByLabel('WhatsApp *').fill('956333444');
+    await page.getByRole('button', { name: /Delivery/ }).click();
+    await page.getByLabel('Dirección *').fill('Jr. Grau 456');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByRole('alert')).toHaveText('Elige tu distrito para calcular el delivery.');
+    await page.getByLabel('Distrito *').selectOption('Parcona');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByText('S/ 60.00').last()).toBeVisible(); // 48 + 12 de delivery
+    await page.getByRole('button', { name: 'Confirmar pedido' }).click();
+    await expect(page.getByText('¡Pedido registrado!')).toBeVisible();
+
+    await page.goto('/#solicitudes');
+    const sol = page.getByRole('article').filter({ hasText: 'Rosa Quispe' });
+    await expect(sol.getByText(/Parcona · S\/ 12\.00/)).toBeVisible();
+    await sol.getByRole('button', { name: 'Crear pedido' }).click();
+    await expect(page.locator('.fixed').getByLabel('Costo de delivery')).toHaveValue('12');
+    expect(errores).toHaveLength(0);
   });
 });

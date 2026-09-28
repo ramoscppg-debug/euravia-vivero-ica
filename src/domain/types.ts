@@ -247,6 +247,7 @@ export type MedioPago = (typeof MEDIOS_PAGO)[number];
 export interface Pago {
   medio: MedioPago;
   monto: number;
+  operacion?: string; // N° de operación de Yape/Plin/transferencia, confirmado a mano por ventas
 }
 
 export interface LineaCarrito {
@@ -381,6 +382,21 @@ export interface ConfigTienda {
   mensajePortada?: string;
 }
 
+/** Tarifa fija de delivery por distrito (la tienda la muestra y el servidor la aplica). */
+export interface TarifaDelivery {
+  distrito: string;
+  costo: number;
+  activo: boolean;
+}
+
+/** Aviso al WhatsApp del dueño cuando llega un pedido web (CallMeBot). */
+export interface AvisosWhatsapp {
+  whatsapp?: string;
+  apikey?: string;
+  activo: boolean;
+  ultimoEnvio?: string;
+}
+
 export interface SolicitudTienda {
   id: string;
   tipo: 'PEDIDO' | 'SERVICIO' | 'CONSULTA';
@@ -398,6 +414,7 @@ export interface SolicitudTienda {
   entrega: 'RECOJO' | 'DELIVERY';
   direccion?: string;
   requiereAsesor: boolean; // pidió más cantidad que el stock
+  costoDelivery?: number; // tarifa del distrito; vacío = a coordinar
   estado: 'NUEVA' | 'EN_PROCESO' | 'ATENDIDA' | 'DESCARTADA';
   pedidoId?: string;
   createdAt: string;

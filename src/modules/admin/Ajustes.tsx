@@ -5,6 +5,7 @@ import type { EmpresaConfig } from '../../domain/types';
 import { useErp } from '../../store/ErpStore';
 import Usuarios from './Usuarios';
 import TiendaAjustes from './TiendaAjustes';
+import { AvisosPedidos, TarifasDelivery } from './AvisosDelivery';
 
 export default function Ajustes() {
   const { state, actions, nube } = useErp();
@@ -151,6 +152,8 @@ export default function Ajustes() {
       </form>
 
       <TiendaAjustes />
+      <AvisosPedidos />
+      <TarifasDelivery />
 
       {nube && <Usuarios />}
     </div>

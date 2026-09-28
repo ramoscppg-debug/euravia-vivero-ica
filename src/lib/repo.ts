@@ -20,6 +20,8 @@ import type {
   ConfigTienda,
   ServicioPublico,
   SolicitudTienda,
+  TarifaDelivery,
+  AvisosWhatsapp,
   Contrato,
   Cotizacion,
   Cupon,
@@ -89,11 +91,13 @@ export interface DatosNube {
   tiendaConfig: ConfigTienda;
   serviciosPublicos: ServicioPublico[];
   gastosCaja: GastoCaja[];
+  tarifasDelivery: TarifaDelivery[];
+  avisos: AvisosWhatsapp;
 }
 
 export async function cargarTodo(): Promise<DatosNube> {
   const sb = await db();
-  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos, solicitudes, tiendaCfg, serviciosTienda, gastos] = await Promise.all([
+  const [empresa, productos, kardex, comprobantes, compras, bajas, detracciones, clientes, servicios, guias, caja, pedidos, notas, tareas, cotizaciones, cupones, contratos, puntos, solicitudes, tiendaCfg, serviciosTienda, gastos, tarifas, avisos] = await Promise.all([
     sb.from('empresa_config').select('*').limit(1).maybeSingle(),
     sb.from('productos').select('*').eq('activo', true).order('sku'),
     sb.from('kardex_movimientos').select('*').order('id', { ascending: false }).limit(500),
@@ -117,7 +121,9 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('servicios_publicos').select('*').order('orden'),
     // Gastos de caja chica de los últimos 13 meses (las devoluciones ya cuentan como notas de crédito)
     sb.from('caja_movimientos').select('id, fecha, concepto, monto, responsable').eq('tipo', 'EGRESO').is('comprobante_id', null)
-      .gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString()).order('fecha', { ascending: false }).limit(2000)
+      .gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString()).order('fecha', { ascending: false }).limit(2000),
+    sb.from('tarifas_delivery').select('*').order('distrito'),
+    sb.from('notificaciones_config').select('whatsapp, apikey, activo, ultimo_envio').eq('id', 1).maybeSingle() // sólo el dueño la ve (RLS)
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -149,6 +155,8 @@ export async function cargarTodo(): Promise<DatosNube> {
     tiendaConfig: configTiendaDesdeFila(ok<Row | null>(tiendaCfg)),
     serviciosPublicos: ok<Row[]>(serviciosTienda).map(servicioPublicoDesdeFila),
     gastosCaja: ok<Row[]>(gastos).map(r => ({ id: String(r.id), fecha: hoyLima(r.fecha), motivo: r.concepto ?? '', monto: num(r.monto), responsable: r.responsable ?? '' })),
+    tarifasDelivery: ok<Row[]>(tarifas).map(tarifaDesdeFila),
+    avisos: avisosDesdeFila(ok<Row | null>(avisos)),
   };
 }
 
@@ -445,6 +453,7 @@ function solicitudDesdeFila(r: Row): SolicitudTienda {
     mensaje: r.mensaje ?? undefined, servicioSlug: r.servicio_slug ?? undefined, items: r.items ?? [], totalReferencial: num(r.total_referencial),
     estado: r.estado, pedidoId: r.pedido_id ?? undefined, createdAt: r.created_at,
     comprobante: r.comprobante ?? 'BOLETA', docCliente: r.doc_cliente ?? undefined, razonSocial: r.razon_social ?? undefined,
+    costoDelivery: r.costo_delivery != null ? num(r.costo_delivery) : undefined,
     entrega: r.entrega ?? 'RECOJO', direccion: r.direccion ?? undefined, requiereAsesor: !!r.requiere_asesor
   };
 }
@@ -948,6 +957,32 @@ export async function guardarServicioPublico(sv: ServicioPublico) {
     slug: sv.slug, nombre: sv.nombre, resumen: sv.resumen, descripcion: sv.descripcion || null, imagen_url: sv.imagen || null,
     orden: sv.orden, visible: sv.visible, precio_desde: sv.precioDesde ?? null, updated_at: new Date().toISOString()
   }, { onConflict: 'slug' }));
+}
+
+export const tarifaDesdeFila = (r: Row): TarifaDelivery => ({ distrito: r.distrito, costo: num(r.costo), activo: !!r.activo });
+const avisosDesdeFila = (r: Row | null): AvisosWhatsapp =>
+  r ? { whatsapp: r.whatsapp ?? undefined, apikey: r.apikey ?? undefined, activo: !!r.activo, ultimoEnvio: r.ultimo_envio ?? undefined } : { activo: false };
+
+export async function guardarAvisos(a: AvisosWhatsapp) {
+  const sb = await db();
+  ok(await sb.from('notificaciones_config').update({
+    whatsapp: a.whatsapp || null, apikey: a.apikey || null, activo: a.activo, url_panel: window.location.origin, updated_at: new Date().toISOString()
+  }).eq('id', 1));
+}
+
+export async function probarAviso(): Promise<boolean> {
+  const sb = await db();
+  return ok<boolean>(await sb.rpc('probar_aviso_whatsapp'));
+}
+
+export async function guardarTarifa(t: TarifaDelivery) {
+  const sb = await db();
+  ok(await sb.from('tarifas_delivery').upsert({ distrito: t.distrito, costo: t.costo, activo: t.activo, updated_at: new Date().toISOString() }, { onConflict: 'distrito' }));
+}
+
+export async function eliminarTarifa(distrito: string) {
+  const sb = await db();
+  ok(await sb.from('tarifas_delivery').delete().eq('distrito', distrito));
 }
 
 /** Quita un servicio de la tienda (las solicitudes antiguas conservan el texto del servicio). */

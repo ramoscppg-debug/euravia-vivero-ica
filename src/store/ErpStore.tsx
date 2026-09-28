@@ -13,6 +13,8 @@ import type {
   CashRegisterState,
   CatalogProduct,
   GastoCaja,
+  TarifaDelivery,
+  AvisosWhatsapp,
   ComprobanteSunat,
   CrmClient,
   DetraccionRecord,
@@ -83,6 +85,8 @@ export interface ErpState {
   tiendaConfig: ConfigTienda;
   serviciosPublicos: ServicioPublico[];
   gastosCaja: GastoCaja[]; // gastos de caja chica de todos los días (el arqueo usa sólo los de hoy)
+  tarifasDelivery: TarifaDelivery[];
+  avisos: AvisosWhatsapp; // sólo el dueño la carga
 }
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -173,10 +177,19 @@ export interface CompraInput {
   ruc: string;
   proveedor: string;
   numeroFactura: string;
-  sku: string;
-  qty: number;
-  costoUnitario: number;
+  items: { sku: string; qty: number; costoUnitario: number }[]; // una factura puede traer varios productos
 }
+
+/** Resultado del conteo físico de un producto; la diferencia se registra con su motivo. */
+export interface LineaConteo {
+  sku: string;
+  contado: number;
+  motivo: MotivoConteo;
+}
+export type MotivoConteo = 'MURIO' | 'PLAGA' | 'CUARENTENA' | 'DANADA' | 'FALTANTE' | 'SOBRANTE';
+export const MOTIVOS_CONTEO: Record<MotivoConteo, string> = {
+  MURIO: 'Murió o se secó', PLAGA: 'Plaga o enfermedad', CUARENTENA: 'Aislada en cuarentena', DANADA: 'Rota o dañada', FALTANTE: 'Faltante sin explicación', SOBRANTE: 'Sobrante (error de registro)'
+};
 
 export interface BajaInput {
   sku: string;
@@ -208,6 +221,9 @@ export interface ProyectoInput {
 const PROJECT_FLOW: ProjectStatus[] = ['COTIZADO', 'APROBADO', 'EN_EJECUCION', 'CONCLUIDO'];
 
 const today = () => hoyLocal();
+/** "Yape (op. 123) + Efectivo": cómo se pagó, tal como lo confirmó ventas. */
+export const textoPagos = (pagos: Pago[]) => pagos.filter(p => p.monto > 0).map(p => `${p.medio}${p.operacion ? ` (op. ${p.operacion})` : ''}`).join(' + ');
+
 /** Id corto y único entre cajas: prefijo-año-sufijo base36 del reloj. */
 const nuevoId = (prefijo: string) => `${prefijo}-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
@@ -238,7 +254,9 @@ function nubeVacia(): ErpState {
     solicitudes: [],
     tiendaConfig: {},
     serviciosPublicos: [],
-    gastosCaja: []
+    gastosCaja: [],
+    tarifasDelivery: [],
+    avisos: { activo: false }
   };
 }
 
@@ -1048,7 +1066,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         commit({
           ...r.next,
           pedidos: r.next.pedidos.map(p => (p.id === pedido.id
-            ? { ...p, estado: 'pagado', comprobanteId: r.invoice.id, metodoPago: r.invoice.pagos?.map(x => x.medio).join(' + '), guiaId: r.guia?.id ?? p.guiaId }
+            ? { ...p, estado: 'pagado', comprobanteId: r.invoice.id, metodoPago: textoPagos(c.pagos), guiaId: r.guia?.id ?? p.guiaId }
             : p))
         });
         return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
@@ -1232,28 +1250,120 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       },
 
       // ---------------- INVENTARIO ----------------
-      async registrarCompra(c: CompraInput): Promise<Result<{ igv: number; productName: string }>> {
+      async registrarCompra(c: CompraInput): Promise<Result<{ igv: number; productName: string; unidades: number }>> {
         const s = get();
-        const prod = s.products.find(p => p.sku === c.sku);
-        if (!prod) return { ok: false, error: 'Producto no encontrado.' };
+        const items = c.items.filter(it => it.sku);
+        if (!items.length) return { ok: false, error: 'Agrega al menos un producto a la compra.' };
         // El crédito fiscal (RCE / SIRE) sólo procede con un RUC de proveedor válido
         if (!validarRuc(c.ruc)) {
           return { ok: false, error: '⚠️ El RUC del proveedor no es válido (11 dígitos, módulo 11). Sin RUC válido la compra no genera crédito fiscal en el RCE.' };
         }
-        if (!(c.qty > 0) || !(c.costoUnitario > 0)) return { ok: false, error: 'La cantidad y el costo unitario deben ser mayores a cero.' };
+        if (!c.numeroFactura.trim()) return { ok: false, error: 'Indica el número de la factura del proveedor.' };
+        for (const it of items) {
+          if (!s.products.some(p => p.sku === it.sku)) return { ok: false, error: `Producto ${it.sku} no encontrado.` };
+          if (!(it.qty > 0) || !(it.costoUnitario > 0)) return { ok: false, error: 'Cada línea necesita cantidad y costo unitario mayores a cero.' };
+        }
+        if (new Set(items.map(it => it.sku)).size !== items.length) return { ok: false, error: 'Un producto está repetido en la compra: suma sus cantidades en una sola línea.' };
         if (s.purchases.some(p => p.id === c.numeroFactura.trim() && p.ruc === c.ruc)) {
           return { ok: false, error: `⚠️ La factura ${c.numeroFactura} de este proveedor ya está registrada.` };
         }
-        const gravada = c.qty * c.costoUnitario;
+        const nombre = (sku: string) => s.products.find(p => p.sku === sku)!.name;
+        const gravada = round2(items.reduce((a, it) => a + it.qty * it.costoUnitario, 0));
         const igv = round2(gravada * 0.18);
-        const compra: Purchase = { id: c.numeroFactura, proveedor: c.proveedor, ruc: c.ruc, fecha: today(), gravada, igv, total: gravada + igv, items: `${c.qty}x ${prod.name}` };
+        const compra: Purchase = {
+          id: c.numeroFactura.trim(), proveedor: c.proveedor, ruc: c.ruc, fecha: today(), gravada, igv, total: round2(gravada + igv),
+          items: items.map(it => `${it.qty}x ${nombre(it.sku)}`).join(', ')
+        };
         try {
           if (nube) await repo.guardarCompra(compra); // primero: rechaza facturas duplicadas antes de mover stock
-          const next = await moverInventario([
-            { sku: c.sku, qtyIn: c.qty, qtyOut: 0, type: 'Compra Proveedor', doc: c.numeroFactura, user: responsable('Almacén Aurevia'), unitCost: c.costoUnitario }
-          ]);
+          const next = await moverInventario(items.map(it => (
+            { sku: it.sku, qtyIn: it.qty, qtyOut: 0, type: 'Compra Proveedor' as const, doc: compra.id, user: responsable('Almacén Aurevia'), unitCost: it.costoUnitario }
+          )));
           commit({ ...next, purchases: [compra, ...next.purchases] });
-          return { ok: true, igv, productName: prod.name };
+          return { ok: true, igv, productName: items.length === 1 ? nombre(items[0].sku) : `${items.length} productos`, unidades: items.reduce((a, it) => a + it.qty, 0) };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /**
+       * Conteo físico: lo contado manda. Una planta muerta, con plaga o dañada sale como baja (merma valorizada);
+       * un faltante o sobrante sin explicación se registra como ajuste de inventario.
+       */
+      async aplicarConteo(lineas: LineaConteo[]): Promise<Result<{ ajustes: number; bajas: number }>> {
+        let ajustes = 0;
+        let bajas = 0;
+        const doc = `CONTEO-${today()}`;
+        const TIPO_BAJA: Partial<Record<MotivoConteo, BiologicalLoss['type']>> = { MURIO: 'MERMA_NATURAL', PLAGA: 'DESMEDRO_PLAGA', CUARENTENA: 'CUARENTENA_FITOSANITARIA', DANADA: 'ROTURA_MECANICA' };
+        for (const l of lineas) {
+          const prod = get().products.find(p => p.sku === l.sku);
+          if (!prod || !Number.isInteger(l.contado) || l.contado < 0) continue;
+          const dif = l.contado - prod.stock;
+          if (dif === 0) continue;
+          const tipoBaja = TIPO_BAJA[l.motivo];
+          if (dif < 0 && tipoBaja) {
+            const r = await acciones.registrarBaja({ sku: l.sku, type: tipoBaja, qty: -dif, reason: `Conteo físico ${today()}: ${MOTIVOS_CONTEO[l.motivo].toLowerCase()}` });
+            if (!r.ok) return { ok: false, error: `${prod.name}: ${r.error}` };
+            bajas++;
+          } else {
+            try {
+              commit(await moverInventario([{ sku: l.sku, qtyIn: Math.max(0, dif), qtyOut: Math.max(0, -dif), type: 'Ajuste Inventario', doc, user: responsable('Almacén Aurevia'), unitCost: prod.cost }]));
+              ajustes++;
+            } catch (e) {
+              return { ok: false, error: `${prod.name}: ${errorNube(e)}` };
+            }
+          }
+        }
+        return { ok: true, ajustes, bajas };
+      },
+
+      // ---------------- DELIVERY Y AVISOS ----------------
+      async guardarTarifa(t: TarifaDelivery): Promise<Result> {
+        const distrito = t.distrito.trim().replace(/\s+/g, ' ');
+        if (distrito.length < 2) return { ok: false, error: 'Escribe el distrito.' };
+        if (!(t.costo >= 0)) return { ok: false, error: 'El costo no puede ser negativo.' };
+        const tarifa = { ...t, distrito };
+        try {
+          if (nube) await repo.guardarTarifa(tarifa);
+          const s = get();
+          const otras = s.tarifasDelivery.filter(x => x.distrito.toLowerCase() !== distrito.toLowerCase());
+          commit({ ...s, tarifasDelivery: [...otras, tarifa].sort((a, b) => a.distrito.localeCompare(b.distrito)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async eliminarTarifa(distrito: string): Promise<Result> {
+        try {
+          if (nube) await repo.eliminarTarifa(distrito);
+          const s = get();
+          commit({ ...s, tarifasDelivery: s.tarifasDelivery.filter(x => x.distrito !== distrito) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async guardarAvisos(a: AvisosWhatsapp): Promise<Result> {
+        const whatsapp = a.whatsapp?.replace(/[^0-9+]/g, '') || undefined;
+        if (whatsapp && !/^\+?[0-9]{8,15}$/.test(whatsapp)) return { ok: false, error: 'El WhatsApp debe tener código de país, ej. +51 9XX XXX XXX.' };
+        if (a.activo && (!whatsapp || !a.apikey?.trim())) return { ok: false, error: 'Para activar los avisos indica tu WhatsApp y la clave (apikey) de CallMeBot.' };
+        const avisos = { ...a, whatsapp, apikey: a.apikey?.trim() || undefined };
+        try {
+          if (nube) await repo.guardarAvisos(avisos);
+          commit({ ...get(), avisos });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async probarAviso(): Promise<Result> {
+        if (!nube) return { ok: false, error: 'Los avisos por WhatsApp funcionan con la base en la nube (no en el modo demo).' };
+        try {
+          const enviado = await repo.probarAviso();
+          return enviado ? { ok: true } : { ok: false, error: 'No se envió: revisa que los avisos estén activos y guardados con tu número y clave.' };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }
