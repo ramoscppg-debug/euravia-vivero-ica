@@ -185,12 +185,11 @@ export default function Cotizar() {
               <fieldset className="space-y-3">
                 <legend className="text-sm font-bold text-slate-700 mb-2">¿Qué comprobante necesitas? *</legend>
                 <div className={`grid gap-3 ${modoServicio ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'}`}>
-                  {modoServicio && <Opcion activa={f.comprobante === 'RXH'} onClick={() => set({ comprobante: 'RXH' })} titulo="Recibo por honorarios" detalle="Lo emite el jardinero · sin IGV" icono={<FileText className="w-5 h-5" aria-hidden />} />}
-                  <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle={modoServicio ? 'La emite AUREVIA · + IGV 18%' : 'Persona natural (DNI) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
-                  <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle={modoServicio ? 'La emite AUREVIA · + IGV 18%' : 'Empresa o negocio (RUC) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
+                  {modoServicio && <Opcion activa={f.comprobante === 'RXH'} onClick={() => set({ comprobante: 'RXH' })} titulo="Recibo por honorarios" icono={<FileText className="w-5 h-5" aria-hidden />} />}
+                  <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle={modoServicio ? undefined : 'Persona natural (DNI) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
+                  <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle={modoServicio ? undefined : 'Empresa o negocio (RUC) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                 </div>
                 {!modoServicio && <p className="text-xs text-amber-900 font-semibold">{AVISO_IGV}</p>}
-                {modoServicio && f.comprobante !== 'RXH' && <p className="text-xs text-amber-900 font-semibold">Con boleta o factura, al precio del servicio se le suma el 18% de IGV.</p>}
                 {f.comprobante !== 'FACTURA' ? (
                   <label className="block text-sm font-bold text-slate-700">DNI (opcional)
                     <input inputMode="numeric" value={f.doc} onChange={e => set({ doc: e.target.value.replace(/\D/g, '').slice(0, 8) })} className={`${campo} mt-1 font-mono`} placeholder="8 dígitos" />
@@ -336,12 +335,12 @@ function Pasos({ pasos, actual }: { pasos: string[]; actual: number }) {
   );
 }
 
-function Opcion({ activa, onClick, titulo, detalle, icono }: { activa: boolean; onClick: () => void; titulo: string; detalle: string; icono: ReactNode }) {
+function Opcion({ activa, onClick, titulo, detalle, icono }: { activa: boolean; onClick: () => void; titulo: string; detalle?: string; icono: ReactNode }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={activa}
       className={`text-left p-4 rounded-2xl border-2 transition-colors flex gap-3 items-start ${activa ? 'border-hoja-600 bg-hoja-50' : 'border-slate-200 hover:border-slate-300'}`}>
       <span className={activa ? 'text-hoja-700' : 'text-slate-400'}>{icono}</span>
-      <span><span className="block font-extrabold text-slate-900">{titulo}</span><span className="block text-xs text-slate-600">{detalle}</span></span>
+      <span><span className="block font-extrabold text-slate-900">{titulo}</span>{detalle && <span className="block text-xs text-slate-600">{detalle}</span>}</span>
     </button>
   );
 }

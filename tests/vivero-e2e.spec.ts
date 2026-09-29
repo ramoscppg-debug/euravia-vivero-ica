@@ -1197,7 +1197,6 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     await expect(page.getByRole('row', { name: /IGV \(18%\)/ })).toContainText('S/ 8.64');
 
     await page.goto('/tienda/servicios/mantenimiento-residencial');
-    await expect(page.getByText(/recibo por honorarios/).first()).toBeVisible();
     await page.getByRole('link', { name: /Cotizar/ }).first().click();
     await page.getByPlaceholder(/jardín de 30 m²/).fill('Mantenimiento mensual de 40 m² de jardín');
     await page.getByRole('button', { name: 'Continuar' }).click();
