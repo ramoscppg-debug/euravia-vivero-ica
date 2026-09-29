@@ -17,6 +17,7 @@ interface Formulario {
   telefono: string;
   email: string;
   comprobante: SolicitudTienda['comprobante'];
+  tipoDoc: 'DNI' | 'RUC'; // recibo por honorarios o boleta: persona natural o empresa
   doc: string;
   razonSocial: string;
   entrega: SolicitudTienda['entrega'];
@@ -25,7 +26,7 @@ interface Formulario {
   mensaje: string;
 }
 
-const VACIO: Formulario = { nombre: '', telefono: '', email: '', comprobante: 'BOLETA', doc: '', razonSocial: '', entrega: 'RECOJO', direccion: '', distrito: '', mensaje: '' };
+const VACIO: Formulario = { nombre: '', telefono: '', email: '', comprobante: 'BOLETA', tipoDoc: 'DNI', doc: '', razonSocial: '', entrega: 'RECOJO', direccion: '', distrito: '', mensaje: '' };
 const CLAVE_DATOS = 'aurevia.cliente.v1'; // se recuerdan nombre y teléfono en este navegador para la próxima vez
 
 function leerDatos(): Formulario {
@@ -64,7 +65,7 @@ export default function Cotizar() {
     tipo: modoServicio ? 'SERVICIO' : 'PEDIDO',
     servicio: servicio?.slug,
     nombre: f.nombre, telefono: f.telefono, email: f.email || undefined,
-    comprobante: f.comprobante, doc: f.doc, razonSocial: f.comprobante === 'FACTURA' ? f.razonSocial : undefined,
+    comprobante: f.comprobante, doc: f.doc, razonSocial: f.comprobante === 'FACTURA' || f.tipoDoc === 'RUC' ? f.razonSocial : undefined,
     entrega: modoServicio ? 'RECOJO' : f.entrega, direccion: modoServicio || f.entrega === 'DELIVERY' ? f.direccion : undefined,
     distrito: f.distrito.trim(), mensaje: f.mensaje,
     items: modoServicio ? [] : lineas.map(l => ({ sku: l.sku, cantidad: l.cantidad }))
@@ -191,9 +192,30 @@ export default function Cotizar() {
                 </div>
                 {!modoServicio && <p className="text-xs text-amber-900 font-semibold">{AVISO_IGV}</p>}
                 {f.comprobante !== 'FACTURA' ? (
-                  <label className="block text-sm font-bold text-slate-700">DNI (opcional)
-                    <input inputMode="numeric" value={f.doc} onChange={e => set({ doc: e.target.value.replace(/\D/g, '').slice(0, 8) })} className={`${campo} mt-1 font-mono`} placeholder="8 dígitos" />
-                  </label>
+                  <div className="space-y-3">
+                    <div role="group" aria-label="Tipo de documento" className="inline-flex rounded-full border border-slate-300 p-1">
+                      {(['DNI', 'RUC'] as const).map(t => (
+                        <button key={t} type="button" aria-pressed={f.tipoDoc === t} onClick={() => set({ tipoDoc: t, doc: '', razonSocial: '' })}
+                          className={`min-h-[40px] px-5 rounded-full text-sm font-bold ${f.tipoDoc === t ? 'bg-hoja-700 text-white' : 'text-slate-600'}`}>
+                          {t === 'DNI' ? 'DNI · persona' : 'RUC · empresa'}
+                        </button>
+                      ))}
+                    </div>
+                    {f.tipoDoc === 'DNI' ? (
+                      <label className="block text-sm font-bold text-slate-700">DNI (opcional)
+                        <input inputMode="numeric" value={f.doc} onChange={e => set({ doc: e.target.value.replace(/\D/g, '').slice(0, 8) })} className={`${campo} mt-1 font-mono`} placeholder="8 dígitos" />
+                      </label>
+                    ) : (
+                      <div className="grid sm:grid-cols-[180px_1fr] gap-3">
+                        <label className="block text-sm font-bold text-slate-700">RUC (opcional)
+                          <input inputMode="numeric" value={f.doc} onChange={e => set({ doc: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={`${campo} mt-1 font-mono`} placeholder="11 dígitos" />
+                        </label>
+                        <label className="block text-sm font-bold text-slate-700">Razón social (opcional)
+                          <input value={f.razonSocial} onChange={e => set({ razonSocial: e.target.value })} maxLength={150} className={`${campo} mt-1`} />
+                        </label>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="grid sm:grid-cols-[180px_1fr] gap-3">
                     <label className="block text-sm font-bold text-slate-700">RUC *
@@ -256,7 +278,7 @@ export default function Cotizar() {
                 <dl className="px-5 py-4 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                   <Dato t="Cliente" v={f.nombre} />
                   <Dato t="WhatsApp" v={f.telefono} />
-                  {f.comprobante === 'FACTURA' ? <><Dato t="RUC" v={f.doc} /><Dato t="Razón social" v={f.razonSocial} /></> : f.doc ? <Dato t="DNI" v={f.doc} /> : null}
+                  {f.comprobante === 'FACTURA' || (f.doc.length === 11 && f.razonSocial.trim()) ? <><Dato t="RUC" v={f.doc} /><Dato t="Razón social" v={f.razonSocial} /></> : f.doc ? <Dato t={f.doc.length === 11 ? 'RUC' : 'DNI'} v={f.doc} /> : null}
                   {modoServicio ? <Dato t="Servicio" v={servicio?.nombre ?? ''} /> : <Dato t="Entrega" v={f.entrega === 'DELIVERY' ? `Delivery · ${[f.direccion, f.distrito.trim()].filter(Boolean).join(', ')} · ${tarifa ? soles(tarifa.costo) : 'costo a coordinar'}` : 'Recojo en el vivero'} />}
                 </dl>
                 {!modoServicio && (

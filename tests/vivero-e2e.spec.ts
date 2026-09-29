@@ -1203,8 +1203,13 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     await expect(page.getByRole('button', { name: /Recibo por honorarios/ })).toBeVisible();
     await page.getByLabel('Nombre *').fill('Carlos Ramos');
     await page.getByLabel('WhatsApp *').fill('956111223');
+    // Lo puede contratar una persona (DNI) o una empresa (RUC)
+    await page.getByRole('button', { name: 'RUC · empresa' }).click();
+    await page.getByLabel('RUC (opcional)').fill('20100070970');
+    await page.getByLabel('Razón social (opcional)').fill('Condominio Los Álamos SAC');
     await page.getByRole('button', { name: 'Continuar' }).click();
     await expect(page.getByText('Recibo por honorarios', { exact: true })).toBeVisible();
+    await expect(page.getByText('Condominio Los Álamos SAC')).toBeVisible();
     await page.getByRole('button', { name: 'Confirmar solicitud' }).click();
     await expect(page.getByText(/registrad/).first()).toBeVisible();
     expect(errores).toHaveLength(0);

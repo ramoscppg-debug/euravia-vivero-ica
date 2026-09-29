@@ -138,8 +138,8 @@ export function validarSolicitud(s: NuevaSolicitud): string | null {
   if (s.comprobante === 'FACTURA') {
     if (!RUC_VALIDO.test(doc)) return 'Para factura indica un RUC válido de 11 dígitos.';
     if ((s.razonSocial ?? '').trim().length < 3) return 'Para factura indica la razón social.';
-  } else if (doc && !/^[0-9]{8}$/.test(doc)) {
-    return 'El DNI debe tener 8 dígitos.';
+  } else if (doc && !/^[0-9]{8}$/.test(doc) && !RUC_VALIDO.test(doc)) {
+    return doc.length > 8 ? 'El RUC debe tener 11 dígitos.' : 'El DNI debe tener 8 dígitos.';
   }
   if (s.entrega === 'DELIVERY' && (s.direccion ?? '').trim().length < 5) return 'Indica la dirección de entrega.';
   if (s.tipo === 'PEDIDO' && !s.items?.length) return 'Tu pedido no tiene productos.';
@@ -203,8 +203,8 @@ export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombr
     s.comprobante === 'FACTURA'
       ? `Comprobante: Factura · RUC ${doc} · ${s.razonSocial?.trim()}`
       : s.comprobante === 'RXH'
-        ? `Comprobante: Recibo por honorarios${doc ? ` · DNI ${doc}` : ''}`
-        : `Comprobante: Boleta${doc ? ` · DNI ${doc}` : ''}`,
+        ? `Comprobante: Recibo por honorarios${doc ? ` · ${doc.length === 11 ? 'RUC' : 'DNI'} ${doc}${s.razonSocial?.trim() ? ` · ${s.razonSocial.trim()}` : ''}` : ''}`
+        : `Comprobante: Boleta${doc ? ` · ${doc.length === 11 ? 'RUC' : 'DNI'} ${doc}${s.razonSocial?.trim() ? ` · ${s.razonSocial.trim()}` : ''}` : ''}`,
     servicio ? `Servicio: ${servicio}` : '',
     s.entrega === 'DELIVERY' ? `Entrega: delivery a ${[s.direccion, s.distrito].filter(Boolean).join(', ')} · ${delivery !== undefined ? soles(delivery) : 'costo a coordinar'}` : s.tipo === 'PEDIDO' ? 'Entrega: recojo en el vivero' : '',
     ...(lineas.length ? ['', ...lineas.map(l => `• ${l.cantidad} × ${l.nombre} (${soles(l.precio)} + IGV)${l.cantidad > l.stock ? ` — hay ${l.stock}, el resto lo coordina un asesor` : ''}`),
