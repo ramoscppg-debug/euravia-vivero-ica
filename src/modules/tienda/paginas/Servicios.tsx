@@ -59,7 +59,7 @@ export function ServicioDetalle({ slug }: { slug: string }) {
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">{s.nombre}</h1>
           <p className="text-lg text-slate-700">{s.resumen}</p>
           {s.precioDesde !== undefined && <p className="text-2xl font-extrabold text-slate-900">Desde {soles(s.precioDesde)} <span className="text-sm font-semibold text-slate-500">· precio final según tu espacio</span></p>}
-          <p className="text-sm text-slate-600 p-3 rounded-2xl bg-slate-50">El jardinero te entrega su <strong>recibo por honorarios</strong> por el servicio. Si necesitas <strong>factura</strong>, la emite AUREVIA y se suma el 18% de IGV al precio.</p>
+          <p className="text-sm text-slate-600 p-3 rounded-2xl bg-slate-50">Con <strong>recibo por honorarios</strong>, el servicio lo cobra directamente el jardinero (sin IGV). Si necesitas <strong>boleta o factura</strong>, la emite AUREVIA y se suma el 18% de IGV al precio.</p>
           {s.descripcion && <p className="text-slate-600 leading-relaxed whitespace-pre-line">{s.descripcion}</p>}
           <BotonCompartir titulo={s.nombre} />
         </div>

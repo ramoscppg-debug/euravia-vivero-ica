@@ -215,8 +215,8 @@ export interface Jardinero {
 
 /**
  * Servicio hecho por un jardinero.
- * RXH_CLIENTE: el jardinero cobra al cliente con su recibo por honorarios; la empresa le cobra la comisión (+ IGV).
- * FACTURA: la empresa factura al cliente (+ IGV) y el jardinero le emite su recibo por (valor − comisión).
+ * RXH_CLIENTE: el jardinero cobra al cliente con su recibo por honorarios; la empresa no cobra comisión.
+ * FACTURA / BOLETA: la empresa cobra al cliente (+ IGV) y el jardinero le emite su recibo por (valor − comisión).
  */
 export interface ServicioJardinero {
   id: string;
@@ -226,13 +226,13 @@ export interface ServicioJardinero {
   clienteNombre: string;
   clienteDoc?: string;
   valor: number; // precio acordado, sin IGV
-  modalidad: 'RXH_CLIENTE' | 'FACTURA';
+  modalidad: 'RXH_CLIENTE' | 'FACTURA' | 'BOLETA';
   comisionPct: number;
   comision: number;
   rxhSerie?: string;
   rxhNumero?: string;
-  comprobanteId?: string; // factura al cliente (FACTURA) o comprobante de la comisión (RXH_CLIENTE)
-  gastoId?: string; // recibo del jardinero a la empresa (FACTURA)
+  comprobanteId?: string; // factura o boleta de la empresa al cliente
+  gastoId?: string; // recibo del jardinero a la empresa (FACTURA / BOLETA)
 }
 
 export interface CashRegisterState {

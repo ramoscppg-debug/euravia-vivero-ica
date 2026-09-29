@@ -1478,8 +1478,11 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (p.descripcion.trim().length < 3) return { ok: false, error: 'Describe el servicio.' };
         if (p.clienteNombre.trim().length < 2) return { ok: false, error: 'Indica el cliente.' };
         if (p.modalidad === 'FACTURA' && !validarRuc(clienteDoc ?? '')) return { ok: false, error: 'Para factura indica el RUC válido del cliente.' };
-        if (p.modalidad === 'FACTURA' && !j.ruc) return { ok: false, error: 'El jardinero necesita RUC para emitir su recibo por honorarios a la empresa.' };
-        const pct = j.comisionPct ?? s.company.comisionJardineroPct;
+        if (p.modalidad === 'BOLETA' && clienteDoc && !validarDni(clienteDoc)) return { ok: false, error: 'Para boleta el DNI debe tener 8 dígitos.' };
+        const empresaCobra = p.modalidad !== 'RXH_CLIENTE';
+        if (empresaCobra && !j.ruc) return { ok: false, error: 'El jardinero necesita RUC para emitir su recibo por honorarios a la empresa.' };
+        // Con recibo por honorarios cobra el jardinero: la empresa no cobra comisión
+        const pct = empresaCobra ? j.comisionPct ?? s.company.comisionJardineroPct : 0;
         if (pct === undefined) return { ok: false, error: 'Configura el % de comisión de los jardineros en Ajustes.' };
         const datos = { ...p, valor, clienteDoc, descripcion: p.descripcion.trim(), clienteNombre: p.clienteNombre.trim() };
         try {
@@ -1498,33 +1501,22 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         }
       },
 
-      /**
-       * FACTURA: factura al cliente por el servicio (+ IGV).
-       * RXH_CLIENTE: comprobante al jardinero por la comisión (+ IGV).
-       * Queda por emitir en SUNAT como cualquier venta y va al RVIE.
-       */
+      /** Factura o boleta de la empresa al cliente por el servicio (+ IGV). Queda por emitir en SUNAT y va al RVIE. */
       async emitirComprobanteServicio(id: string, pagos: Pago[]): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number }>> {
         const s = get();
         const sv = s.serviciosJardinero.find(x => x.id === id);
         const j = sv && s.jardineros.find(x => x.id === sv.jardineroId);
         if (!sv || !j) return { ok: false, error: 'Servicio no encontrado.' };
         if (sv.comprobanteId) return { ok: false, error: `Este servicio ya tiene el comprobante ${sv.comprobanteId}.` };
-        const factura = sv.modalidad === 'FACTURA';
-        const monto = factura ? sv.valor : sv.comision;
-        if (!(monto > 0)) return { ok: false, error: 'La comisión es cero: no hay nada que cobrar.' };
-        const doc = factura ? sv.clienteDoc ?? '' : j.ruc ?? j.dni ?? '';
-        const precio = round2(conIgv(monto));
+        if (sv.modalidad === 'RXH_CLIENTE') return { ok: false, error: 'Con recibo por honorarios cobra el jardinero: la empresa no emite comprobante.' };
+        const precio = round2(conIgv(sv.valor));
         const r = await venderYGuardar({
-          lineas: [{
-            sku: factura ? 'SRV-JARDIN' : 'SRV-COMISION',
-            name: factura ? `Servicio de jardinería: ${sv.descripcion}` : `Comisión ${sv.comisionPct}% por servicio de jardinería: ${sv.descripcion} (${sv.clienteNombre})`,
-            qty: 1, precioUnitNeto: precio, esProducto: false
-          }],
+          lineas: [{ sku: 'SRV-JARDIN', name: `Servicio de jardinería: ${sv.descripcion}`, qty: 1, precioUnitNeto: precio, esProducto: false }],
           total: precio,
           descuentoTotal: 0,
-          tipoComprobante: validarRuc(doc) ? '01' : '03',
-          docIdentidad: doc,
-          clientName: factura ? sv.clienteNombre : j.nombre,
+          tipoComprobante: sv.modalidad === 'FACTURA' ? '01' : '03',
+          docIdentidad: sv.clienteDoc ?? '',
+          clientName: sv.clienteNombre,
           pagos,
           generarGre: false,
           canal: 'Servicios'
@@ -1542,7 +1534,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       },
 
       /**
-       * Recibo por honorarios del jardinero. En la modalidad FACTURA queda como gasto por pagar
+       * Recibo por honorarios del jardinero. Si cobró la empresa (factura o boleta) queda como gasto por pagar
        * (633 a 424) con la retención de 4ta (8%) si supera S/ 1 500 y no tiene suspensión.
        */
       async registrarRxhJardinero(id: string, serie: string, numero: string, fecha = today()): Promise<Result<{ retencion: number }>> {
@@ -1554,7 +1546,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!sv || !j) return { ok: false, error: 'Servicio no encontrado.' };
         if (!/^[A-Z0-9]{4}$/.test(serieN) || !/^\d{1,8}$/.test(numeroN)) return { ok: false, error: 'Indica la serie (ej. E001) y el número del recibo por honorarios.' };
         if (sv.rxhNumero) return { ok: false, error: 'Este servicio ya tiene su recibo por honorarios.' };
-        const factura = sv.modalidad === 'FACTURA';
+        const factura = sv.modalidad !== 'RXH_CLIENTE'; // cobró la empresa: el RxH es a la empresa
         const monto = round2(sv.valor - sv.comision);
         const retencion = factura && monto > 1500 && !j.suspension4ta ? round2(monto * 0.08) : 0;
         if (factura) {

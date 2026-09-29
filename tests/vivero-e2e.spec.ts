@@ -942,7 +942,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
-  test('48. Jardinero con recibo por honorarios: comisión + IGV, factura al cliente, RxH con retención de 4ta y pago', async ({ page }) => {
+  test('48. Jardinero: con RxH cobra él sin comisión; con boleta o factura cobra AUREVIA + IGV, RxH con retención de 4ta y pago', async ({ page }) => {
     page.on('dialog', d => void d.accept());
     await ir(page, 'configuracion');
     await page.getByLabel('Comisión a jardineros (%)').fill('20');
@@ -955,25 +955,36 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await jard.getByRole('button', { name: 'Agregar jardinero' }).click();
     await expect(jard.getByText('Juan Pérez Huamán')).toBeVisible();
 
-    // 1) El jardinero cobra con RxH al cliente; AUREVIA le cobra 20% + IGV
+    // 1) Recibo por honorarios: cobra el jardinero y AUREVIA no cobra comisión
     const nuevo = page.getByRole('region', { name: 'Registrar servicio' });
     await nuevo.getByLabel('Descripción del servicio').fill('Poda de ficus');
     await nuevo.getByLabel('Cliente del servicio', { exact: true }).fill('Ana Salas');
     await nuevo.getByLabel('Precio del servicio sin IGV').fill('150');
-    await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('S/ 35.40'); // 30 + IGV
+    await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('no cobra');
     await nuevo.getByRole('button', { name: 'Registrar servicio' }).click();
     const lista = page.getByRole('region', { name: 'Servicios de jardineros' });
     const poda = lista.getByRole('listitem').filter({ hasText: 'Poda de ficus' });
-    await poda.getByLabel('Medio de pago del servicio Poda de ficus').selectOption('Efectivo');
-    await poda.getByRole('button', { name: 'Cobrar comisión' }).click();
-    await expect(page.getByText(/Comisión 20% por servicio de jardinería/)).toBeVisible();
-    await page.locator('button:has(svg.lucide-x)').first().click();
-    await expect(poda.getByText(/Comisión cobrada F001-/)).toBeVisible(); // el jardinero tiene RUC → factura
+    await expect(poda.getByText('sin comisión')).toBeVisible();
+    await expect(poda.getByRole('button', { name: /Emitir/ })).toHaveCount(0);
     await poda.getByLabel('Número del RxH de Poda de ficus').fill('31');
     await poda.getByRole('button', { name: 'Registrar RxH' }).click();
     await expect(poda.getByText('RxH E001-31')).toBeVisible();
 
-    // 2) El cliente pide factura: AUREVIA factura con IGV y el jardinero le emite su RxH (retención 8% > S/ 1 500)
+    // 2) Boleta: AUREVIA cobra el servicio + IGV
+    await nuevo.getByLabel('Descripción del servicio').fill('Mantenimiento de terraza');
+    await nuevo.getByLabel('Cliente del servicio', { exact: true }).fill('Luis Rojas');
+    await nuevo.getByText('Cliente pide boleta').click();
+    await nuevo.getByLabel('Precio del servicio sin IGV').fill('200');
+    await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('S/ 236.00');
+    await nuevo.getByRole('button', { name: 'Registrar servicio' }).click();
+    const terraza = lista.getByRole('listitem').filter({ hasText: 'Mantenimiento de terraza' });
+    await terraza.getByLabel('Medio de pago del servicio Mantenimiento de terraza').selectOption('Efectivo');
+    await terraza.getByRole('button', { name: 'Emitir boleta' }).click();
+    await expect(page.getByText(/Servicio de jardinería: Mantenimiento de terraza/)).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await expect(terraza.getByText(/Boleta B001-/)).toBeVisible();
+
+    // 3) El cliente pide factura: AUREVIA factura con IGV y el jardinero le emite su RxH (retención 8% > S/ 1 500)
     await nuevo.getByLabel('Descripción del servicio').fill('Diseño de jardín corporativo');
     await nuevo.getByLabel('Cliente del servicio', { exact: true }).fill('Empresa Agrícola SAC');
     await nuevo.getByText('Cliente pide factura').click();

@@ -204,7 +204,7 @@ export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombr
       ? `Comprobante: Factura · RUC ${doc} · ${s.razonSocial?.trim()}${s.tipo === 'SERVICIO' ? ' (+ IGV 18%)' : ''}`
       : s.comprobante === 'RXH'
         ? `Comprobante: Recibo por honorarios del jardinero${doc ? ` · DNI ${doc}` : ''}`
-        : `Comprobante: Boleta${doc ? ` · DNI ${doc}` : ''}`,
+        : `Comprobante: Boleta${doc ? ` · DNI ${doc}` : ''}${s.tipo === 'SERVICIO' ? ' (+ IGV 18%)' : ''}`,
     servicio ? `Servicio: ${servicio}` : '',
     s.entrega === 'DELIVERY' ? `Entrega: delivery a ${[s.direccion, s.distrito].filter(Boolean).join(', ')} · ${delivery !== undefined ? soles(delivery) : 'costo a coordinar'}` : s.tipo === 'PEDIDO' ? 'Entrega: recojo en el vivero' : '',
     ...(lineas.length ? ['', ...lineas.map(l => `• ${l.cantidad} × ${l.nombre} (${soles(l.precio)} + IGV)${l.cantidad > l.stock ? ` — hay ${l.stock}, el resto lo coordina un asesor` : ''}`),

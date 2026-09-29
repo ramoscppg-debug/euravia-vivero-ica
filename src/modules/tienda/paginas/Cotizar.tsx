@@ -184,14 +184,13 @@ export default function Cotizar() {
 
               <fieldset className="space-y-3">
                 <legend className="text-sm font-bold text-slate-700 mb-2">¿Qué comprobante necesitas? *</legend>
-                <div className="grid grid-cols-2 gap-3">
-                  {modoServicio
-                    ? <Opcion activa={f.comprobante === 'RXH'} onClick={() => set({ comprobante: 'RXH' })} titulo="Recibo por honorarios" detalle="Lo emite el jardinero" icono={<FileText className="w-5 h-5" aria-hidden />} />
-                    : <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle="Persona natural (DNI) · + IGV" icono={<FileText className="w-5 h-5" aria-hidden />} />}
+                <div className={`grid gap-3 ${modoServicio ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                  {modoServicio && <Opcion activa={f.comprobante === 'RXH'} onClick={() => set({ comprobante: 'RXH' })} titulo="Recibo por honorarios" detalle="Lo emite el jardinero · sin IGV" icono={<FileText className="w-5 h-5" aria-hidden />} />}
+                  <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle={modoServicio ? 'La emite AUREVIA · + IGV 18%' : 'Persona natural (DNI) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                   <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle={modoServicio ? 'La emite AUREVIA · + IGV 18%' : 'Empresa o negocio (RUC) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                 </div>
                 {!modoServicio && <p className="text-xs text-amber-900 font-semibold">{AVISO_IGV}</p>}
-                {modoServicio && f.comprobante === 'FACTURA' && <p className="text-xs text-amber-900 font-semibold">Con factura, al precio del servicio se le suma el 18% de IGV.</p>}
+                {modoServicio && f.comprobante !== 'RXH' && <p className="text-xs text-amber-900 font-semibold">Con boleta o factura, al precio del servicio se le suma el 18% de IGV.</p>}
                 {f.comprobante !== 'FACTURA' ? (
                   <label className="block text-sm font-bold text-slate-700">DNI (opcional)
                     <input inputMode="numeric" value={f.doc} onChange={e => set({ doc: e.target.value.replace(/\D/g, '').slice(0, 8) })} className={`${campo} mt-1 font-mono`} placeholder="8 dígitos" />

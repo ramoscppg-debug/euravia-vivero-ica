@@ -120,7 +120,7 @@ export const NAV_BLOCKS: NavBlock[] = [
     items: [
       { id: 'jardineria', label: 'Proyectos de jardinería', icon: Flower2, badge: s => cuenta(s.projects.filter(p => p.status !== 'CONCLUIDO').length) },
       { id: 'contratos', label: 'Contratos de mantenimiento', icon: CalendarCheck, badge: s => cuenta(s.contratos.filter(c => c.activo).length) },
-      { id: 'honorarios', label: 'Jardineros y honorarios', icon: Receipt, badge: s => cuenta(s.serviciosJardinero.filter(x => !x.comprobanteId && (x.comision > 0 || x.modalidad === 'FACTURA')).length) }
+      { id: 'honorarios', label: 'Jardineros y honorarios', icon: Receipt, badge: s => cuenta(s.serviciosJardinero.filter(x => !x.comprobanteId && x.modalidad !== 'RXH_CLIENTE').length) }
     ]
   },
   {
