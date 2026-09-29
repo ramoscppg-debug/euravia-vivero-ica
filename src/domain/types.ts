@@ -201,6 +201,22 @@ export interface Gasto {
   retencion?: number; // recibo por honorarios: renta de 4ta retenida (8% si supera S/ 1 500)
 }
 
+/** Ejercicio contable (año). Cerrado: nadie registra con fecha de ese año. */
+export interface Ejercicio {
+  anio: number;
+  estado: 'CERRADO' | 'ABIERTO';
+  resultado?: number; // utilidad (+) o pérdida (−)
+  cerradoAt?: string;
+  cerradoPor?: string;
+  historial: { accion: 'CIERRE' | 'REAPERTURA'; fecha: string; usuario?: string; motivo?: string; resultado?: number }[];
+}
+
+/** Foto al 1 de enero: saldos de las cuentas 1 a 5 e inventario por producto. */
+export interface AperturaEjercicio {
+  saldos: { cuenta: string; debe: number; haber: number }[];
+  inventario: { sku: string; cantidad: number; costoUnitario: number; costoTotal: number }[];
+}
+
 /** Jardinero independiente: cobra con recibo por honorarios y la empresa le cobra una comisión. */
 export interface Jardinero {
   id: string;

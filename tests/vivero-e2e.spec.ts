@@ -1014,6 +1014,47 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('49. Cierre del ejercicio: resultado a 891 y 59, saldos e inventario inicial del año nuevo y reapertura con motivo', async ({ page }) => {
+    page.on('dialog', d => void d.accept());
+    // Los datos del demo quedaron en el año en curso; el reloj pasa al 5 de enero del año siguiente
+    const anio = new Date().getFullYear();
+    await page.clock.setFixedTime(new Date(`${anio + 1}-01-05T10:00:00-05:00`));
+    await page.reload();
+    await ir(page, 'cierre');
+    await expect(page.getByRole('region', { name: `Ejercicio ${anio + 1}` }).getByRole('button', { name: `Cerrar ejercicio ${anio + 1}` })).toBeDisabled();
+    const ej = page.getByRole('region', { name: `Ejercicio ${anio}`, exact: true });
+    await ej.getByRole('button', { name: `Cerrar ejercicio ${anio}` }).click();
+    await expect(ej.getByText(new RegExp(`Ejercicio ${anio} cerrado con (utilidad|pérdida)`))).toBeVisible();
+    await expect(ej.getByRole('region', { name: `Saldos iniciales ${anio + 1}` })).toContainText(/59[12]1/);
+    await expect(ej.getByRole('region', { name: `Inventario inicial ${anio + 1}` })).toContainText('Monstera Deliciosa');
+
+    await ej.getByRole('button', { name: 'Reabrir' }).click();
+    await expect(ej.getByRole('alert')).toHaveText('Indica el motivo de la reapertura.');
+    await ej.getByLabel(`Motivo para reabrir ${anio}`).fill('Registrar la depreciación del año');
+    await ej.getByRole('button', { name: 'Reabrir' }).click();
+    await expect(ej.getByText(`Ejercicio ${anio} reabierto.`)).toBeVisible();
+    await expect(ej.getByRole('button', { name: `Cerrar ejercicio ${anio}` })).toBeEnabled();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
+  test('50. Borrar datos de prueba: pide el RUC de la empresa y deja todo en cero', async ({ page }) => {
+    page.on('dialog', d => void d.accept());
+    await ir(page, 'configuracion');
+    const zona = page.getByRole('region', { name: 'Borrar datos de prueba' });
+    await zona.getByLabel('RUC para confirmar el borrado').fill('20100070970');
+    await zona.getByRole('button', { name: 'Borrar datos de prueba' }).click();
+    await expect(zona.getByRole('alert')).toHaveText('Escribe el RUC de la empresa para confirmar.');
+    await zona.getByLabel('RUC para confirmar el borrado').fill('20609876541');
+    await zona.getByRole('button', { name: 'Borrar datos de prueba' }).click();
+    await expect(zona.getByRole('status')).toContainText('se borraron');
+
+    await ir(page, 'kardex');
+    await expect(page.locator('table').first().locator('tr', { hasText: 'AUR-001' }).locator('td').nth(5)).toHaveText('0');
+    await ir(page, 'libro-diario');
+    await expect(page.getByRole('listitem').filter({ hasText: 'Venta' })).toHaveCount(0);
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

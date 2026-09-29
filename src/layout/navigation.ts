@@ -14,6 +14,7 @@ import {
   Flower2,
   Inbox,
   Landmark,
+  Lock,
   LineChart,
   QrCode,
   Receipt,
@@ -59,6 +60,7 @@ export type TabId =
   | 'detracciones'
   | 'contabilidad'
   | 'planilla'
+  | 'cierre'
   | 'reportes'
   | 'estadisticas'
   | 'configuracion';
@@ -141,7 +143,8 @@ export const NAV_BLOCKS: NavBlock[] = [
       { id: 'sunat', label: 'Comprobantes SUNAT', icon: Receipt },
       { id: 'detracciones', label: 'Detracciones', icon: Landmark, badge: s => cuenta(s.detracciones.filter(d => d.estado === 'PENDIENTE').length) },
       { id: 'contabilidad', label: 'Impuestos y SIRE', icon: Calculator },
-      { id: 'planilla', label: 'Planilla', icon: Users }
+      { id: 'planilla', label: 'Planilla', icon: Users },
+      { id: 'cierre', label: 'Cierre del ejercicio', icon: Lock }
     ]
   },
   {
@@ -196,6 +199,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   detracciones: DUENO,
   contabilidad: DUENO,
   planilla: DUENO,
+  cierre: DUENO,
   reportes: DUENO,
   estadisticas: DUENO,
   configuracion: DUENO

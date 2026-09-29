@@ -27,7 +27,7 @@ export interface Asiento {
   id: string;
   fecha: string;
   glosa: string;
-  origen: 'KARDEX' | 'VENTA' | 'COMPRA' | 'COBRO' | 'MANUAL' | 'GASTO' | 'PAGO' | 'CAJA' | 'PLANILLA';
+  origen: 'KARDEX' | 'VENTA' | 'COMPRA' | 'COBRO' | 'MANUAL' | 'GASTO' | 'PAGO' | 'CAJA' | 'PLANILLA' | 'CIERRE';
   origenId?: string;
   tipoComprobante?: string;
   serie?: string;
@@ -253,6 +253,47 @@ export function lineasPlanilla(p: { totalBruto: number; totalEssalud: number; to
   const neto = lineas.find(l => l.cuenta === '4111');
   if (dif && neto) neto.haber = r4(neto.haber + dif);
   return lineas;
+}
+
+/**
+ * Cierre del ejercicio (sin cierre de balance): salda 6x y 7x contra 891 Utilidad / 892 Pérdida
+ * y traslada el resultado a 5911 Utilidades acumuladas / 5921 Pérdidas acumuladas.
+ */
+export function asientosDeCierre(asientos: Asiento[], anio: number): { resultado: number; ingresos: number; gastos: number; asientos: Asiento[] } {
+  const fin = `${anio}-12-31`;
+  const saldos = new Map<string, number>();
+  for (const a of asientos) {
+    if (a.fecha < `${anio}-01-01` || a.fecha > fin) continue;
+    for (const l of a.lineas) if (l.cuenta[0] === '6' || l.cuenta[0] === '7') saldos.set(l.cuenta, r4((saldos.get(l.cuenta) ?? 0) + l.debe - l.haber));
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const cuentas = [...saldos].map(([c, s]) => [c, r2(s)] as const).filter(([, s]) => s !== 0).sort(([a], [b]) => a.localeCompare(b));
+  const gastos = r2(cuentas.filter(([c]) => c[0] === '6').reduce((t, [, s]) => t + s, 0));
+  const ingresos = r2(-cuentas.filter(([c]) => c[0] === '7').reduce((t, [, s]) => t + s, 0));
+  const resultado = r2(ingresos - gastos);
+  if (!cuentas.length) return { resultado: 0, ingresos: 0, gastos: 0, asientos: [] };
+  const lista: Asiento[] = [{
+    id: `CI-${anio}`, fecha: fin, glosa: `Cierre del ejercicio ${anio}: determinación del resultado`, origen: 'CIERRE', origenId: String(anio), tipoComprobante: '00',
+    lineas: [...cuentas.map(([c, s]) => (s > 0 ? H(c, s) : D(c, -s))), resultado >= 0 ? H('891', resultado) : D('892', -resultado)]
+  }];
+  if (resultado !== 0) lista.push({
+    id: `CT-${anio}`, fecha: fin, origen: 'CIERRE', origenId: `${anio}-T`, tipoComprobante: '00',
+    glosa: `${resultado > 0 ? 'Utilidad' : 'Pérdida'} del ejercicio ${anio} a resultados acumulados`,
+    lineas: resultado > 0 ? [D('891', resultado), H('5911', resultado)] : [D('5921', -resultado), H('892', -resultado)]
+  });
+  return { resultado, ingresos, gastos, asientos: lista };
+}
+
+/** Saldos de las cuentas 1 a 5 hasta una fecha (foto de apertura del año siguiente). */
+export function saldosBalance(asientos: Asiento[], hasta: string) {
+  const saldos = new Map<string, number>();
+  for (const a of asientos) {
+    if (a.fecha > hasta) continue;
+    for (const l of a.lineas) if ('12345'.includes(l.cuenta[0])) saldos.set(l.cuenta, r4((saldos.get(l.cuenta) ?? 0) + l.debe - l.haber));
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return [...saldos].map(([cuenta, s]) => ({ cuenta, debe: r2(Math.max(s, 0)), haber: r2(Math.max(-s, 0)) }))
+    .filter(s => s.debe || s.haber).sort((a, b) => a.cuenta.localeCompare(b.cuenta));
 }
 
 /** Libro diario del modo demo, derivado de los hechos registrados. */

@@ -16,6 +16,8 @@ import type {
   Gasto,
   Jardinero,
   ServicioJardinero,
+  Ejercicio,
+  AperturaEjercicio,
   ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
@@ -55,7 +57,7 @@ import { cargarEstadoDemo, guardarEstadoDemo, seedState, STORAGE_KEY } from '../
 import { EMPRESA_VACIA } from '../data/seed';
 import { fotoComoJpeg } from '../lib/imagen';
 import { aplicarPromedio, codigosSunat, saldoDe } from '../lib/kardexValorado';
-import { CONFIG_CONTABLE, lineasPlanilla, type Asiento } from '../lib/contabilidad';
+import { asientosDeCierre, CONFIG_CONTABLE, diarioDemo, lineasPlanilla, saldosBalance, type Asiento } from '../lib/contabilidad';
 import { calcularPlanillaMes } from './selectors';
 import { calcularDetraccion, conIgv, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
@@ -99,6 +101,7 @@ export interface ErpState {
   asientosExtra: Asiento[]; // modo demo: asientos que no nacen de otro registro (planilla)
   jardineros: Jardinero[];
   serviciosJardinero: ServicioJardinero[];
+  ejercicios: Ejercicio[];
 }
 
 export type JardineroInput = Omit<Jardinero, 'id'> & { id?: string };
@@ -286,7 +289,8 @@ function nubeVacia(): ErpState {
     gastos: [],
     asientosExtra: [],
     jardineros: [],
-    serviciosJardinero: []
+    serviciosJardinero: [],
+    ejercicios: []
   };
 }
 
@@ -653,13 +657,14 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const [partesProduccion, gastos, jardineros, serviciosJardinero] = await Promise.all([
+          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios] = await Promise.all([
             repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
             repo.cargarGastos().catch(() => []),
             repo.cargarJardineros().catch(() => []), // dueño y ventas
-            repo.cargarServiciosJardinero().catch(() => [])
+            repo.cargarServiciosJardinero().catch(() => []),
+            repo.cargarEjercicios().catch(() => [])
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero });
+          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -1573,6 +1578,102 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const cur = get();
           commit({ ...cur, gastos, serviciosJardinero: cur.serviciosJardinero.map(x => (x.id === id ? { ...x, rxhSerie: serieN, rxhNumero: numeroN, gastoId } : x)) });
           return { ok: true, retencion };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- CIERRE ANUAL ----------------
+      /** Cierra el año: resultado (6x/7x a 891/892), traslado a 5911/5921, foto de apertura y bloqueo del año. */
+      async cerrarEjercicio(anio: number): Promise<Result<{ resultado: number }>> {
+        const s = get();
+        if (today() <= `${anio}-12-31`) return { ok: false, error: `El ejercicio ${anio} aún no termina: se cierra desde el 1 de enero de ${anio + 1}.` };
+        if (s.ejercicios.some(e => e.anio === anio && e.estado === 'CERRADO')) return { ok: false, error: `El ejercicio ${anio} ya está cerrado.` };
+        const pendientes = s.invoices.filter(i => i.fechaEmision.startsWith(String(anio)) && !i.numeroSunat && i.estadoSunat === 'PENDIENTE').length;
+        if (pendientes) return { ok: false, error: `Hay ${pendientes} comprobante(s) de ${anio} por emitir en SUNAT: regístralos antes de cerrar.` };
+        try {
+          let resultado: number;
+          let asientosExtra = s.asientosExtra;
+          if (nube) resultado = await repo.cerrarEjercicio(anio, usuario);
+          else {
+            const cierre = asientosDeCierre(diarioDemo(s), anio);
+            resultado = cierre.resultado;
+            asientosExtra = [...s.asientosExtra, ...cierre.asientos];
+          }
+          const registro = { accion: 'CIERRE' as const, fecha: new Date().toISOString(), usuario, resultado };
+          const cur = get();
+          const previo = cur.ejercicios.find(e => e.anio === anio);
+          const ejercicio: Ejercicio = { anio, estado: 'CERRADO', resultado, cerradoAt: registro.fecha, cerradoPor: usuario, historial: [...(previo?.historial ?? []), registro] };
+          commit({ ...cur, asientosExtra, ejercicios: [...cur.ejercicios.filter(e => e.anio !== anio), ejercicio].sort((a, b) => a.anio - b.anio) });
+          return { ok: true, resultado };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async reabrirEjercicio(anio: number, motivo: string): Promise<Result> {
+        const s = get();
+        if (motivo.trim().length < 5) return { ok: false, error: 'Indica el motivo de la reapertura.' };
+        if (!s.ejercicios.some(e => e.anio === anio && e.estado === 'CERRADO')) return { ok: false, error: `El ejercicio ${anio} no está cerrado.` };
+        if (s.ejercicios.some(e => e.anio > anio && e.estado === 'CERRADO')) return { ok: false, error: 'Reabre primero los ejercicios posteriores.' };
+        try {
+          if (nube) await repo.reabrirEjercicio(anio, motivo.trim(), usuario);
+          const cur = get();
+          commit({
+            ...cur,
+            asientosExtra: cur.asientosExtra.filter(a => !(a.origen === 'CIERRE' && (a.origenId === String(anio) || a.origenId === `${anio}-T`))),
+            ejercicios: cur.ejercicios.map(e => (e.anio === anio
+              ? { ...e, estado: 'ABIERTO', historial: [...e.historial, { accion: 'REAPERTURA', fecha: new Date().toISOString(), usuario, motivo: motivo.trim() }] }
+              : e))
+          });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Saldos de las cuentas 1 a 5 e inventario al 1 de enero del año (foto tomada al cerrar el anterior). */
+      async aperturaDe(anio: number): Promise<AperturaEjercicio> {
+        if (nube) return repo.cargarApertura(anio);
+        const s = get();
+        const fin = `${anio - 1}-12-31`;
+        const ultimo = new Map<string, KardexMovement>();
+        for (const k of s.kardex) {
+          const f = k.fechaEmision ?? k.date;
+          if (f > fin) continue;
+          const prev = ultimo.get(k.productSku);
+          if (!prev || (prev.fechaEmision ?? prev.date) <= f) ultimo.set(k.productSku, k);
+        }
+        return {
+          saldos: saldosBalance(diarioDemo(s), fin),
+          inventario: [...ultimo.values()]
+            .map(k => ({ sku: k.productSku, cantidad: k.saldoCantidad ?? k.balance, costoUnitario: k.saldoCostoUnitario ?? 0, costoTotal: k.saldoCostoTotal ?? 0 }))
+            .filter(i => i.cantidad || i.costoTotal)
+            .sort((a, b) => a.sku.localeCompare(b.sku))
+        };
+      },
+
+      /** Deja la empresa lista para empezar (sólo mientras son datos de prueba). */
+      async borrarDatosPrueba(ruc: string): Promise<Result> {
+        const s = get();
+        if (!s.company.ruc || ruc.trim() !== s.company.ruc) return { ok: false, error: 'Escribe el RUC de la empresa para confirmar.' };
+        if (s.ejercicios.some(e => e.estado === 'CERRADO')) return { ok: false, error: 'Ya hay un ejercicio cerrado: los libros deben conservarse y no se pueden borrar.' };
+        if (s.invoices.some(i => i.numeroSunat)) return { ok: false, error: 'Ya hay comprobantes emitidos en SUNAT: son operaciones reales y no se pueden borrar.' };
+        try {
+          if (nube) {
+            await repo.borrarDatosPrueba(ruc.trim());
+            return acciones.recargar();
+          }
+          commit({
+            ...s,
+            products: s.products.map(p => ({ ...p, stock: 0 })),
+            kardex: [], invoices: [], purchases: [], losses: [], consumptions: [], guiasRemision: [], detracciones: [], projects: [], contratos: [],
+            crmClients: [], notasClientes: [], tareas: [], pedidos: [], cotizaciones: [], solicitudes: [], puntosSaldo: {},
+            cupones: s.cupones.map(c => ({ ...c, usos: 0 })), gastos: [], gastosCaja: [], asientosExtra: [], partesProduccion: [],
+            serviciosJardinero: [], ejercicios: [],
+            cashRegister: { aperturaEfectivo: 0, ventasEfectivo: 0, ventasBilleteras: 0, ventasTarjetas: 0, ventasTransferencias: 0, egresos: [], conteoRealEfectivo: 0, estadoCaja: 'ABIERTA' }
+          });
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

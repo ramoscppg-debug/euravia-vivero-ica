@@ -31,6 +31,8 @@ import type {
   Gasto,
   Jardinero,
   ServicioJardinero,
+  Ejercicio,
+  AperturaEjercicio,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -1071,6 +1073,43 @@ export async function cargarGastos(): Promise<Gasto[]> {
     tipoComprobante: r.tipo_comprobante, serie: r.serie ?? undefined, numero: r.numero ?? undefined, base: num(r.base), igv: num(r.igv), total: num(r.total),
     medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined, fechaPago: r.fecha_pago ?? undefined, retencion: num(r.retencion ?? 0)
   }));
+}
+
+// ---------------- CIERRE ANUAL ----------------
+export async function cargarEjercicios(): Promise<Ejercicio[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('ejercicios').select('*').order('anio')).map(r => ({
+    anio: r.anio, estado: r.estado, resultado: r.resultado != null ? num(r.resultado) : undefined,
+    cerradoAt: r.cerrado_at ?? undefined, cerradoPor: r.cerrado_por ?? undefined, historial: r.historial ?? []
+  }));
+}
+
+export async function cargarApertura(anio: number): Promise<AperturaEjercicio> {
+  const sb = await db();
+  const [saldos, inventario] = await Promise.all([
+    sb.from('saldos_iniciales').select('*').eq('anio', anio).order('cuenta'),
+    sb.from('inventario_inicial').select('*').eq('anio', anio).order('producto_sku')
+  ]);
+  return {
+    saldos: ok<Row[]>(saldos).map(r => ({ cuenta: r.cuenta, debe: num(r.debe), haber: num(r.haber) })),
+    inventario: ok<Row[]>(inventario).map(r => ({ sku: r.producto_sku, cantidad: num(r.cantidad), costoUnitario: num(r.costo_unitario), costoTotal: num(r.costo_total) }))
+  };
+}
+
+export async function cerrarEjercicio(anio: number, usuario: string): Promise<number> {
+  const sb = await db();
+  const r = ok<{ resultado: number }>(await sb.rpc('cerrar_ejercicio', { p: { anio, usuario } }));
+  return num(r.resultado);
+}
+
+export async function reabrirEjercicio(anio: number, motivo: string, usuario: string) {
+  const sb = await db();
+  ok(await sb.rpc('reabrir_ejercicio', { p: { anio, motivo, usuario } }));
+}
+
+export async function borrarDatosPrueba(ruc: string) {
+  const sb = await db();
+  ok(await sb.rpc('borrar_datos_prueba', { p: { ruc } }));
 }
 
 // ---------------- JARDINEROS Y RECIBOS POR HONORARIOS ----------------
