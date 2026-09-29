@@ -29,6 +29,8 @@ import type {
   Tarea,
   ParteProduccion,
   Gasto,
+  Jardinero,
+  ServicioJardinero,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -183,7 +185,8 @@ function empresaDesdeFila(r: Row | null): EmpresaConfig {
     modoEmision: r.modo_emision ?? base.modoEmision,
     ultimosNumeros: r.ultimos_numeros ?? {},
     serieNcBoleta: r.serie_nc_boleta ?? base.serieNcBoleta,
-    serieNcFactura: r.serie_nc_factura ?? base.serieNcFactura
+    serieNcFactura: r.serie_nc_factura ?? base.serieNcFactura,
+    comisionJardineroPct: r.comision_jardinero_pct != null ? num(r.comision_jardinero_pct) : undefined
   };
 }
 
@@ -477,7 +480,7 @@ function solicitudDesdeFila(r: Row): SolicitudTienda {
     id: String(r.id), tipo: r.tipo, nombre: r.nombre, telefono: r.telefono, email: r.email ?? undefined, distrito: r.distrito ?? undefined,
     mensaje: r.mensaje ?? undefined, servicioSlug: r.servicio_slug ?? undefined, items: r.items ?? [], totalReferencial: num(r.total_referencial),
     estado: r.estado, pedidoId: r.pedido_id ?? undefined, createdAt: r.created_at,
-    comprobante: r.comprobante ?? 'BOLETA', docCliente: r.doc_cliente ?? undefined, razonSocial: r.razon_social ?? undefined,
+    comprobante: r.comprobante ?? 'BOLETA', igvReferencial: r.igv_referencial != null ? num(r.igv_referencial) : undefined, docCliente: r.doc_cliente ?? undefined, razonSocial: r.razon_social ?? undefined,
     costoDelivery: r.costo_delivery != null ? num(r.costo_delivery) : undefined,
     entrega: r.entrega ?? 'RECOJO', direccion: r.direccion ?? undefined, requiereAsesor: !!r.requiere_asesor
   };
@@ -770,6 +773,7 @@ export async function guardarEmpresa(c: EmpresaConfig, regimen: RegimenTributari
     ultimos_numeros: c.ultimosNumeros,
     serie_nc_boleta: c.serieNcBoleta,
     serie_nc_factura: c.serieNcFactura,
+    comision_jardinero_pct: c.comisionJardineroPct ?? null,
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' }));
   // La fila se identifica por el RUC: si el RUC cambió, se retira la anterior para no tener dos empresas
@@ -1065,8 +1069,59 @@ export async function cargarGastos(): Promise<Gasto[]> {
   return ok<Row[]>(await sb.from('gastos').select('*').gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10)).order('fecha', { ascending: false }).limit(2000)).map(r => ({
     id: String(r.id), fecha: r.fecha, cuenta: r.cuenta, descripcion: r.descripcion, proveedorRuc: r.proveedor_ruc ?? undefined, proveedor: r.proveedor ?? undefined,
     tipoComprobante: r.tipo_comprobante, serie: r.serie ?? undefined, numero: r.numero ?? undefined, base: num(r.base), igv: num(r.igv), total: num(r.total),
-    medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined, fechaPago: r.fecha_pago ?? undefined
+    medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined, fechaPago: r.fecha_pago ?? undefined, retencion: num(r.retencion ?? 0)
   }));
+}
+
+// ---------------- JARDINEROS Y RECIBOS POR HONORARIOS ----------------
+export async function cargarJardineros(): Promise<Jardinero[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('jardineros').select('*').order('nombre')).map(r => ({
+    id: String(r.id), nombre: r.nombre, ruc: r.ruc ?? undefined, dni: r.dni ?? undefined, telefono: r.telefono ?? undefined,
+    comisionPct: r.comision_pct != null ? num(r.comision_pct) : undefined, suspension4ta: !!r.suspension_4ta, activo: !!r.activo
+  }));
+}
+
+export async function guardarJardinero(j: Omit<Jardinero, 'id'> & { id?: string }): Promise<string> {
+  const sb = await db();
+  const fila = { nombre: j.nombre, ruc: j.ruc || null, dni: j.dni || null, telefono: j.telefono || null, comision_pct: j.comisionPct ?? null, suspension_4ta: j.suspension4ta, activo: j.activo };
+  if (j.id) {
+    ok(await sb.from('jardineros').update(fila).eq('id', Number(j.id)));
+    return j.id;
+  }
+  return String(ok<Row>(await sb.from('jardineros').insert(fila).select('id').single()).id);
+}
+
+const servicioJardineroDesdeFila = (r: Row): ServicioJardinero => ({
+  id: String(r.id), fecha: r.fecha, jardineroId: String(r.jardinero_id), descripcion: r.descripcion, clienteNombre: r.cliente_nombre, clienteDoc: r.cliente_doc ?? undefined,
+  valor: num(r.valor), modalidad: r.modalidad, comisionPct: num(r.comision_pct), comision: num(r.comision), rxhSerie: r.rxh_serie ?? undefined, rxhNumero: r.rxh_numero ?? undefined,
+  comprobanteId: r.comprobante_id ?? undefined, gastoId: r.gasto_id != null ? String(r.gasto_id) : undefined
+});
+
+export async function cargarServiciosJardinero(): Promise<ServicioJardinero[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('servicios_jardinero').select('*').order('fecha', { ascending: false }).order('id', { ascending: false }).limit(500)).map(servicioJardineroDesdeFila);
+}
+
+export async function registrarServicioJardinero(p: { jardineroId: string; fecha: string; descripcion: string; clienteNombre: string; clienteDoc?: string; valor: number; modalidad: ServicioJardinero['modalidad']; rxhSerie?: string; rxhNumero?: string; usuario: string }): Promise<ServicioJardinero> {
+  const sb = await db();
+  const id = ok<number>(await sb.rpc('registrar_servicio_jardinero', { p: {
+    jardinero_id: Number(p.jardineroId), fecha: p.fecha, descripcion: p.descripcion, cliente_nombre: p.clienteNombre, cliente_doc: p.clienteDoc,
+    valor: p.valor, modalidad: p.modalidad, rxh_serie: p.rxhSerie, rxh_numero: p.rxhNumero, usuario: p.usuario
+  } }));
+  return servicioJardineroDesdeFila(ok<Row>(await sb.from('servicios_jardinero').select('*').eq('id', id).single()));
+}
+
+export async function vincularComprobanteServicio(id: string, comprobanteId: string) {
+  const sb = await db();
+  ok(await sb.rpc('vincular_comprobante_servicio', { p: { id: Number(id), comprobante_id: comprobanteId } }));
+}
+
+/** Devuelve el id del gasto creado (sólo en la modalidad FACTURA). */
+export async function registrarRxhJardinero(p: { id: string; serie: string; numero: string; fecha: string; usuario: string }): Promise<string | undefined> {
+  const sb = await db();
+  const gasto = ok<number | null>(await sb.rpc('registrar_rxh_jardinero', { p: { id: Number(p.id), serie: p.serie, numero: p.numero, fecha: p.fecha, usuario: p.usuario } }));
+  return gasto != null ? String(gasto) : undefined;
 }
 
 export async function pagarGasto(p: { id: string; medioPago: string; operacion?: string; fecha: string; usuario: string }) {

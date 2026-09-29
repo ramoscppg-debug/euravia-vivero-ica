@@ -75,7 +75,7 @@ export function TarjetaProducto({ p }: { p: ProductoPublico }) {
         </h3>
         <ChipStock p={p} />
         <div className="mt-auto pt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-lg sm:text-xl font-extrabold text-slate-900 whitespace-nowrap">{soles(p.precio)}</span>
+          <span className="text-lg sm:text-xl font-extrabold text-slate-900 whitespace-nowrap">{soles(p.precio)} <span className="text-xs font-semibold text-slate-500">+ IGV</span></span>
           <button
             onClick={() => agregar(p.sku)}
             className={`min-h-[40px] px-4 rounded-full text-sm font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${enSeleccion ? 'bg-hoja-50 text-hoja-800 border border-hoja-200' : 'bg-hoja-700 hover:bg-hoja-800 text-white'}`}

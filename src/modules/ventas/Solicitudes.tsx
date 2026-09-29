@@ -65,7 +65,7 @@ export default function Solicitudes() {
                   <div className="flex flex-col items-end gap-1">
                     <Insignia tono={ESTADO_TONO[s.estado]}>{ESTADO_TEXTO[s.estado]}</Insignia>
                     <Insignia>{TIPO[s.tipo]}</Insignia>
-                    <Insignia tono={s.comprobante === 'FACTURA' ? 'marca' : 'neutro'}>{s.comprobante === 'FACTURA' ? 'Factura' : 'Boleta'}</Insignia>
+                    <Insignia tono={s.comprobante === 'FACTURA' ? 'marca' : 'neutro'}>{s.comprobante === 'FACTURA' ? 'Factura' : s.comprobante === 'RXH' ? 'Recibo por honorarios' : 'Boleta'}</Insignia>
                   </div>
                 </div>
                 {(s.docCliente || s.razonSocial) && <p className="text-xs text-tinta"><b>{s.comprobante === 'FACTURA' ? 'RUC' : 'DNI'} {s.docCliente}</b>{s.razonSocial ? ` · ${s.razonSocial}` : ''}</p>}
@@ -74,8 +74,8 @@ export default function Solicitudes() {
                 {servicio && <p className="font-semibold text-tinta">Servicio: {servicio.nombre}</p>}
                 {!!s.items.length && (
                   <ul className="text-tinta">
-                    {s.items.map(it => <li key={it.sku}>• {it.cantidad}× {it.nombre} ({soles(it.precio)}){it.stock !== undefined && it.cantidad > it.stock && <span className="text-aviso font-bold"> · había {it.stock}</span>}</li>)}
-                    <li className="font-bold pt-1">Total referencial: {soles(s.totalReferencial)}</li>
+                    {s.items.map(it => <li key={it.sku}>• {it.cantidad}× {it.nombre} ({soles(it.precio)}{s.igvReferencial !== undefined ? ' + IGV' : ''}){it.stock !== undefined && it.cantidad > it.stock && <span className="text-aviso font-bold"> · había {it.stock}</span>}</li>)}
+                    <li className="font-bold pt-1">Total referencial: {soles(s.totalReferencial)}{s.igvReferencial !== undefined && <span className="font-normal text-tinta-suave"> (incluye IGV {soles(s.igvReferencial)})</span>}</li>
                   </ul>
                 )}
                 {s.mensaje && <p className="p-3 rounded-control bg-crema-200/60 text-tinta italic">“{s.mensaje}”</p>}

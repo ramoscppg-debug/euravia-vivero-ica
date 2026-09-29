@@ -16,6 +16,7 @@ import Dashboard from '../modules/inicio/Dashboard';
 import Bajas from '../modules/inventario/Bajas';
 import Kardex from '../modules/inventario/Kardex';
 import Proyectos from '../modules/servicios/Proyectos';
+import Honorarios from '../modules/servicios/Honorarios';
 import Caja from '../modules/ventas/Caja';
 import Catalogo from '../modules/ventas/Catalogo';
 import Pedidos from '../modules/ventas/Pedidos';
@@ -46,6 +47,7 @@ const SCREENS: Record<TabId, ComponentType> = {
   contratos: Contratos,
   reportes: Reportes,
   jardineria: Proyectos,
+  honorarios: Honorarios,
   crm: Clientes,
   kardex: Kardex,
   bajas: Bajas,

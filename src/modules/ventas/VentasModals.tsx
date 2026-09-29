@@ -7,7 +7,7 @@ import { GeneradorEtiquetas } from '../inventario/Etiquetas';
 import { CATEGORIAS_GASTO } from '../../lib/contabilidad';
 import { AccionesEmision, porEmitir } from '../admin/Emision';
 import { MEDIOS_PAGO, type ComprobanteSunat, type DescuentoGlobal, type LineaCarrito, type MedioPago, type Pago } from '../../domain/types';
-import { round2 } from '../../lib/peru';
+import { conIgv, round2 } from '../../lib/peru';
 import { VALOR_PUNTO } from '../../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../../lib/pos';
 import { aplicarPromociones } from '../../store/ErpStore';
@@ -151,7 +151,7 @@ export function PosModal({ presetSku, preset }: { presetSku?: string; preset?: P
                   <span className="min-w-0">
                     <span className="block font-bold text-tinta truncate">{p.name}</span>
                     <span className="block font-mono text-[10px] text-tinta-suave">{p.sku} · stock {p.stock - enCarrito}</span>
-                    <span className="block font-serif font-bold text-bosque-700">S/ {p.price.toFixed(2)}</span>
+                    <span className="block font-serif font-bold text-bosque-700">S/ {conIgv(p.price).toFixed(2)} <span className="text-[10px] font-sans text-tinta-suave">con IGV</span></span>
                   </span>
                 </button>
               );

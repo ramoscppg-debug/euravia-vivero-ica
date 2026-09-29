@@ -3,6 +3,7 @@ import type { Cotizacion, Pedido, SolicitudTienda } from '../../domain/types';
 import { imprimirDocumento, type DocumentoComercial, type TipoDocumento } from '../../lib/documentos';
 import { hoyLocal, sumarDias } from '../../lib/fechas';
 import { calcularCarrito } from '../../lib/pos';
+import { conIgv, round2 } from '../../lib/peru';
 import type { ErpState } from '../../store/ErpStore';
 
 const contacto = (s: ErpState) => ({ whatsapp: s.tiendaConfig.whatsapp, email: s.tiendaConfig.email || s.company.email, telefono: s.company.telefono });
@@ -37,7 +38,7 @@ export function docDeSolicitud(s: ErpState, sol: SolicitudTienda, tipo: TipoDocu
     cliente: { nombre: sol.razonSocial || sol.nombre, doc: sol.docCliente, telefono: sol.telefono, direccion: [sol.direccion, sol.distrito].filter(Boolean).join(', ') },
     comprobante: sol.comprobante,
     lineas: sol.items.length
-      ? sol.items.map(it => ({ codigo: it.sku, descripcion: it.nombre, cantidad: it.cantidad, precio: s.products.find(p => p.sku === it.sku)?.price ?? it.precio }))
+      ? sol.items.map(it => ({ codigo: it.sku, descripcion: it.nombre, cantidad: it.cantidad, precio: round2(conIgv(s.products.find(p => p.sku === it.sku)?.price ?? it.precio)) }))
       : [{ descripcion: `Servicio: ${servicio?.nombre ?? sol.servicioSlug ?? 'por definir'} (monto por cotizar)`, cantidad: 1, precio: 0 }],
     notas: sol.mensaje,
     condiciones: sol.requiereAsesor ? ['Parte de las cantidades supera el stock actual: la fecha de entrega se confirma con el asesor.'] : undefined

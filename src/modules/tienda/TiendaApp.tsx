@@ -7,7 +7,7 @@ import { ArrowRight, CheckCircle2, Leaf, Mail, MapPin, Menu, ShoppingBag, X } fr
 import { Enlace, navegar, useUbicacion } from '../../app/router';
 import { EstadoError } from '../../components/ui';
 import { soles } from '../../lib/formato';
-import { cargarDatosTienda, url, type DatosTienda } from './datos';
+import { AVISO_IGV, cargarDatosTienda, desgloseIgv, url, type DatosTienda } from './datos';
 import { Contador, Imagen, NotaStock } from './componentes';
 import Inicio from './paginas/Inicio';
 import Catalogo from './paginas/Catalogo';
@@ -161,7 +161,7 @@ function PanelCotizacion() {
                   <Imagen src={l.p.imagen} alt={l.p.nombre} className="w-16 h-16 rounded-xl shrink-0" />
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <p className="font-bold text-slate-900 leading-tight">{l.p.nombre}</p>
-                    <p className="text-xs text-slate-600">{soles(l.p.precio)} c/u</p>
+                    <p className="text-xs text-slate-600">{soles(l.p.precio)} c/u + IGV</p>
                     <Contador valor={l.cantidad} cambiar={n => cambiarCantidad(l.sku, n)} etiqueta={l.p.nombre} permitirCero />
                     <NotaStock stock={l.p.stock} cantidad={l.cantidad} compacta />
                   </div>
@@ -170,10 +170,13 @@ function PanelCotizacion() {
               ))}
             </ul>
             <div className="border-t border-slate-200 p-5 space-y-3">
+              <div className="flex justify-between text-sm text-slate-600"><span>Valor de venta</span><span>{soles(desgloseIgv(total).valor)}</span></div>
+              <div className="flex justify-between text-sm text-slate-600"><span>IGV (18%)</span><span>{soles(desgloseIgv(total).igv)}</span></div>
               <div className="flex justify-between items-baseline">
-                <span className="text-slate-600 text-sm">Total referencial (con IGV)</span>
-                <span className="text-2xl font-extrabold text-slate-900">{soles(total)}</span>
+                <span className="text-slate-600 text-sm">Total referencial</span>
+                <span className="text-2xl font-extrabold text-slate-900">{soles(desgloseIgv(total).total)}</span>
               </div>
+              <p className="text-xs text-amber-800 bg-amber-50 rounded-xl p-2">{AVISO_IGV}</p>
               <button onClick={() => { setPanel(false); navegar(url('/cotizar')); }} className="w-full min-h-[52px] rounded-full bg-hoja-700 hover:bg-hoja-800 text-white font-bold inline-flex items-center justify-center gap-2">
                 Confirmar pedido <ArrowRight className="w-5 h-5" aria-hidden />
               </button>
@@ -220,7 +223,7 @@ function Pie() {
         <div className="space-y-2">
           <p className="text-lg font-extrabold tracking-[0.18em] text-hoja-900">AUREVIA</p>
           <p>Plantas, insumos y servicios de jardinería.</p>
-          <p className="text-xs">Precios con IGV. Pagos coordinados por WhatsApp con nuestro equipo de ventas.</p>
+          <p className="text-xs">Precios sin IGV: la boleta o factura suma el 18%. Pagos coordinados por WhatsApp con nuestro equipo de ventas.</p>
         </div>
         <nav aria-label="Pie de página" className="space-y-2">
           {NAV.slice(1).map(n => <Enlace key={n.href} href={n.href} className="block hover:text-hoja-800">{n.label}</Enlace>)}

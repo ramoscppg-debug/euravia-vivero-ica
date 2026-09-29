@@ -36,6 +36,8 @@ export interface EmpresaConfig extends EmisorSunat {
   ultimosNumeros: Record<string, number>;
   serieNcBoleta: string;
   serieNcFactura: string;
+  /** % que la empresa cobra al jardinero por cada servicio (sin configurar no se registran servicios). */
+  comisionJardineroPct?: number;
 }
 
 // ---------- Catálogo & Kardex ----------
@@ -196,6 +198,41 @@ export interface Gasto {
   medioPago?: string; // sin medio = por pagar
   operacion?: string;
   fechaPago?: string;
+  retencion?: number; // recibo por honorarios: renta de 4ta retenida (8% si supera S/ 1 500)
+}
+
+/** Jardinero independiente: cobra con recibo por honorarios y la empresa le cobra una comisión. */
+export interface Jardinero {
+  id: string;
+  nombre: string;
+  ruc?: string;
+  dni?: string;
+  telefono?: string;
+  comisionPct?: number; // vacío = la comisión general de Ajustes
+  suspension4ta: boolean; // tiene constancia de suspensión de retenciones de 4ta
+  activo: boolean;
+}
+
+/**
+ * Servicio hecho por un jardinero.
+ * RXH_CLIENTE: el jardinero cobra al cliente con su recibo por honorarios; la empresa le cobra la comisión (+ IGV).
+ * FACTURA: la empresa factura al cliente (+ IGV) y el jardinero le emite su recibo por (valor − comisión).
+ */
+export interface ServicioJardinero {
+  id: string;
+  fecha: string;
+  jardineroId: string;
+  descripcion: string;
+  clienteNombre: string;
+  clienteDoc?: string;
+  valor: number; // precio acordado, sin IGV
+  modalidad: 'RXH_CLIENTE' | 'FACTURA';
+  comisionPct: number;
+  comision: number;
+  rxhSerie?: string;
+  rxhNumero?: string;
+  comprobanteId?: string; // factura al cliente (FACTURA) o comprobante de la comisión (RXH_CLIENTE)
+  gastoId?: string; // recibo del jardinero a la empresa (FACTURA)
 }
 
 export interface CashRegisterState {
@@ -466,8 +503,9 @@ export interface SolicitudTienda {
   servicioSlug?: string;
   items: { sku: string; nombre: string; cantidad: number; precio: number; stock?: number }[];
   totalReferencial: number;
-  comprobante: 'BOLETA' | 'FACTURA';
+  comprobante: 'BOLETA' | 'FACTURA' | 'RXH'; // RXH: servicio cobrado por el jardinero con recibo por honorarios
   docCliente?: string; // DNI (boleta, opcional) o RUC (factura)
+  igvReferencial?: number; // IGV incluido en el total referencial (el catálogo es sin IGV)
   razonSocial?: string;
   entrega: 'RECOJO' | 'DELIVERY';
   direccion?: string;

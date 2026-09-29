@@ -83,7 +83,7 @@ export default function Ajustes() {
             <Landmark className="w-5 h-5 text-oro" />
             <h4 className="font-serif font-bold text-base text-tinta">2. Parámetros Bancarios & Cuentas de Detracción SPOT</h4>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
             <div>
               <label className="font-bold block mb-1 text-tinta">Cta. Detracciones Banco de la Nación</label>
               <input type="text" value={company.cuentaDetraccionesBn} onChange={(e) => set({ cuentaDetraccionesBn: e.target.value })} className="w-full p-2.5 bg-crema border border-crema-300 rounded-xl font-mono font-bold text-xs" />
@@ -96,6 +96,11 @@ export default function Ajustes() {
             <div>
               <label className="font-bold block mb-1 text-tinta">Tasa Detracción Servicios (%)</label>
               <input type="number" step="1" value={company.tasaDetraccionServicios * 100} onChange={(e) => set({ tasaDetraccionServicios: Number(e.target.value) / 100 })} className="w-full p-2.5 bg-crema border border-crema-300 rounded-xl font-bold text-xs" />
+            </div>
+            <div>
+              <label htmlFor="comision-jardinero" className="font-bold block mb-1 text-tinta">Comisión a jardineros (%)</label>
+              <input id="comision-jardinero" type="number" min={0} max={100} step="0.5" value={company.comisionJardineroPct ?? ''} onChange={(e) => set({ comisionJardineroPct: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Ej. 20" className="w-full p-2.5 bg-crema border border-crema-300 rounded-xl font-bold text-xs" />
+              <span className="text-[10px] text-tinta-suave">Sobre el precio del servicio sin IGV</span>
             </div>
           </div>
         </div>

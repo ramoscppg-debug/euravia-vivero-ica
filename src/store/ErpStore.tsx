@@ -14,6 +14,8 @@ import type {
   CatalogProduct,
   GastoCaja,
   Gasto,
+  Jardinero,
+  ServicioJardinero,
   ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
@@ -53,9 +55,9 @@ import { cargarEstadoDemo, guardarEstadoDemo, seedState, STORAGE_KEY } from '../
 import { EMPRESA_VACIA } from '../data/seed';
 import { fotoComoJpeg } from '../lib/imagen';
 import { aplicarPromedio, codigosSunat, saldoDe } from '../lib/kardexValorado';
-import { lineasPlanilla, type Asiento } from '../lib/contabilidad';
+import { CONFIG_CONTABLE, lineasPlanilla, type Asiento } from '../lib/contabilidad';
 import { calcularPlanillaMes } from './selectors';
-import { calcularDetraccion, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
+import { calcularDetraccion, conIgv, round2, validarDni, validarRuc, vencimientoDetraccion } from '../lib/peru';
 import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
@@ -95,7 +97,12 @@ export interface ErpState {
   partesProduccion: ParteProduccion[];
   gastos: Gasto[]; // gastos con comprobante (luz, agua, alquiler…)
   asientosExtra: Asiento[]; // modo demo: asientos que no nacen de otro registro (planilla)
+  jardineros: Jardinero[];
+  serviciosJardinero: ServicioJardinero[];
 }
+
+export type JardineroInput = Omit<Jardinero, 'id'> & { id?: string };
+export type ServicioJardineroInput = Omit<ServicioJardinero, 'id' | 'comisionPct' | 'comision' | 'comprobanteId' | 'gastoId'>;
 
 export type GastoInput = Omit<Gasto, 'id' | 'base'>;
 
@@ -277,7 +284,9 @@ function nubeVacia(): ErpState {
     avisos: { activo: false },
     partesProduccion: [],
     gastos: [],
-    asientosExtra: []
+    asientosExtra: [],
+    jardineros: [],
+    serviciosJardinero: []
   };
 }
 
@@ -644,11 +653,13 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const [partesProduccion, gastos] = await Promise.all([
+          const [partesProduccion, gastos, jardineros, serviciosJardinero] = await Promise.all([
             repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
-            repo.cargarGastos().catch(() => [])
+            repo.cargarGastos().catch(() => []),
+            repo.cargarJardineros().catch(() => []), // dueño y ventas
+            repo.cargarServiciosJardinero().catch(() => [])
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos });
+          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -854,7 +865,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (sol.pedidoId) return { ok: false, error: `Esta solicitud ya es el pedido ${sol.pedidoId}.` };
         const items = sol.items.map(it => {
           const prod = s.products.find(pr => pr.sku === it.sku);
-          return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: prod?.price ?? it.precio };
+          return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: round2(conIgv(prod?.price ?? it.precio)) };
         });
         const r = await acciones.crearPedido({
           canal: 'Web', cliente: { nombre: sol.nombre, telefono: sol.telefono, doc: sol.docCliente }, direccion: datos.direccion, distrito: datos.distrito || sol.distrito || '',
@@ -1414,7 +1425,8 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         const g = s.gastos.find(x => x.id === id);
         if (!g) return { ok: false, error: 'Gasto no encontrado.' };
         if (g.medioPago) return { ok: false, error: 'Este gasto ya está pagado.' };
-        if (medioPago === 'Efectivo' && g.total > s.cashRegister.conteoRealEfectivo) {
+        const neto = round2(g.total - (g.retencion ?? 0));
+        if (medioPago === 'Efectivo' && neto > s.cashRegister.conteoRealEfectivo) {
           return { ok: false, error: `⚠️ No hay suficiente efectivo en caja (S/ ${s.cashRegister.conteoRealEfectivo.toFixed(2)}).` };
         }
         try {
@@ -1425,10 +1437,150 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             ...cur,
             gastos: cur.gastos.map(x => (x.id === id ? { ...x, medioPago, operacion: operacion?.trim() || undefined, fechaPago: fecha } : x)),
             cashRegister: medioPago === 'Efectivo'
-              ? { ...caja, egresos: [...caja.egresos, { id: `EG-${String(caja.egresos.length + 1).padStart(2, '0')}`, motivo: `Pago: ${g.descripcion}`, monto: g.total, hora: new Date().toTimeString().slice(0, 5), responsable: responsable('Administración') }], conteoRealEfectivo: round2(caja.conteoRealEfectivo - g.total) }
+              ? { ...caja, egresos: [...caja.egresos, { id: `EG-${String(caja.egresos.length + 1).padStart(2, '0')}`, motivo: `Pago: ${g.descripcion}`, monto: neto, hora: new Date().toTimeString().slice(0, 5), responsable: responsable('Administración') }], conteoRealEfectivo: round2(caja.conteoRealEfectivo - neto) }
               : caja
           });
           return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- JARDINEROS Y RECIBOS POR HONORARIOS ----------------
+      async guardarJardinero(j: JardineroInput): Promise<Result<{ jardinero: Jardinero }>> {
+        const nombre = j.nombre.trim();
+        const ruc = j.ruc?.trim() || undefined;
+        const dni = j.dni?.trim() || undefined;
+        if (nombre.length < 3) return { ok: false, error: 'Indica el nombre del jardinero.' };
+        if (ruc && (!/^(10|15|17)/.test(ruc) || !validarRuc(ruc))) return { ok: false, error: 'El RUC del jardinero no es válido (persona natural: empieza con 10, 11 dígitos).' };
+        if (dni && !validarDni(dni)) return { ok: false, error: 'El DNI debe tener 8 dígitos.' };
+        if (j.comisionPct !== undefined && !(j.comisionPct >= 0 && j.comisionPct <= 100)) return { ok: false, error: 'La comisión debe estar entre 0 y 100%.' };
+        try {
+          const datos = { ...j, nombre, ruc, dni, telefono: j.telefono?.trim() || undefined };
+          const id = nube ? await repo.guardarJardinero(datos) : j.id ?? `JAR-${Date.now().toString(36).toUpperCase()}`;
+          const jardinero: Jardinero = { ...datos, id };
+          const cur = get();
+          commit({ ...cur, jardineros: j.id ? cur.jardineros.map(x => (x.id === j.id ? jardinero : x)) : [...cur.jardineros, jardinero] });
+          return { ok: true, jardinero };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Registra el servicio y fija la comisión (del jardinero o la general de Ajustes) sobre el precio sin IGV. */
+      async registrarServicioJardinero(p: ServicioJardineroInput): Promise<Result<{ servicio: ServicioJardinero }>> {
+        const s = get();
+        const j = s.jardineros.find(x => x.id === p.jardineroId && x.activo);
+        const valor = round2(p.valor);
+        const clienteDoc = p.clienteDoc?.replace(/\D/g, '') || undefined;
+        if (!j) return { ok: false, error: 'Elige un jardinero activo.' };
+        if (!(valor > 0)) return { ok: false, error: 'Indica el precio del servicio (sin IGV).' };
+        if (p.descripcion.trim().length < 3) return { ok: false, error: 'Describe el servicio.' };
+        if (p.clienteNombre.trim().length < 2) return { ok: false, error: 'Indica el cliente.' };
+        if (p.modalidad === 'FACTURA' && !validarRuc(clienteDoc ?? '')) return { ok: false, error: 'Para factura indica el RUC válido del cliente.' };
+        if (p.modalidad === 'FACTURA' && !j.ruc) return { ok: false, error: 'El jardinero necesita RUC para emitir su recibo por honorarios a la empresa.' };
+        const pct = j.comisionPct ?? s.company.comisionJardineroPct;
+        if (pct === undefined) return { ok: false, error: 'Configura el % de comisión de los jardineros en Ajustes.' };
+        const datos = { ...p, valor, clienteDoc, descripcion: p.descripcion.trim(), clienteNombre: p.clienteNombre.trim() };
+        try {
+          const servicio: ServicioJardinero = nube
+            ? await repo.registrarServicioJardinero({ ...datos, usuario })
+            : {
+                ...datos, id: `SJ-${Date.now().toString(36).toUpperCase()}`, comisionPct: pct, comision: round2(valor * pct / 100),
+                rxhSerie: p.modalidad === 'RXH_CLIENTE' ? p.rxhSerie?.trim().toUpperCase() || undefined : undefined,
+                rxhNumero: p.modalidad === 'RXH_CLIENTE' ? p.rxhNumero?.trim() || undefined : undefined
+              };
+          const cur = get();
+          commit({ ...cur, serviciosJardinero: [servicio, ...cur.serviciosJardinero] });
+          return { ok: true, servicio };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /**
+       * FACTURA: factura al cliente por el servicio (+ IGV).
+       * RXH_CLIENTE: comprobante al jardinero por la comisión (+ IGV).
+       * Queda por emitir en SUNAT como cualquier venta y va al RVIE.
+       */
+      async emitirComprobanteServicio(id: string, pagos: Pago[]): Promise<Result<{ invoice: ComprobanteSunat; vuelto: number }>> {
+        const s = get();
+        const sv = s.serviciosJardinero.find(x => x.id === id);
+        const j = sv && s.jardineros.find(x => x.id === sv.jardineroId);
+        if (!sv || !j) return { ok: false, error: 'Servicio no encontrado.' };
+        if (sv.comprobanteId) return { ok: false, error: `Este servicio ya tiene el comprobante ${sv.comprobanteId}.` };
+        const factura = sv.modalidad === 'FACTURA';
+        const monto = factura ? sv.valor : sv.comision;
+        if (!(monto > 0)) return { ok: false, error: 'La comisión es cero: no hay nada que cobrar.' };
+        const doc = factura ? sv.clienteDoc ?? '' : j.ruc ?? j.dni ?? '';
+        const precio = round2(conIgv(monto));
+        const r = await venderYGuardar({
+          lineas: [{
+            sku: factura ? 'SRV-JARDIN' : 'SRV-COMISION',
+            name: factura ? `Servicio de jardinería: ${sv.descripcion}` : `Comisión ${sv.comisionPct}% por servicio de jardinería: ${sv.descripcion} (${sv.clienteNombre})`,
+            qty: 1, precioUnitNeto: precio, esProducto: false
+          }],
+          total: precio,
+          descuentoTotal: 0,
+          tipoComprobante: validarRuc(doc) ? '01' : '03',
+          docIdentidad: doc,
+          clientName: factura ? sv.clienteNombre : j.nombre,
+          pagos,
+          generarGre: false,
+          canal: 'Servicios'
+        });
+        if (!r.ok) return r;
+        let aviso: string | undefined;
+        try {
+          if (nube) await repo.vincularComprobanteServicio(id, r.invoice.id);
+        } catch (e) {
+          aviso = errorNube(e);
+        }
+        commit({ ...r.next, serviciosJardinero: r.next.serviciosJardinero.map(x => (x.id === id ? { ...x, comprobanteId: r.invoice.id } : x)) });
+        if (aviso) return { ok: false, error: `Se emitió ${r.invoice.id}, pero no se pudo enlazar al servicio: ${aviso}` };
+        return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
+      },
+
+      /**
+       * Recibo por honorarios del jardinero. En la modalidad FACTURA queda como gasto por pagar
+       * (633 a 424) con la retención de 4ta (8%) si supera S/ 1 500 y no tiene suspensión.
+       */
+      async registrarRxhJardinero(id: string, serie: string, numero: string, fecha = today()): Promise<Result<{ retencion: number }>> {
+        const s = get();
+        const sv = s.serviciosJardinero.find(x => x.id === id);
+        const j = sv && s.jardineros.find(x => x.id === sv.jardineroId);
+        const serieN = serie.trim().toUpperCase();
+        const numeroN = numero.trim();
+        if (!sv || !j) return { ok: false, error: 'Servicio no encontrado.' };
+        if (!/^[A-Z0-9]{4}$/.test(serieN) || !/^\d{1,8}$/.test(numeroN)) return { ok: false, error: 'Indica la serie (ej. E001) y el número del recibo por honorarios.' };
+        if (sv.rxhNumero) return { ok: false, error: 'Este servicio ya tiene su recibo por honorarios.' };
+        const factura = sv.modalidad === 'FACTURA';
+        const monto = round2(sv.valor - sv.comision);
+        const retencion = factura && monto > 1500 && !j.suspension4ta ? round2(monto * 0.08) : 0;
+        if (factura) {
+          if (!j.ruc) return { ok: false, error: 'El jardinero necesita RUC.' };
+          if (!(monto > 0)) return { ok: false, error: 'Con esa comisión no queda honorario por pagar.' };
+          if (fecha < sv.fecha) return { ok: false, error: 'El recibo no puede ser anterior al servicio.' };
+          if (s.gastos.some(g => g.proveedorRuc === j.ruc && g.tipoComprobante === '02' && g.serie === serieN && g.numero === numeroN)) {
+            return { ok: false, error: 'Ese recibo por honorarios ya está registrado.' };
+          }
+        }
+        try {
+          let gastoId: string | undefined;
+          let gastos = s.gastos;
+          if (nube) {
+            gastoId = await repo.registrarRxhJardinero({ id, serie: serieN, numero: numeroN, fecha, usuario });
+            if (gastoId) gastos = await repo.cargarGastos();
+          } else if (factura) {
+            gastoId = `GAS-${Date.now().toString(36).toUpperCase()}`;
+            gastos = [{
+              id: gastoId, fecha, cuenta: CONFIG_CONTABLE.HONORARIOS.cuenta, descripcion: `Honorarios: ${sv.descripcion}`.slice(0, 200), proveedorRuc: j.ruc, proveedor: j.nombre,
+              tipoComprobante: '02', serie: serieN, numero: numeroN, base: monto, igv: 0, total: monto, retencion
+            }, ...s.gastos];
+          }
+          const cur = get();
+          commit({ ...cur, gastos, serviciosJardinero: cur.serviciosJardinero.map(x => (x.id === id ? { ...x, rxhSerie: serieN, rxhNumero: numeroN, gastoId } : x)) });
+          return { ok: true, retencion };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

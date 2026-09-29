@@ -328,20 +328,20 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Monstera Deliciosa")').click();
-    await pos.getByLabel('Más AUR-001').click(); // 2 × 85 = 170
-    await pos.locator('button:has-text("Sansevieria Laurentii")').click(); // + 48 = 218
-    await pos.getByLabel('Valor del descuento').fill('10'); // 10% → 196.20
-    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 196.20');
+    await pos.getByLabel('Más AUR-001').click(); // 2 × 85 + IGV = 200.60
+    await pos.locator('button:has-text("Sansevieria Laurentii")').click(); // + 48 + IGV = 257.24
+    await pos.getByLabel('Valor del descuento').fill('10'); // 10% → 231.52
+    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 231.52');
 
     await pos.locator('button:has-text("+ Pago")').click();
     await pos.getByLabel('Monto 1').fill('100');
-    await pos.locator('button:has-text("completar")').click(); // Yape 96.20
+    await pos.locator('button:has-text("completar")').click(); // Yape 131.52
     await expect(pos.getByText('Cobro completo ✓')).toBeVisible();
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
 
-    await expect(page.getByText('Total: S/ 196.20')).toBeVisible();
-    await expect(page.getByText('Pago Yape: 96.20')).toBeVisible();
-    await expect(page.getByText('Descuento aplicado: -21.80')).toBeVisible();
+    await expect(page.getByText('Total: S/ 231.52')).toBeVisible();
+    await expect(page.getByText('Pago Yape: 131.52')).toBeVisible();
+    await expect(page.getByText('Descuento aplicado: -25.72')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
 
     await ir(page, 'kardex');
@@ -355,13 +355,13 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Monstera Deliciosa")').click();
     await pos.getByLabel('Monto 1').fill('50');
-    await expect(pos.getByText('Falta cobrar S/ 35.00.')).toBeVisible();
+    await expect(pos.getByText('Falta cobrar S/ 50.30.')).toBeVisible(); // 85 + IGV = 100.30
     await expect(page.locator('button:has-text("Emitir Comprobante SUNAT")')).toBeDisabled();
 
     await pos.locator('button:has-text("S/ 200")').click();
-    await expect(pos.getByText('Vuelto: S/ 115.00')).toBeVisible();
+    await expect(pos.getByText('Vuelto: S/ 99.70')).toBeVisible();
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
-    await expect(page.getByText('Vuelto: S/ 115.00')).toBeVisible();
+    await expect(page.getByText('Vuelto: S/ 99.70')).toBeVisible();
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
@@ -411,7 +411,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await m.getByLabel('Distrito').fill('Surco');
     await m.getByLabel('Producto').selectOption('AUR-003');
     await m.locator('button:has-text("+ Agregar")').click();
-    await expect(m.getByLabel('Total del pedido')).toHaveText('S/ 130.00'); // 120 + 10 delivery
+    await expect(m.getByLabel('Total del pedido')).toHaveText('S/ 151.60'); // 120 + IGV + 10 delivery
     await m.locator('button:has-text("Guardar Pedido")').click();
 
     const tarjeta = page.getByRole('article').filter({ hasText: 'Lucía Torres' });
@@ -551,17 +551,17 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   test('30. POS: cupón de descuento y canje de puntos del cliente', async ({ page }) => {
     await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
-    await pos.locator('button:has-text("Monstera Deliciosa")').click(); // 85
+    await pos.locator('button:has-text("Monstera Deliciosa")').click(); // 85 + IGV = 100.30
     await pos.getByLabel('Documento del cliente').fill('47891234'); // Valeria: 8 puntos
     await pos.getByLabel('Código de cupón').fill('bienvenida10');
-    await pos.locator('button:has-text("Aplicar")').click(); // 10% → 76.50
-    await expect(pos.getByText('✓ BIENVENIDA10: − S/ 8.50')).toBeVisible();
-    await pos.getByLabel('Puntos a canjear').fill('8'); // S/ 0.80 → 75.70
-    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 75.70');
+    await pos.locator('button:has-text("Aplicar")').click(); // 10% → 90.27
+    await expect(pos.getByText('✓ BIENVENIDA10: − S/ 10.03')).toBeVisible();
+    await pos.getByLabel('Puntos a canjear').fill('8'); // S/ 0.80 → 89.47
+    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 89.47');
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await expect(page.getByText('Cupón: BIENVENIDA10')).toBeVisible();
     await expect(page.getByText('Puntos canjeados: 8')).toBeVisible();
-    await expect(page.getByText('Puntos ganados: 7')).toBeVisible(); // piso(75.70 / 10)
+    await expect(page.getByText('Puntos ganados: 8')).toBeVisible(); // piso(89.47 / 10)
     await page.locator('button:has(svg.lucide-x)').first().click();
 
     // El cupón con compra mínima no aplica a una venta chica
@@ -582,14 +582,14 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await m.getByLabel('Cliente').fill('Oficinas Ica SAC');
     await m.getByLabel('Producto').selectOption('AUR-002');
     await m.locator('button:has-text("+ Agregar")').click();
-    await m.getByLabel('Cantidad AUR-002').fill('3'); // 144
-    await expect(m.getByLabel('Total cotizado')).toHaveText('S/ 144.00');
+    await m.getByLabel('Cantidad AUR-002').fill('3'); // 3 × 48 + IGV
+    await expect(m.getByLabel('Total cotizado')).toHaveText('S/ 169.92');
     await m.locator('button:has-text("Guardar Cotización")').click();
 
     const cot = page.getByRole('article').filter({ hasText: 'Oficinas Ica SAC' });
     await expect(cot.getByText('ENVIADA')).toBeVisible();
     await cot.locator('button:has-text("Convertir en venta")').click();
-    await expect(page.locator('.fixed').getByLabel('Total a cobrar')).toHaveText('S/ 144.00');
+    await expect(page.locator('.fixed').getByLabel('Total a cobrar')).toHaveText('S/ 169.92');
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await expect(page.getByText('COMPROBANTE ELECTRÓNICO')).toBeVisible();
     await page.locator('button:has(svg.lucide-x)').first().click();
@@ -621,7 +621,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await page.click('button:has-text("Nueva venta")');
     const pos = page.locator('.fixed');
     await pos.locator('button:has-text("Palmera Areca")').click();
-    await pos.getByLabel('Más AUR-004').click(); // 2 × 95 = 190
+    await pos.getByLabel('Más AUR-004').click(); // 2 × 95 + IGV = 224.20
     await page.click('button:has-text("Emitir Comprobante SUNAT")');
     await page.locator('button:has(svg.lucide-x)').first().click();
 
@@ -633,7 +633,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(page.getByRole('region', { name: 'Ventas por vendedor' }).getByText('Caja Principal')).toBeVisible();
 
     await productos.locator('button:has-text("Ver tabla")').click();
-    await expect(productos.locator('tr', { hasText: 'Palmera Areca Palma de Salón' })).toContainText('S/ 190.00');
+    await expect(productos.locator('tr', { hasText: 'Palmera Areca Palma de Salón' })).toContainText('S/ 224.20');
 
     await page.getByRole('radio', { name: 'Mes anterior' }).click();
     await expect(page.getByRole('region', { name: 'Productos más vendidos' }).getByText('Sin ventas en el periodo.')).toBeVisible();
@@ -658,9 +658,9 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await m.getByLabel('Categoría', { exact: true }).selectOption('macetas');
     await expect(m.getByLabel('SKU')).toHaveValue('MAC-002'); // MAC-001 ya existe en el demo
     await m.getByLabel('Nombre del producto').fill('Maceta de barro 20 cm');
-    await m.getByLabel('Precio de venta').fill('23.60');
+    await m.getByLabel('Precio de venta').fill('20');
     await m.getByLabel('Costo unitario').fill('10');
-    await expect(m.getByText("50% · gana S/ 10.00 por unidad")).toBeVisible(); // 20 de base sin IGV − 10 de costo
+    await expect(m.getByText("50% · gana S/ 10.00 por unidad")).toBeVisible(); // precio sin IGV 20 − costo 10
     await m.getByLabel('Stock inicial').fill('12');
     await m.getByRole('button', { name: 'Guardar y crear otro' }).click();
     await expect(m.getByText('✓ Maceta de barro 20 cm creado con 12 u.')).toBeVisible();
@@ -942,6 +942,67 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('48. Jardinero con recibo por honorarios: comisión + IGV, factura al cliente, RxH con retención de 4ta y pago', async ({ page }) => {
+    page.on('dialog', d => void d.accept());
+    await ir(page, 'configuracion');
+    await page.getByLabel('Comisión a jardineros (%)').fill('20');
+    await page.getByRole('button', { name: 'Guardar Todos los Cambios de la Empresa' }).click();
+
+    await ir(page, 'honorarios');
+    const jard = page.getByRole('region', { name: 'Jardineros' });
+    await jard.getByLabel('Nombre del jardinero').fill('Juan Pérez Huamán');
+    await jard.getByLabel('RUC del jardinero').fill('10456789019');
+    await jard.getByRole('button', { name: 'Agregar jardinero' }).click();
+    await expect(jard.getByText('Juan Pérez Huamán')).toBeVisible();
+
+    // 1) El jardinero cobra con RxH al cliente; AUREVIA le cobra 20% + IGV
+    const nuevo = page.getByRole('region', { name: 'Registrar servicio' });
+    await nuevo.getByLabel('Descripción del servicio').fill('Poda de ficus');
+    await nuevo.getByLabel('Cliente del servicio', { exact: true }).fill('Ana Salas');
+    await nuevo.getByLabel('Precio del servicio sin IGV').fill('150');
+    await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('S/ 35.40'); // 30 + IGV
+    await nuevo.getByRole('button', { name: 'Registrar servicio' }).click();
+    const lista = page.getByRole('region', { name: 'Servicios de jardineros' });
+    const poda = lista.getByRole('listitem').filter({ hasText: 'Poda de ficus' });
+    await poda.getByLabel('Medio de pago del servicio Poda de ficus').selectOption('Efectivo');
+    await poda.getByRole('button', { name: 'Cobrar comisión' }).click();
+    await expect(page.getByText(/Comisión 20% por servicio de jardinería/)).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await expect(poda.getByText(/Comisión cobrada F001-/)).toBeVisible(); // el jardinero tiene RUC → factura
+    await poda.getByLabel('Número del RxH de Poda de ficus').fill('31');
+    await poda.getByRole('button', { name: 'Registrar RxH' }).click();
+    await expect(poda.getByText('RxH E001-31')).toBeVisible();
+
+    // 2) El cliente pide factura: AUREVIA factura con IGV y el jardinero le emite su RxH (retención 8% > S/ 1 500)
+    await nuevo.getByLabel('Descripción del servicio').fill('Diseño de jardín corporativo');
+    await nuevo.getByLabel('Cliente del servicio', { exact: true }).fill('Empresa Agrícola SAC');
+    await nuevo.getByText('Cliente pide factura').click();
+    await nuevo.getByLabel('Documento del cliente del servicio').fill('20100070970');
+    await nuevo.getByLabel('Precio del servicio sin IGV').fill('2000');
+    await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('S/ 2,360.00');
+    await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('S/ 1,472.00');
+    await nuevo.getByRole('button', { name: 'Registrar servicio' }).click();
+    const diseno = lista.getByRole('listitem').filter({ hasText: 'Diseño de jardín corporativo' });
+    await diseno.getByLabel('N° de operación del servicio Diseño de jardín corporativo').fill('778899');
+    await diseno.getByRole('button', { name: 'Emitir factura' }).click();
+    await expect(page.getByText('FACTURA ELECTRÓNICA')).toBeVisible();
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await diseno.getByLabel('Número del RxH de Diseño de jardín corporativo').fill('32');
+    await diseno.getByRole('button', { name: 'Registrar RxH' }).click();
+    await expect(diseno.getByText('Pagar al jardinero: S/ 1,472.00')).toBeVisible();
+    await diseno.getByLabel('N° de operación del servicio Diseño de jardín corporativo').fill('990011');
+    await diseno.getByRole('button', { name: 'Pagar' }).click();
+    await expect(diseno.getByText(/Pagado S\/ 1,472.00/)).toBeVisible();
+
+    await ir(page, 'libro-diario');
+    const rxh = page.getByRole('listitem').filter({ hasText: 'Honorarios: Diseño de jardín corporativo' }).first();
+    await expect(rxh).toContainText('633');
+    await expect(rxh).toContainText('40172');
+    await expect(rxh).toContainText('424');
+    await expect(page.getByText('Todo cuadra')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();
@@ -1110,6 +1171,35 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Ingresos, egresos y por emitir' })).toBeVisible();
     await ctx.close();
   });
+  test('T9. Precios sin IGV: la tienda lo recuerda y el servicio se pide con recibo por honorarios', async ({ page }) => {
+    await page.goto('/tienda/producto/AUR-002');
+    await expect(page.getByText(/Precio unitario sin IGV/)).toBeVisible();
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    const panel = page.getByRole('dialog');
+    await expect(panel.getByText(/no incluyen IGV/)).toBeVisible();
+    await expect(panel.getByText('S/ 56.64')).toBeVisible(); // 48 + 18%
+    await panel.getByRole('button', { name: 'Confirmar pedido' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByLabel('Nombre *').fill('Carlos Ramos');
+    await page.getByLabel('WhatsApp *').fill('956111222');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByRole('row', { name: /IGV \(18%\)/ })).toContainText('S/ 8.64');
+
+    await page.goto('/tienda/servicios/mantenimiento-residencial');
+    await expect(page.getByText(/recibo por honorarios/).first()).toBeVisible();
+    await page.getByRole('link', { name: /Cotizar/ }).first().click();
+    await page.getByPlaceholder(/jardín de 30 m²/).fill('Mantenimiento mensual de 40 m² de jardín');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByRole('button', { name: /Recibo por honorarios/ })).toBeVisible();
+    await page.getByLabel('Nombre *').fill('Carlos Ramos');
+    await page.getByLabel('WhatsApp *').fill('956111223');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByText('Recibo por honorarios', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Confirmar solicitud' }).click();
+    await expect(page.getByText(/registrad/).first()).toBeVisible();
+    expect(errores).toHaveLength(0);
+  });
+
   test('T8. Delivery por distrito: el cliente ve la tarifa y el pedido llega con ese costo', async ({ page }) => {
     await page.goto('/#configuracion');
     await page.getByLabel('Distrito nuevo', { exact: true }).fill('Parcona');
@@ -1129,7 +1219,7 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     await expect(page.getByRole('alert')).toHaveText('Elige tu distrito para calcular el delivery.');
     await page.getByLabel('Distrito *').selectOption('Parcona');
     await page.getByRole('button', { name: 'Continuar' }).click();
-    await expect(page.getByText('S/ 60.00').last()).toBeVisible(); // 48 + 12 de delivery
+    await expect(page.getByText('S/ 68.64').last()).toBeVisible(); // 48 + 8.64 de IGV + 12 de delivery
     await page.getByRole('button', { name: 'Confirmar pedido' }).click();
     await expect(page.getByText('¡Pedido registrado!')).toBeVisible();
 

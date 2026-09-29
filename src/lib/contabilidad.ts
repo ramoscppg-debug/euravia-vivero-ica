@@ -101,7 +101,10 @@ export const CONFIG_CONTABLE: Record<string, { cuenta: string; descripcion: stri
   DEVOL_SERV: { cuenta: '70941', descripcion: 'Devoluciones de servicios' },
   APERTURA: { cuenta: '5911', descripcion: 'Contrapartida del inventario inicial (ajústala con tu contador)' },
   FALTANTES: { cuenta: '6593', descripcion: 'Faltantes de inventario sin causa' },
-  SOBRANTES: { cuenta: '7599', descripcion: 'Sobrantes de inventario' }
+  SOBRANTES: { cuenta: '7599', descripcion: 'Sobrantes de inventario' },
+  HONORARIOS: { cuenta: '633', descripcion: 'Servicios de jardineros con recibo por honorarios' },
+  CXP_HONOR: { cuenta: '424', descripcion: 'Honorarios por pagar a jardineros' },
+  RET_4TA: { cuenta: '40172', descripcion: 'Retención de renta de cuarta categoría' }
 };
 
 const r4 = (n: number) => Math.round(n * 10000) / 10000;
@@ -209,13 +212,20 @@ export function asientoDeCobro(inv: ComprobanteSunat, cfg = CONFIG_CONTABLE): As
 /** Gasto con comprobante: 6x (+ 40111) a 4212; si se pagó, 4212 a caja o bancos. */
 export function asientosDeGasto(g: Gasto, cfg = CONFIG_CONTABLE): Asiento[] {
   const doc = [g.serie, g.numero].filter(Boolean).join('-');
+  // Recibo por honorarios: 633 a 424 (neto) y 40172 (retención de 4ta)
+  const rxh = g.tipoComprobante === '02';
+  const cxp = rxh ? cfg.CXP_HONOR.cuenta : cfg.CXP.cuenta;
+  const retencion = g.retencion ?? 0;
+  const neto = r4(g.total - retencion);
   const a: Asiento[] = [{
     id: `G-${g.id}`, fecha: g.fecha, glosa: `${g.descripcion}${g.proveedor ? ` · ${g.proveedor}` : ''}${doc ? ` (${doc})` : ''}`, origen: 'GASTO', origenId: g.id,
     tipoComprobante: g.tipoComprobante, serie: g.serie, numero: g.numero,
-    lineas: [D(g.cuenta, g.base), ...(g.igv > 0 ? [D(cfg.IGV.cuenta, g.igv)] : []), H(cfg.CXP.cuenta, g.total)]
+    lineas: rxh
+      ? [D(g.cuenta, g.total), ...(retencion > 0 ? [H(cfg.RET_4TA.cuenta, retencion)] : []), H(cxp, neto)]
+      : [D(g.cuenta, g.base), ...(g.igv > 0 ? [D(cfg.IGV.cuenta, g.igv)] : []), H(cxp, g.total)]
   }];
   if (g.medioPago) a.push({ id: `GP-${g.id}`, fecha: g.fechaPago ?? g.fecha, glosa: `Pago de ${g.descripcion} · ${g.medioPago}${g.operacion ? ` op. ${g.operacion}` : ''}`, origen: 'PAGO', origenId: g.id,
-    lineas: [D(cfg.CXP.cuenta, g.total), H(g.medioPago === 'Efectivo' ? cfg.CAJA.cuenta : cfg.BANCOS.cuenta, g.total)] });
+    lineas: [D(cxp, neto), H(g.medioPago === 'Efectivo' ? cfg.CAJA.cuenta : cfg.BANCOS.cuenta, neto)] });
   return a;
 }
 

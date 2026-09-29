@@ -71,7 +71,7 @@ export default function Finanzas() {
             {serviciosPorCotizar.map(s => (
               <li key={s.id} className="py-2.5 flex flex-wrap items-center gap-3">
                 <span className="flex-1 min-w-[200px]"><span className="font-bold text-tinta">{s.razonSocial || s.nombre}</span><span className="block text-xs text-tinta-suave font-mono">Solicitud {s.id} · servicio por cotizar</span></span>
-                <Insignia tono={s.comprobante === 'FACTURA' ? 'marca' : 'neutro'}>{s.comprobante === 'FACTURA' ? 'Factura' : 'Boleta'}</Insignia>
+                <Insignia tono={s.comprobante === 'FACTURA' ? 'marca' : 'neutro'}>{s.comprobante === 'FACTURA' ? 'Factura' : s.comprobante === 'RXH' ? 'Recibo por honorarios' : 'Boleta'}</Insignia>
                 <Boton tamano="sm" variante="secundario" onClick={() => setTab('solicitudes')}>Ver solicitud</Boton>
               </li>
             ))}
@@ -139,7 +139,7 @@ function CuentasPorPagar() {
     if (!r.ok) setError(r.error);
   };
   return (
-    <Bloque titulo="Cuentas por pagar" accion={<span className="text-xs text-tinta-suave">{soles(pendientes.reduce((a, g) => a + g.total, 0))} pendiente(s) · cuenta 4212</span>}>
+    <Bloque titulo="Cuentas por pagar" accion={<span className="text-xs text-tinta-suave">{soles(pendientes.reduce((a, g) => a + g.total - (g.retencion ?? 0), 0))} pendiente(s) · cuentas 4212 y 424</span>}>
       {error && <p role="alert" className="text-error font-bold text-xs">{error}</p>}
       <ul className="divide-y divide-crema-200">
         {pendientes.map(g => {
@@ -147,7 +147,7 @@ function CuentasPorPagar() {
           return (
             <li key={g.id} className="py-2.5 flex flex-wrap items-center gap-2">
               <span className="flex-1 min-w-[200px]"><span className="font-bold text-tinta">{g.descripcion}</span><span className="block text-xs text-tinta-suave">{[g.proveedor, [g.serie, g.numero].filter(Boolean).join('-'), g.fecha].filter(Boolean).join(' · ')}</span></span>
-              <span className="font-extrabold w-24 text-right">{soles(g.total)}</span>
+              <span className="font-extrabold w-24 text-right">{soles(g.total - (g.retencion ?? 0))}{g.retencion ? <span className="block text-[10px] font-normal text-tinta-suave">ret. 4ta {soles(g.retencion)}</span> : null}</span>
               <select aria-label={`Medio de pago de ${g.descripcion}`} value={p.medio} onChange={e => setPago({ ...pago, [g.id]: { ...p, medio: e.target.value } })} className="min-h-[36px] px-2 rounded-control border border-crema-300 bg-white text-xs">
                 {['Transferencia', 'Yape', 'Plin', 'Tarjeta', 'Efectivo'].map(m => <option key={m} value={m}>{m === 'Efectivo' ? 'Efectivo de caja' : m}</option>)}
               </select>

@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, MessageCircle, St
 import { Enlace, useUbicacion } from '../../../app/router';
 import { Esqueleto } from '../../../components/ui';
 import type { SolicitudTienda } from '../../../domain/types';
-import { enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
+import { AVISO_IGV, desgloseIgv, enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
 import { Contador, Imagen, NotaStock, soles } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useLineas, useTienda } from '../TiendaApp';
@@ -57,6 +57,8 @@ export default function Cotizar() {
 
   useEffect(() => fijarMetadatos({ titulo: modoServicio ? 'Cotizar servicio' : 'Confirmar pedido', descripcion: 'Confirma tu pedido y envíalo por WhatsApp.' }), [modoServicio]);
   useEffect(() => { window.scrollTo({ top: 0 }); setError(null); }, [paso]);
+  // Servicios: recibo por honorarios del jardinero o factura de la empresa; productos: boleta o factura
+  useEffect(() => setF(prev => (modoServicio && prev.comprobante === 'BOLETA' ? { ...prev, comprobante: 'RXH' } : !modoServicio && prev.comprobante === 'RXH' ? { ...prev, comprobante: 'BOLETA' } : prev)), [modoServicio]);
 
   const solicitud: NuevaSolicitud = useMemo(() => ({
     tipo: modoServicio ? 'SERVICIO' : 'PEDIDO',
@@ -70,7 +72,7 @@ export default function Cotizar() {
 
   if (!datos) return <Pagina className="py-10"><Esqueleto className="h-72 !rounded-3xl" /></Pagina>;
   const tarifa = !modoServicio && f.entrega === 'DELIVERY' ? tarifaDe(datos.tarifas, f.distrito) : undefined;
-  const totalConDelivery = total + (tarifa?.costo ?? 0);
+  const montos = desgloseIgv(total, tarifa?.costo ?? 0);
   if (enviado) return <Exito enviado={enviado} modoServicio={modoServicio} />;
 
   if (modoServicio && !servicio) {
@@ -134,7 +136,7 @@ export default function Cotizar() {
                     <Imagen src={l.p.imagen} alt={l.p.nombre} className="w-20 h-20 rounded-2xl shrink-0" />
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <p className="font-bold text-slate-900">{l.p.nombre}</p>
-                      <p className="text-xs text-slate-500">{soles(l.p.precio)} c/u · {l.p.stock > 0 ? `${l.p.stock} disponibles` : 'sin stock'}</p>
+                      <p className="text-xs text-slate-500">{soles(l.p.precio)} c/u + IGV · {l.p.stock > 0 ? `${l.p.stock} disponibles` : 'sin stock'}</p>
                       <Contador valor={l.cantidad} cambiar={n => cambiarCantidad(l.sku, n)} etiqueta={l.p.nombre} permitirCero />
                       <NotaStock stock={l.p.stock} cantidad={l.cantidad} compacta />
                     </div>
@@ -142,6 +144,7 @@ export default function Cotizar() {
                   </li>
                 ))}
               </ul>
+              <p className="p-3 rounded-2xl bg-amber-50 text-amber-900 text-sm font-semibold">{AVISO_IGV}</p>
               <Enlace href={url('/plantas')} className="inline-block text-sm font-bold text-hoja-700 hover:underline">+ Seguir agregando</Enlace>
             </section>
           )}
@@ -182,10 +185,14 @@ export default function Cotizar() {
               <fieldset className="space-y-3">
                 <legend className="text-sm font-bold text-slate-700 mb-2">¿Qué comprobante necesitas? *</legend>
                 <div className="grid grid-cols-2 gap-3">
-                  <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle="Persona natural (DNI)" icono={<FileText className="w-5 h-5" aria-hidden />} />
-                  <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle="Empresa o negocio (RUC)" icono={<FileText className="w-5 h-5" aria-hidden />} />
+                  {modoServicio
+                    ? <Opcion activa={f.comprobante === 'RXH'} onClick={() => set({ comprobante: 'RXH' })} titulo="Recibo por honorarios" detalle="Lo emite el jardinero" icono={<FileText className="w-5 h-5" aria-hidden />} />
+                    : <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle="Persona natural (DNI) · + IGV" icono={<FileText className="w-5 h-5" aria-hidden />} />}
+                  <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle={modoServicio ? 'La emite AUREVIA · + IGV 18%' : 'Empresa o negocio (RUC) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                 </div>
-                {f.comprobante === 'BOLETA' ? (
+                {!modoServicio && <p className="text-xs text-amber-900 font-semibold">{AVISO_IGV}</p>}
+                {modoServicio && f.comprobante === 'FACTURA' && <p className="text-xs text-amber-900 font-semibold">Con factura, al precio del servicio se le suma el 18% de IGV.</p>}
+                {f.comprobante !== 'FACTURA' ? (
                   <label className="block text-sm font-bold text-slate-700">DNI (opcional)
                     <input inputMode="numeric" value={f.doc} onChange={e => set({ doc: e.target.value.replace(/\D/g, '').slice(0, 8) })} className={`${campo} mt-1 font-mono`} placeholder="8 dígitos" />
                   </label>
@@ -246,7 +253,7 @@ export default function Cotizar() {
               <div className="rounded-3xl border border-slate-200 overflow-hidden">
                 <div className="px-5 py-4 bg-hoja-50 flex justify-between items-center gap-3">
                   <p className="font-extrabold text-hoja-900">{modoServicio ? 'Solicitud de cotización' : 'Nota de pedido'}</p>
-                  <span className="text-xs font-bold text-hoja-800">{f.comprobante === 'FACTURA' ? 'Factura' : 'Boleta'}</span>
+                  <span className="text-xs font-bold text-hoja-800">{f.comprobante === 'FACTURA' ? 'Factura' : f.comprobante === 'RXH' ? 'Recibo por honorarios' : 'Boleta'}</span>
                 </div>
                 <dl className="px-5 py-4 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                   <Dato t="Cliente" v={f.nombre} />
@@ -263,8 +270,10 @@ export default function Cotizar() {
                       ))}
                     </tbody>
                     <tfoot>
+                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Valor de venta</td><td className="text-right px-5 font-semibold">{soles(montos.valor)}</td></tr>
+                      <tr><td colSpan={2} className="px-5 py-2">IGV (18%)</td><td className="text-right px-5 font-semibold">{soles(montos.igv)}</td></tr>
                       {tarifa && <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Delivery a {tarifa.distrito}</td><td className="text-right px-5 font-semibold">{soles(tarifa.costo)}</td></tr>}
-                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial (IGV incluido)</td><td className="text-right px-5 font-extrabold text-lg">{soles(totalConDelivery)}</td></tr>
+                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial</td><td className="text-right px-5 font-extrabold text-lg">{soles(montos.total)}</td></tr>
                     </tfoot>
                   </table>
                 )}
@@ -297,9 +306,11 @@ export default function Cotizar() {
             <p className="text-slate-600">{servicio?.nombre}: te enviaremos una cotización a medida.</p>
           ) : (
             <>
-              <p className="flex justify-between"><span className="text-slate-600">{lineas.length} producto(s)</span><span className="font-bold">{soles(total)}</span></p>
+              <p className="flex justify-between"><span className="text-slate-600">{lineas.length} producto(s) sin IGV</span><span className="font-bold">{soles(montos.valor)}</span></p>
+              <p className="flex justify-between"><span className="text-slate-600">IGV (18%)</span><span className="font-bold">{soles(montos.igv)}</span></p>
               <p className="flex justify-between"><span className="text-slate-600">Delivery</span><span className="font-bold">{f.entrega !== 'DELIVERY' ? '—' : tarifa ? soles(tarifa.costo) : 'A coordinar'}</span></p>
-              <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(totalConDelivery)}</span></p>
+              <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(montos.total)}</span></p>
+              <p className="text-xs text-slate-500">{AVISO_IGV}</p>
               {hayAsesor && <p className="p-2.5 rounded-xl bg-amber-50 text-amber-900 text-xs font-semibold">Parte de tu pedido supera el stock: un asesor de ventas lo coordina contigo.</p>}
             </>
           )}

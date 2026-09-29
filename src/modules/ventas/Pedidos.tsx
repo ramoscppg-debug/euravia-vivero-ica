@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Camera, CheckCircle2, ChevronLeft, ClipboardList, FileText, Image, MapPin, MessageCircle, PlusCircle, Receipt, Trash2, Truck, X, XCircle } from 'lucide-react';
 import { ModalShell, useDocLookup } from '../../components/shared';
 import { CANALES_VENTA, MEDIOS_PAGO, type CanalVenta, type EstadoPedido, type MedioPago, type Pago, type Pedido, type PedidoItem } from '../../domain/types';
-import { round2 } from '../../lib/peru';
+import { conIgv, round2 } from '../../lib/peru';
 import { resumirPagos } from '../../lib/pos';
 import { urlEvidencia } from '../../lib/repo';
 import { reservadoEnPedidos, useErp } from '../../store/ErpStore';
@@ -210,7 +210,7 @@ export function NuevoPedidoModal() {
   const agregar = () => {
     const p = products.find(x => x.sku === skuNuevo);
     if (!p) return;
-    setItems(its => (its.some(i => i.sku === p.sku) ? its.map(i => (i.sku === p.sku ? { ...i, qty: i.qty + 1 } : i)) : [...its, { sku: p.sku, name: p.name, qty: 1, unitPrice: p.price }]));
+    setItems(its => (its.some(i => i.sku === p.sku) ? its.map(i => (i.sku === p.sku ? { ...i, qty: i.qty + 1 } : i)) : [...its, { sku: p.sku, name: p.name, qty: 1, unitPrice: round2(conIgv(p.price)) }]));
   };
 
   const guardar = async () => {
@@ -258,7 +258,7 @@ export function NuevoPedidoModal() {
         <span className="text-[10px] text-tinta-suave uppercase font-bold block">Productos</span>
         <div className="flex gap-2">
           <select aria-label="Producto" value={skuNuevo} onChange={e => setSkuNuevo(e.target.value)} className={`${input} bg-white`}>
-            {products.map(p => <option key={p.sku} value={p.sku}>{p.name} — S/ {p.price.toFixed(2)} (libres {libre(p.sku)})</option>)}
+            {products.map(p => <option key={p.sku} value={p.sku}>{p.name} — S/ {p.price.toFixed(2)} + IGV (libres {libre(p.sku)})</option>)}
           </select>
           <button type="button" onClick={agregar} className="shrink-0 px-3 rounded-xl bg-bosque-950 text-oro font-bold">+ Agregar</button>
         </div>

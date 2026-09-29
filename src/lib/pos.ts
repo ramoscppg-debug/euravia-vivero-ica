@@ -1,10 +1,10 @@
 // ==========================================
 // CÁLCULOS DEL PUNTO DE VENTA (puros)
 // Carrito con descuento por línea y global (prorrateado en los ítems), pago mixto y vuelto.
-// Todos los precios incluyen IGV.
+// El precio del catálogo es sin IGV: el carrito trabaja con el precio con IGV que va al comprobante.
 // ==========================================
 import type { CatalogProduct, DescuentoGlobal, LineaCarrito, Pago } from '../domain/types';
-import { round2 } from './peru';
+import { conIgv, round2 } from './peru';
 
 export interface LineaCalculada {
   sku: string;
@@ -32,8 +32,9 @@ export function calcularCarrito(lineas: LineaCarrito[], productos: CatalogProduc
       const p = productos.find(x => x.sku === l.sku);
       if (!p || l.qty <= 0) return null;
       const pct = Math.min(100, Math.max(0, l.descuentoPct || 0));
-      const bruto = round2(p.price * l.qty);
-      return { sku: p.sku, name: p.name, qty: l.qty, precioLista: p.price, descuentoPct: pct, bruto, trasLinea: round2(bruto * (1 - pct / 100)) };
+      const precioLista = conIgv(p.price);
+      const bruto = round2(precioLista * l.qty);
+      return { sku: p.sku, name: p.name, qty: l.qty, precioLista, descuentoPct: pct, bruto, trasLinea: round2(bruto * (1 - pct / 100)) };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 

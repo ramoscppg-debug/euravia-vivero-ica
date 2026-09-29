@@ -26,6 +26,9 @@ export const RMV = 1130; // S/ — Remuneración Mínima Vital vigente
 export const ASIGNACION_FAMILIAR = Math.round(RMV * 0.10 * 100) / 100; // S/ 113.00
 export const IGV_RATE = 0.18;
 
+/** El precio del catálogo es valor de venta (sin IGV); la boleta o factura lo cobra con IGV. */
+export const conIgv = (valor: number) => valor * (1 + IGV_RATE);
+
 /** Aporte del empleador al SIS (semicontributivo) por trabajador de microempresa. */
 export const APORTE_SIS_MICRO = 15;
 

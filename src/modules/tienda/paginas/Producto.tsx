@@ -49,7 +49,7 @@ export default function Producto({ sku }: { sku: string }) {
             <span className="text-3xl font-extrabold text-slate-900">{soles(p.precio)}</span>
             <ChipStock p={p} />
           </div>
-          <p className="text-xs text-slate-500 -mt-3">Precio unitario con IGV.</p>
+          <p className="text-xs text-slate-500 -mt-3">Precio unitario sin IGV: en tu boleta o factura se suma el 18% ({soles(Math.round(p.precio * 118) / 100)} con IGV).</p>
 
           {p.descripcion && <p className="text-base leading-relaxed text-slate-700">{p.descripcion}</p>}
 
