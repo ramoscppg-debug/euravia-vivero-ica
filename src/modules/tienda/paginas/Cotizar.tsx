@@ -191,6 +191,7 @@ export default function Cotizar() {
                   <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle={modoServicio ? undefined : 'Empresa o negocio (RUC) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                 </div>
                 {!modoServicio && <p className="text-xs text-amber-900 font-semibold">{AVISO_IGV}</p>}
+                {modoServicio && <p className="text-xs text-amber-900 font-semibold">Si eliges boleta o factura, al precio del servicio se le agrega el 18% de IGV.</p>}
                 {f.comprobante !== 'FACTURA' ? (
                   <div className="space-y-3">
                     <div role="group" aria-label="Tipo de documento" className="inline-flex rounded-full border border-slate-300 p-1">

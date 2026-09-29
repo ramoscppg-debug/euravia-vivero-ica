@@ -201,10 +201,10 @@ export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombr
     `*${s.tipo === 'SERVICIO' ? 'Cotización de servicio' : 'Pedido'} AUREVIA N° ${numero}*`,
     `Cliente: ${s.nombre.trim()} · ${s.telefono.trim()}`,
     s.comprobante === 'FACTURA'
-      ? `Comprobante: Factura · RUC ${doc} · ${s.razonSocial?.trim()}`
+      ? `Comprobante: Factura · RUC ${doc} · ${s.razonSocial?.trim()}${s.tipo === 'SERVICIO' ? ' (se agrega 18% de IGV)' : ''}`
       : s.comprobante === 'RXH'
         ? `Comprobante: Recibo por honorarios${doc ? ` · ${doc.length === 11 ? 'RUC' : 'DNI'} ${doc}${s.razonSocial?.trim() ? ` · ${s.razonSocial.trim()}` : ''}` : ''}`
-        : `Comprobante: Boleta${doc ? ` · ${doc.length === 11 ? 'RUC' : 'DNI'} ${doc}${s.razonSocial?.trim() ? ` · ${s.razonSocial.trim()}` : ''}` : ''}`,
+        : `Comprobante: Boleta${doc ? ` · ${doc.length === 11 ? 'RUC' : 'DNI'} ${doc}${s.razonSocial?.trim() ? ` · ${s.razonSocial.trim()}` : ''}` : ''}${s.tipo === 'SERVICIO' ? ' (se agrega 18% de IGV)' : ''}`,
     servicio ? `Servicio: ${servicio}` : '',
     s.entrega === 'DELIVERY' ? `Entrega: delivery a ${[s.direccion, s.distrito].filter(Boolean).join(', ')} · ${delivery !== undefined ? soles(delivery) : 'costo a coordinar'}` : s.tipo === 'PEDIDO' ? 'Entrega: recojo en el vivero' : '',
     ...(lineas.length ? ['', ...lineas.map(l => `• ${l.cantidad} × ${l.nombre} (${soles(l.precio)} + IGV)${l.cantidad > l.stock ? ` — hay ${l.stock}, el resto lo coordina un asesor` : ''}`),
