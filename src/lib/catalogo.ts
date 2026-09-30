@@ -29,7 +29,7 @@ export function siguienteSku(categoria: Category, existentes: string[], reservad
 }
 
 export const margenPct = (precio: number, costo: number) => {
-  const base = precio; // precio y costo se registran sin IGV
+  const base = precio / 1.18; // el precio incluye IGV; el costo se registra sin IGV
   return base > 0 && costo > 0 ? Math.round(((base - costo) / base) * 100) : null;
 };
 

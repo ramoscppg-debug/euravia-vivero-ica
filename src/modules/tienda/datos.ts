@@ -118,14 +118,10 @@ export interface NuevaSolicitud {
 
 export const RUC_VALIDO = /^(10|15|17|20)[0-9]{9}$/;
 
-/** Los precios del catálogo son valor de venta: la boleta o factura suma el 18% de IGV. */
-export const TASA_IGV = 0.18;
-export const AVISO_IGV = 'Los precios de nuestras plantas y productos no incluyen IGV: se suma el 18% en tu boleta o factura.';
-export function desgloseIgv(valor: number, delivery = 0) {
-  const r2 = (n: number) => Math.round(n * 100) / 100;
-  const igv = r2(valor * TASA_IGV);
-  return { valor: r2(valor), igv, delivery, total: r2(valor + igv + delivery) };
-}
+/** Los precios de plantas e insumos ya incluyen IGV. */
+export const AVISO_IGV = 'Todos nuestros precios incluyen IGV.';
+/** IGV contenido en un precio que ya lo incluye. */
+export const igvIncluido = (total: number) => Math.round((total - total / 1.18) * 100) / 100;
 
 /** Las mismas reglas que aplica el servidor (crear_solicitud), para avisar antes de enviar. */
 export function validarSolicitud(s: NuevaSolicitud): string | null {
@@ -165,8 +161,8 @@ export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPubli
     const id = `WEB-${Date.now().toString(36).toUpperCase()}`;
     agregarSolicitudDemo({
       id, tipo: s.tipo, nombre, telefono, email: s.email || undefined, distrito: s.distrito || undefined, mensaje: s.mensaje || undefined,
-      servicioSlug: s.servicio, items, totalReferencial: desgloseIgv(items.reduce((a, it) => a + it.cantidad * it.precio, 0)).total,
-      igvReferencial: desgloseIgv(items.reduce((a, it) => a + it.cantidad * it.precio, 0)).igv, estado: 'NUEVA', createdAt: new Date().toISOString(),
+      servicioSlug: s.servicio, items, totalReferencial: items.reduce((a, it) => a + it.cantidad * it.precio, 0),
+      igvReferencial: igvIncluido(items.reduce((a, it) => a + it.cantidad * it.precio, 0)), estado: 'NUEVA', createdAt: new Date().toISOString(),
       comprobante, docCliente: doc, razonSocial: s.razonSocial?.trim() || undefined, entrega, direccion: s.direccion?.trim() || undefined,
       requiereAsesor: items.some(it => it.cantidad > it.stock),
       costoDelivery: s.tipo === 'PEDIDO' && entrega === 'DELIVERY' ? tarifaDe(tarifas, s.distrito)?.costo : undefined
@@ -195,7 +191,7 @@ export function enlaceWhatsapp(config: ConfigTienda, texto: string): string | nu
 
 /** Mensaje que el cliente envía por WhatsApp con su pedido ya registrado. */
 export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombre: string; cantidad: number; precio: number; stock: number }[], servicio?: string, delivery?: number): string {
-  const d = desgloseIgv(lineas.reduce((a, l) => a + l.cantidad * l.precio, 0), delivery ?? 0);
+  const total = lineas.reduce((a, l) => a + l.cantidad * l.precio, 0) + (delivery ?? 0);
   const doc = (s.doc ?? '').replace(/[^0-9]/g, '');
   const partes = [
     `*${s.tipo === 'SERVICIO' ? 'Cotización de servicio' : 'Pedido'} AUREVIA N° ${numero}*`,
@@ -207,8 +203,8 @@ export function mensajePedido(numero: string, s: NuevaSolicitud, lineas: { nombr
         : `Comprobante: Boleta${doc ? ` · ${doc.length === 11 ? 'RUC' : 'DNI'} ${doc}${s.razonSocial?.trim() ? ` · ${s.razonSocial.trim()}` : ''}` : ''}${s.tipo === 'SERVICIO' ? ' (se agrega 18% de IGV)' : ''}`,
     servicio ? `Servicio: ${servicio}` : '',
     s.entrega === 'DELIVERY' ? `Entrega: delivery a ${[s.direccion, s.distrito].filter(Boolean).join(', ')} · ${delivery !== undefined ? soles(delivery) : 'costo a coordinar'}` : s.tipo === 'PEDIDO' ? 'Entrega: recojo en el vivero' : '',
-    ...(lineas.length ? ['', ...lineas.map(l => `• ${l.cantidad} × ${l.nombre} (${soles(l.precio)} + IGV)${l.cantidad > l.stock ? ` — hay ${l.stock}, el resto lo coordina un asesor` : ''}`),
-      `Valor de venta: ${soles(d.valor)}`, `IGV (18%): ${soles(d.igv)}`, ...(d.delivery ? [`Delivery: ${soles(d.delivery)}`] : []), `Total referencial: ${soles(d.total)}`] : []),
+    ...(lineas.length ? ['', ...lineas.map(l => `• ${l.cantidad} × ${l.nombre} (${soles(l.precio)})${l.cantidad > l.stock ? ` — hay ${l.stock}, el resto lo coordina un asesor` : ''}`),
+      ...(delivery ? [`Delivery: ${soles(delivery)}`] : []), `Total referencial (IGV incluido): ${soles(total)}`] : []),
     s.mensaje?.trim() ? `\nNota: ${s.mensaje.trim()}` : '',
     '',
     'Quedo atento(a) para coordinar el pago y la entrega.'

@@ -112,7 +112,7 @@ export default function Catalogo() {
                         </div>
                         <p className="text-[11px] font-mono text-tinta-suave">{p.sku} · {p.categoryName}</p>
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-extrabold text-tinta">{soles(p.price)} <span className="text-[10px] font-semibold text-tinta-suave">+ IGV</span></span>
+                          <span className="font-extrabold text-tinta">{soles(p.price)}</span>
                           <Insignia tono={p.stock <= 0 ? 'error' : p.stock <= p.minStock ? 'aviso' : 'exito'}>{p.stock} u.</Insignia>
                           {margen !== null && <Insignia tono={margen < 20 ? 'error' : 'neutro'}>margen {margen}%</Insignia>}
                           {p.visibleTienda === false && <Insignia><EyeOff className="w-3 h-3" aria-hidden /> oculto</Insignia>}

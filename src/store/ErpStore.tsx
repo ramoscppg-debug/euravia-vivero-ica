@@ -870,7 +870,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (sol.pedidoId) return { ok: false, error: `Esta solicitud ya es el pedido ${sol.pedidoId}.` };
         const items = sol.items.map(it => {
           const prod = s.products.find(pr => pr.sku === it.sku);
-          return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: round2(conIgv(prod?.price ?? it.precio)) };
+          return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: prod?.price ?? it.precio };
         });
         const r = await acciones.crearPedido({
           canal: 'Web', cliente: { nombre: sol.nombre, telefono: sol.telefono, doc: sol.docCliente }, direccion: datos.direccion, distrito: datos.distrito || sol.distrito || '',

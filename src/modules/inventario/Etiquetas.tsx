@@ -85,7 +85,7 @@ export function GeneradorEtiquetas({ presetSku }: { presetSku?: string }) {
             <span className="min-w-0">
               <span className="block text-[10px] font-extrabold tracking-widest text-bosque-700 uppercase">{empresa}</span>
               <span className="block font-bold text-tinta truncate">{primero.name}</span>
-              <span className="block font-extrabold">{soles(primero.price)} <small>+IGV</small></span>
+              <span className="block font-extrabold">{soles(primero.price)}</span>
               <span className="block text-[10px] font-mono text-tinta-suave">{primero.sku}</span>
             </span>
           </div>

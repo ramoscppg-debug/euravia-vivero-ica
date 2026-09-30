@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AlertTriangle, Boxes, ChevronRight, MapPin, PlusCircle, Receipt, Trash2, X } from 'lucide-react';
 import { ModalShell } from '../../components/shared';
 import type { GardeningMaterialItem, GardeningProject, ProjectStatus } from '../../domain/types';
-import { calcularDetraccion, conIgv, round2, validarRuc } from '../../lib/peru';
+import { calcularDetraccion, round2, validarRuc } from '../../lib/peru';
 import { useAuth } from '../../store/AuthStore';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
@@ -196,7 +196,7 @@ export function NuevaCotizacionModal() {
     if (!prod) return;
     setMaterials(ms => ms.some(m => m.sku === prod.sku)
       ? ms.map(m => (m.sku === prod.sku ? { ...m, qty: m.qty + 1 } : m))
-      : [...ms, { sku: prod.sku, name: prod.name, qty: 1, unitPrice: round2(conIgv(prod.price)) }]);
+      : [...ms, { sku: prod.sku, name: prod.name, qty: 1, unitPrice: prod.price }]);
   };
 
   const guardar = async () => {
@@ -252,7 +252,7 @@ export function NuevaCotizacionModal() {
         <span className="text-[10px] text-tinta-suave uppercase font-bold block">Materiales del catálogo</span>
         <div className="flex gap-2">
           <select value={skuNuevo} onChange={e => setSkuNuevo(e.target.value)} className={`${input} bg-white`}>
-            {products.map(p => <option key={p.sku} value={p.sku}>{p.name} — S/ {p.price.toFixed(2)} + IGV (stock {p.stock})</option>)}
+            {products.map(p => <option key={p.sku} value={p.sku}>{p.name} — S/ {p.price.toFixed(2)} (stock {p.stock})</option>)}
           </select>
           <button type="button" onClick={agregarMaterial} className="shrink-0 px-3 rounded-xl bg-bosque-950 text-oro font-bold">+ Agregar</button>
         </div>

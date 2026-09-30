@@ -74,7 +74,7 @@ export default function Solicitudes() {
                 {servicio && <p className="font-semibold text-tinta">Servicio: {servicio.nombre}</p>}
                 {!!s.items.length && (
                   <ul className="text-tinta">
-                    {s.items.map(it => <li key={it.sku}>• {it.cantidad}× {it.nombre} ({soles(it.precio)}{s.igvReferencial !== undefined ? ' + IGV' : ''}){it.stock !== undefined && it.cantidad > it.stock && <span className="text-aviso font-bold"> · había {it.stock}</span>}</li>)}
+                    {s.items.map(it => <li key={it.sku}>• {it.cantidad}× {it.nombre} ({soles(it.precio)}){it.stock !== undefined && it.cantidad > it.stock && <span className="text-aviso font-bold"> · había {it.stock}</span>}</li>)}
                     <li className="font-bold pt-1">Total referencial: {soles(s.totalReferencial)}{s.igvReferencial !== undefined && <span className="font-normal text-tinta-suave"> (incluye IGV {soles(s.igvReferencial)})</span>}</li>
                   </ul>
                 )}

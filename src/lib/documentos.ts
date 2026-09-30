@@ -76,8 +76,8 @@ export interface DocumentoComercial {
 }
 
 const CONDICIONES_BASE: Record<TipoDocumento, string[]> = {
-  'COTIZACIÓN': ['Precios unitarios en soles con IGV: el valor de venta de nuestras plantas no incluye IGV y aquí ya se suma el 18%.', 'Disponibilidad sujeta a stock al momento de confirmar.', 'Pago y entrega se coordinan con su asesor de ventas.'],
-  'PROFORMA': ['Documento previo a la emisión del comprobante electrónico.', 'Precios unitarios en soles con IGV: el valor de venta de nuestras plantas no incluye IGV y aquí ya se suma el 18%.', 'El comprobante se emite al confirmarse el pago.'],
+  'COTIZACIÓN': ['Precios en soles, IGV incluido.', 'Disponibilidad sujeta a stock al momento de confirmar.', 'Pago y entrega se coordinan con su asesor de ventas.'],
+  'PROFORMA': ['Documento previo a la emisión del comprobante electrónico.', 'Precios en soles, IGV incluido.', 'El comprobante se emite al confirmarse el pago.'],
   'NOTA DE PEDIDO': ['Documento interno de preparación y despacho.', 'El comprobante electrónico se entrega junto con el pedido.']
 };
 
@@ -155,7 +155,7 @@ export interface DatosBrochure {
 export function imprimirBrochure(b: DatosBrochure) {
   const nombre = b.empresa.nombreComercial?.split(' - ')[0] || b.empresa.razonSocial || 'AUREVIA';
   const tarjetas = b.productos.map(p => `<div class="prod">${p.imagen ? `<img src="${esc(p.imagen)}" alt="">` : '<div class="sinfoto">🌿</div>'}
-    <div class="cat">${esc(p.categoria)}</div><div class="nom">${esc(p.nombre)}</div>${b.mostrarPrecios ? `<div class="pre">${dinero(p.precio)} <small>+ IGV</small></div>` : ''}</div>`).join('');
+    <div class="cat">${esc(p.categoria)}</div><div class="nom">${esc(p.nombre)}</div>${b.mostrarPrecios ? `<div class="pre">${dinero(p.precio)}</div>` : ''}</div>`).join('');
   const servicios = b.servicios.map(s => `<div class="serv"><div class="nom">${esc(s.nombre)}</div><div class="suave">${esc(s.resumen)}</div></div>`).join('');
   const contacto = [b.contacto.whatsapp && `WhatsApp ${esc(b.contacto.whatsapp)}`, b.contacto.email && esc(b.contacto.email), b.contacto.direccion && esc(b.contacto.direccion), b.contacto.horario && esc(b.contacto.horario)].filter(Boolean);
   imprimirHtml(`Brochure ${nombre}`, `
@@ -213,7 +213,7 @@ export function imprimirEtiquetas(items: EtiquetaProducto[], formato: FormatoEti
   const qr = (t: string) => cache.get(t) ?? (cache.set(t, qrSvg(t)), cache.get(t)!);
   const html = etiquetas.map(e => `<div class="et"><div class="q">${qr(e.enlace)}</div><div class="t">
     <div class="m">${esc(empresa)}</div><div class="n">${esc(e.nombre)}</div>${e.cientifico && formato !== '50x30' ? `<div class="s">${esc(e.cientifico)}</div>` : ''}
-    <div class="p">${dinero(e.precio)} <small>+IGV</small></div><div class="k">${esc(e.sku)}</div></div></div>`).join('');
+    <div class="p">${dinero(e.precio)}</div><div class="k">${esc(e.sku)}</div></div></div>`).join('');
   const tam = formato === '50x30' ? { w: 50, h: 30, q: 24 } : formato === '70x40' ? { w: 70, h: 40, q: 32 } : { w: 63.5, h: 38.1, q: 30 };
   const pagina = formato === 'A4'
     ? '@page{size:A4;margin:12mm 8mm} .hoja{display:grid;grid-template-columns:repeat(3,63.5mm);gap:0 2.5mm;justify-content:center}'

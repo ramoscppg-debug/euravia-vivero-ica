@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, MessageCircle, St
 import { Enlace, useUbicacion } from '../../../app/router';
 import { Esqueleto } from '../../../components/ui';
 import type { SolicitudTienda } from '../../../domain/types';
-import { AVISO_IGV, desgloseIgv, enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
+import { AVISO_IGV, enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
 import { Contador, Imagen, NotaStock, soles } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useLineas, useTienda } from '../TiendaApp';
@@ -73,7 +73,7 @@ export default function Cotizar() {
 
   if (!datos) return <Pagina className="py-10"><Esqueleto className="h-72 !rounded-3xl" /></Pagina>;
   const tarifa = !modoServicio && f.entrega === 'DELIVERY' ? tarifaDe(datos.tarifas, f.distrito) : undefined;
-  const montos = desgloseIgv(total, tarifa?.costo ?? 0);
+  const totalConDelivery = total + (tarifa?.costo ?? 0);
   if (enviado) return <Exito enviado={enviado} modoServicio={modoServicio} />;
 
   if (modoServicio && !servicio) {
@@ -137,7 +137,7 @@ export default function Cotizar() {
                     <Imagen src={l.p.imagen} alt={l.p.nombre} className="w-20 h-20 rounded-2xl shrink-0" />
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <p className="font-bold text-slate-900">{l.p.nombre}</p>
-                      <p className="text-xs text-slate-500">{soles(l.p.precio)} c/u + IGV · {l.p.stock > 0 ? `${l.p.stock} disponibles` : 'sin stock'}</p>
+                      <p className="text-xs text-slate-500">{soles(l.p.precio)} c/u · {l.p.stock > 0 ? `${l.p.stock} disponibles` : 'sin stock'}</p>
                       <Contador valor={l.cantidad} cambiar={n => cambiarCantidad(l.sku, n)} etiqueta={l.p.nombre} permitirCero />
                       <NotaStock stock={l.p.stock} cantidad={l.cantidad} compacta />
                     </div>
@@ -145,7 +145,6 @@ export default function Cotizar() {
                   </li>
                 ))}
               </ul>
-              <p className="p-3 rounded-2xl bg-amber-50 text-amber-900 text-sm font-semibold">{AVISO_IGV}</p>
               <Enlace href={url('/plantas')} className="inline-block text-sm font-bold text-hoja-700 hover:underline">+ Seguir agregando</Enlace>
             </section>
           )}
@@ -190,7 +189,6 @@ export default function Cotizar() {
                   <Opcion activa={f.comprobante === 'BOLETA'} onClick={() => set({ comprobante: 'BOLETA' })} titulo="Boleta" detalle={modoServicio ? undefined : 'Persona natural (DNI) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                   <Opcion activa={f.comprobante === 'FACTURA'} onClick={() => set({ comprobante: 'FACTURA' })} titulo="Factura" detalle={modoServicio ? undefined : 'Empresa o negocio (RUC) · + IGV'} icono={<FileText className="w-5 h-5" aria-hidden />} />
                 </div>
-                {!modoServicio && <p className="text-xs text-amber-900 font-semibold">{AVISO_IGV}</p>}
                 {modoServicio && <p className="text-xs text-amber-900 font-semibold">Si eliges boleta o factura, al precio del servicio se le agrega el 18% de IGV.</p>}
                 {f.comprobante !== 'FACTURA' ? (
                   <div className="space-y-3">
@@ -291,10 +289,8 @@ export default function Cotizar() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Valor de venta</td><td className="text-right px-5 font-semibold">{soles(montos.valor)}</td></tr>
-                      <tr><td colSpan={2} className="px-5 py-2">IGV (18%)</td><td className="text-right px-5 font-semibold">{soles(montos.igv)}</td></tr>
                       {tarifa && <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Delivery a {tarifa.distrito}</td><td className="text-right px-5 font-semibold">{soles(tarifa.costo)}</td></tr>}
-                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial</td><td className="text-right px-5 font-extrabold text-lg">{soles(montos.total)}</td></tr>
+                      <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial (IGV incluido)</td><td className="text-right px-5 font-extrabold text-lg">{soles(totalConDelivery)}</td></tr>
                     </tfoot>
                   </table>
                 )}
@@ -327,10 +323,9 @@ export default function Cotizar() {
             <p className="text-slate-600">{servicio?.nombre}: te enviaremos una cotización a medida.</p>
           ) : (
             <>
-              <p className="flex justify-between"><span className="text-slate-600">{lineas.length} producto(s) sin IGV</span><span className="font-bold">{soles(montos.valor)}</span></p>
-              <p className="flex justify-between"><span className="text-slate-600">IGV (18%)</span><span className="font-bold">{soles(montos.igv)}</span></p>
+              <p className="flex justify-between"><span className="text-slate-600">{lineas.length} producto(s)</span><span className="font-bold">{soles(total)}</span></p>
               <p className="flex justify-between"><span className="text-slate-600">Delivery</span><span className="font-bold">{f.entrega !== 'DELIVERY' ? '—' : tarifa ? soles(tarifa.costo) : 'A coordinar'}</span></p>
-              <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(montos.total)}</span></p>
+              <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(totalConDelivery)}</span></p>
               <p className="text-xs text-slate-500">{AVISO_IGV}</p>
               {hayAsesor && <p className="p-2.5 rounded-xl bg-amber-50 text-amber-900 text-xs font-semibold">Parte de tu pedido supera el stock: un asesor de ventas lo coordina contigo.</p>}
             </>
