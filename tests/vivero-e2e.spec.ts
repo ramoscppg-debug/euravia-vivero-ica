@@ -1356,6 +1356,62 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     expect(errores).toHaveLength(0);
   });
 
+  test('T13. Ofertas y productos nuevos primero; evento con banner interactivo y el mismo precio en la tienda y en la caja', async ({ page }) => {
+    // Oferta en la ficha de la Sansevieria (48 → 40)
+    await page.goto('/#catalogo');
+    await page.getByRole('button', { name: 'Editar Sansevieria Laurentii' }).click();
+    const ficha = page.locator('.fixed');
+    await ficha.getByLabel('Precio de oferta').fill('40');
+    await ficha.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(ficha.getByLabel('Precio de oferta')).toHaveCount(0);
+    await expect(page.getByRole('article').filter({ hasText: 'Sansevieria Laurentii' })).toContainText('oferta S/ 40.00');
+    // Producto nuevo
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    await ficha.getByLabel('Categoría', { exact: true }).selectOption('macetas');
+    await ficha.getByLabel('Nombre del producto').fill('Maceta terracota 25 cm');
+    await ficha.getByLabel('Precio de venta').fill('30');
+    await ficha.getByRole('button', { name: 'Crear producto' }).click();
+
+    // Evento: Día de la Madre, 20% en la Monstera
+    await page.goto('/#ofertas');
+    await page.getByRole('button', { name: 'Nuevo evento' }).click();
+    await page.getByLabel('Nombre del evento').fill('Día de la Madre');
+    await page.getByLabel('Descuento del evento').fill('20');
+    await page.getByLabel('Descripción del evento').fill('Regala vida a mamá');
+    await page.getByLabel('Buscar producto del evento').fill('Monstera');
+    await page.getByLabel('Monstera Deliciosa').check();
+    await page.getByRole('button', { name: 'Guardar evento' }).click();
+    await expect(page.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Productos en oferta' })).toContainText('Sansevieria Laurentii');
+
+    // Tienda: banner al inicio, ofertas primero, lo nuevo marcado
+    await page.goto('/tienda');
+    const banner = page.getByRole('region', { name: 'Eventos y promociones' }).first();
+    await expect(banner).toContainText('Día de la Madre');
+    await expect(banner).toContainText('-20%');
+    const ofertas = page.getByRole('heading', { name: 'Ofertas' });
+    await expect(ofertas).toBeVisible();
+    await page.goto('/tienda/productos');
+    await expect(page.getByRole('article').first()).toContainText('Maceta terracota 25 cm'); // lo nuevo, antes que el resto
+    await expect(page.getByRole('article').filter({ hasText: 'Maceta terracota 25 cm' })).toContainText('Nuevo');
+    await page.goto('/tienda/plantas');
+    await expect(page.getByRole('article').nth(0)).toContainText(/Sansevieria|Monstera/); // ofertas primero
+    const sanse = page.getByRole('article').filter({ hasText: 'Sansevieria Laurentii' });
+    await expect(sanse).toContainText('-17%');
+    await expect(sanse).toContainText('S/ 40.00');
+    await page.goto('/tienda');
+    await page.getByRole('link', { name: 'Ver promociones' }).click();
+    await expect(page.getByRole('article').filter({ hasText: 'Monstera Deliciosa' })).toContainText('S/ 68.00'); // 85 − 20%
+
+    // Caja: cobra el mismo precio
+    await page.goto('/');
+    await page.click('button:has-text("Nueva venta")');
+    const pos = page.locator('.fixed');
+    await pos.locator('button:has-text("Monstera Deliciosa")').click();
+    await expect(pos.getByLabel('Total a cobrar')).toHaveText('S/ 68.00');
+    expect(errores).toHaveLength(0);
+  });
+
   test('T8. Delivery por distrito: el cliente ve la tarifa y el pedido llega con ese costo', async ({ page }) => {
     await page.goto('/#configuracion');
     await page.getByLabel('Distrito nuevo', { exact: true }).fill('Parcona');

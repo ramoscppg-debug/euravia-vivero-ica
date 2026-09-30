@@ -7,6 +7,7 @@ import { Imagen, TarjetaProducto, Titulo } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useTienda } from '../TiendaApp';
 import { FormResena, ListaResenas } from '../Resenas';
+import { BannerEventos } from '../Eventos';
 
 const PASOS = [
   { Icono: ShoppingBag, titulo: 'Elige', detalle: 'Arma tu cotización con plantas, insumos o un servicio. Ves el stock real de cada producto.' },
@@ -24,6 +25,8 @@ export default function Inicio() {
 
   const productos = (datos?.productos ?? []).filter(p => !p.combo);
   const combos = (datos?.productos ?? []).filter(p => p.combo);
+  const ofertas = productos.filter(p => (p.precioRegular ?? 0) > p.precio).slice(0, 8);
+  const nuevos = productos.filter(p => p.esNuevo && !((p.precioRegular ?? 0) > p.precio)).slice(0, 8);
   // Destacados que marcó el dueño; si no marcó ninguno, lo que tiene stock
   const destacados = (productos.some(p => p.destacado) ? productos.filter(p => p.destacado) : productos.filter(p => p.stock > 0)).slice(0, 8);
   const portada = destacados.find(p => p.imagen) ?? productos.find(p => p.imagen);
@@ -37,6 +40,26 @@ export default function Inicio() {
 
   return (
     <>
+      {/* Eventos con promoción: lo primero que ve el cliente */}
+      {!!datos?.eventos.length && <Pagina className="pt-6"><BannerEventos eventos={datos.eventos} /></Pagina>}
+
+      {/* Ofertas y lo nuevo */}
+      {ofertas.length > 0 && (
+        <Pagina className="pt-8">
+          <div className="flex items-end justify-between gap-4 mb-5">
+            <Titulo antetitulo="Precio especial" titulo="Ofertas" />
+            <Enlace href={url('/ofertas')} className="text-sm font-bold text-hoja-700 hover:underline shrink-0">Ver todas</Enlace>
+          </div>
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">{ofertas.map(p => <TarjetaProducto key={p.sku} p={p} />)}</div>
+        </Pagina>
+      )}
+      {nuevos.length > 0 && (
+        <Pagina className="pt-8">
+          <div className="mb-5"><Titulo antetitulo="Recién llegados" titulo="Nuevos en el vivero" /></div>
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">{nuevos.map(p => <TarjetaProducto key={p.sku} p={p} />)}</div>
+        </Pagina>
+      )}
+
       {/* Portada */}
       <section className="relative overflow-hidden bg-gradient-to-b from-hoja-50 to-white">
         <Pagina className="grid lg:grid-cols-[1.15fr_1fr] gap-10 items-center py-12 lg:py-20">

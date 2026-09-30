@@ -9,6 +9,7 @@ import { imprimirDocumento } from '../../lib/documentos';
 import { docDeCotizacion } from './documentosVenta';
 import { useUi } from '../../store/UiStore';
 import { hoyLocal, sumarDias } from '../../lib/fechas';
+import { conPreciosVigentes } from '../../lib/ofertas';
 
 const hoy = () => hoyLocal();
 const ESTADO_COLOR: Record<Cotizacion['estado'], string> = {
@@ -22,7 +23,8 @@ export default function Cotizaciones() {
   const { state, actions } = useErp();
   const { open } = useUi();
   const rol = useAuth().perfil?.rol ?? 'dueno';
-  const { cotizaciones, products, company } = state;
+  const { cotizaciones, company } = state;
+  const products = conPreciosVigentes(state.products, state.eventos, hoyLocal()); // ofertas y eventos vigentes
 
   const texto = (c: Cotizacion) => {
     const carrito = calcularCarrito(c.lineas, products, c.descuentoGlobal);
@@ -152,7 +154,7 @@ function Cupones({ editable }: { editable: boolean }) {
 export function NuevaCotizacionProductosModal() {
   const { state, actions } = useErp();
   const { close } = useUi();
-  const { products } = state;
+  const products = conPreciosVigentes(state.products, state.eventos, hoyLocal());
   const [nombre, setNombre] = useState('');
   const [doc, setDoc] = useState('');
   const [telefono, setTelefono] = useState('');

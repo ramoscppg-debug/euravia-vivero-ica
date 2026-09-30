@@ -35,6 +35,7 @@ import type {
   AperturaEjercicio,
   Combo,
   Resena,
+  EventoPromocion,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -214,6 +215,9 @@ function productoDesdeFila(r: Row): CatalogProduct {
     categoryName: r.categoria_nombre ?? r.categoria,
     visibleTienda: r.visible_tienda ?? true,
     destacado: !!r.destacado,
+    precioOferta: r.precio_oferta != null ? num(r.precio_oferta) : undefined,
+    ofertaHasta: r.oferta_hasta ?? undefined,
+    creadoAt: r.created_at ?? undefined,
     valorInventario: r.valor_inventario != null ? num(r.valor_inventario) : undefined,
     costoPromedio: r.costo_promedio != null ? num(r.costo_promedio) : undefined,
     unidadMedida: r.unidad_medida ?? undefined,
@@ -1081,7 +1085,29 @@ export async function cargarGastos(): Promise<Gasto[]> {
 }
 
 // ---------------- COMBOS, RESEÑAS Y RECORDATORIOS ----------------
-export type CarpetaFoto = 'productos' | 'servicios' | 'combos' | 'resenas';
+export type CarpetaFoto = 'productos' | 'servicios' | 'combos' | 'resenas' | 'eventos';
+
+export const eventoDesdeFila = (r: Row): EventoPromocion => ({
+  id: String(r.id), nombre: r.nombre, descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined, desde: r.desde, hasta: r.hasta,
+  descuentoPct: num(r.descuento_pct), categorias: r.categorias ?? [], skus: r.skus ?? [], visible: !!r.visible
+});
+
+export async function cargarEventos(): Promise<EventoPromocion[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('eventos_promocion').select('*').order('desde', { ascending: false })).map(eventoDesdeFila);
+}
+
+export async function guardarEvento(e: EventoPromocion): Promise<EventoPromocion> {
+  const sb = await db();
+  const fila = {
+    nombre: e.nombre, descripcion: e.descripcion || null, imagen_url: e.imagen || null, desde: e.desde, hasta: e.hasta,
+    descuento_pct: e.descuentoPct, categorias: e.categorias, skus: e.skus, visible: e.visible
+  };
+  const r = e.id.startsWith('nuevo')
+    ? ok<Row>(await sb.from('eventos_promocion').insert(fila).select('*').single())
+    : ok<Row>(await sb.from('eventos_promocion').update(fila).eq('id', Number(e.id)).select('*').single());
+  return eventoDesdeFila(r);
+}
 
 export const comboDesdeFila = (r: Row): Combo => ({
   codigo: r.codigo, nombre: r.nombre, descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined, precio: num(r.precio),
@@ -1332,6 +1358,7 @@ export async function guardarProductoCatalogo(p: CatalogProduct, nuevo: boolean)
     ubicacion_estante: p.location || null, costo_unitario: p.cost, precio_venta: p.price, stock_minimo: p.minStock,
     cuidado_luz: p.careLight || null, cuidado_riego: p.careWater || null, es_planta_viva: p.isLivePlant,
     visible_tienda: p.visibleTienda ?? true, destacado: !!p.destacado,
+    precio_oferta: p.precioOferta ?? null, oferta_hasta: p.precioOferta ? p.ofertaHasta || null : null,
     tipo_existencia: p.tipoExistencia ?? (['sustratos', 'fertilizantes'].includes(p.category) ? '03' : '01'),
     unidad_medida: p.unidadMedida ?? 'NIU'
   };

@@ -20,6 +20,7 @@ import type {
   AperturaEjercicio,
   Combo,
   Resena,
+  EventoPromocion,
   ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
@@ -65,6 +66,7 @@ import { calcularDetraccion, conIgv, round2, validarDni, validarRuc, vencimiento
 import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
+import { conPreciosVigentes } from '../lib/ofertas';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
@@ -105,6 +107,7 @@ export interface ErpState {
   serviciosJardinero: ServicioJardinero[];
   ejercicios: Ejercicio[];
   combos: Combo[];
+  eventos: EventoPromocion[];
   resenas: Resena[];
   recordatoriosEnviados: Record<string, string>; // clave → fecha en que se envió
 }
@@ -297,6 +300,7 @@ function nubeVacia(): ErpState {
     serviciosJardinero: [],
     ejercicios: [],
     combos: [],
+    eventos: [],
     resenas: [],
     recordatoriosEnviados: {}
   };
@@ -359,9 +363,10 @@ export function reservadoEnPedidos(pedidos: Pedido[]): Map<string, number> {
  * Descuento manual + cupón + canje de puntos sobre el carrito.
  * El cupón se calcula sobre el total ya con descuentos manuales (misma base que valida el servidor).
  */
-export function aplicarPromociones(lineas: LineaCarrito[], manual: DescuentoGlobal, cupon: string | undefined, puntos: number, s: Pick<ErpState, 'products' | 'cupones'>):
+export function aplicarPromociones(lineas: LineaCarrito[], manual: DescuentoGlobal, cupon: string | undefined, puntos: number, s: Pick<ErpState, 'products' | 'cupones' | 'eventos'>):
   Result<{ carrito: ReturnType<typeof calcularCarrito>; cupon?: { codigo: string; base: number; descuento: number }; descuentoPuntos: number }> {
-  const conManual = calcularCarrito(lineas, s.products, manual);
+  const productos = conPreciosVigentes(s.products, s.eventos, hoyLocal());
+  const conManual = calcularCarrito(lineas, productos, manual);
   const base = conManual.total;
   let cup: { codigo: string; base: number; descuento: number } | undefined;
   if (cupon?.trim()) {
@@ -375,7 +380,7 @@ export function aplicarPromociones(lineas: LineaCarrito[], manual: DescuentoGlob
   if (descuentoPuntos > restante) return { ok: false, error: `Los puntos (S/ ${descuentoPuntos.toFixed(2)}) superan el total a pagar.` };
   const extra = (cup?.descuento ?? 0) + descuentoPuntos;
   const carrito = extra > 0
-    ? calcularCarrito(lineas, s.products, { tipo: 'MONTO', valor: round2(conManual.descuentoGlobal + extra) })
+    ? calcularCarrito(lineas, productos, { tipo: 'MONTO', valor: round2(conManual.descuentoGlobal + extra) })
     : conManual;
   return { ok: true, carrito, cupon: cup, descuentoPuntos };
 }
@@ -665,7 +670,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados] = await Promise.all([
+          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos] = await Promise.all([
             repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
             repo.cargarGastos().catch(() => []),
             repo.cargarJardineros().catch(() => []), // dueño y ventas
@@ -673,9 +678,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             repo.cargarEjercicios().catch(() => []),
             repo.cargarCombos().catch(() => []),
             repo.cargarResenas().catch(() => []),
-            repo.cargarRecordatoriosEnviados().catch(() => ({}))
+            repo.cargarRecordatoriosEnviados().catch(() => ({})),
+            repo.cargarEventos().catch(() => [])
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados });
+          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -712,7 +718,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       async crearCotizacion(c: CotizacionInput): Promise<Result<{ cotizacion: Cotizacion }>> {
         if (!c.cliente.nombre.trim()) return { ok: false, error: 'Indica el nombre del cliente.' };
         const s = get();
-        const carrito = calcularCarrito(c.lineas, s.products, c.descuentoGlobal);
+        const carrito = calcularCarrito(c.lineas, conPreciosVigentes(s.products, s.eventos, today()), c.descuentoGlobal);
         if (!carrito.lineas.length) return { ok: false, error: 'Agrega al menos un producto a la cotización.' };
         const hoy = today();
         const cot: Cotizacion = {
@@ -882,8 +888,8 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         const porSku = new Map<string, { sku: string; name: string; qty: number; importe: number }>();
         for (const it of sol.items) {
           const prod = s.products.find(pr => pr.sku === it.sku);
-          // En un combo manda el precio repartido del combo; suelto, el precio vigente del catálogo
-          const precio = it.combo ? it.precio : prod?.price ?? it.precio;
+          // Se respeta el precio que vio el cliente (oferta, evento o reparto del combo)
+          const precio = it.precio;
           const l = porSku.get(it.sku) ?? { sku: it.sku, name: prod?.name ?? it.nombre, qty: 0, importe: 0 };
           l.qty += it.cantidad;
           l.importe += it.cantidad * precio;
@@ -955,7 +961,8 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (nuevo && s.products.some(x => x.sku === sku)) return { ok: false, error: `Ya existe el SKU ${sku}.` };
         const inicial = nuevo ? Math.max(0, Math.floor(stockInicial || 0)) : 0;
         if (inicial > 0 && !(p.cost > 0)) return { ok: false, error: 'Para registrar stock inicial indica el costo unitario (valoriza el inventario).' };
-        const ficha: CatalogProduct = { ...p, sku, name: p.name.trim(), stock: nuevo ? 0 : p.stock };
+        if (p.precioOferta !== undefined && !(p.precioOferta > 0 && p.precioOferta < p.price)) return { ok: false, error: 'La oferta debe ser menor que el precio de venta.' };
+        const ficha: CatalogProduct = { ...p, sku, name: p.name.trim(), stock: nuevo ? 0 : p.stock, creadoAt: nuevo ? new Date().toISOString() : p.creadoAt };
         try {
           const guardado = nube ? await repo.guardarProductoCatalogo(ficha, nuevo) : ficha;
           const cur = get();
@@ -1598,6 +1605,22 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           return { ok: true, retencion };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- OFERTAS Y EVENTOS ----------------
+      async guardarEvento(e: EventoPromocion): Promise<Result<{ evento: EventoPromocion }>> {
+        if (e.nombre.trim().length < 3) return { ok: false, error: 'Ponle un nombre al evento (ej. Día de la Madre).' };
+        if (!e.desde || !e.hasta || e.hasta < e.desde) return { ok: false, error: 'Revisa las fechas: el fin no puede ser antes del inicio.' };
+        if (!(e.descuentoPct >= 0 && e.descuentoPct <= 90)) return { ok: false, error: 'El descuento va de 0 a 90%.' };
+        const datos = { ...e, nombre: e.nombre.trim(), descripcion: e.descripcion?.trim() || undefined };
+        try {
+          const evento = nube ? await repo.guardarEvento(datos) : { ...datos, id: e.id.startsWith('nuevo') ? `EV-${Date.now().toString(36).toUpperCase()}` : e.id };
+          const cur = get();
+          commit({ ...cur, eventos: [evento, ...cur.eventos.filter(x => x.id !== e.id)].sort((a, b) => b.desde.localeCompare(a.desde)) });
+          return { ok: true, evento };
+        } catch (err) {
+          return { ok: false, error: errorNube(err) };
         }
       },
 

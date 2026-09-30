@@ -14,6 +14,7 @@ import Catalogo from './paginas/Catalogo';
 import Producto from './paginas/Producto';
 import { ServicioDetalle, Servicios } from './paginas/Servicios';
 import Contacto from './paginas/Contacto';
+import Ofertas from './paginas/Ofertas';
 import Cotizar from './paginas/Cotizar';
 import NoEncontrado from './paginas/NoEncontrado';
 
@@ -68,6 +69,7 @@ const NAV = [
   { href: url(), label: 'Inicio' },
   { href: url('/plantas'), label: 'Plantas' },
   { href: url('/productos'), label: 'Productos e insumos' },
+  { href: url('/ofertas'), label: 'Ofertas' },
   { href: url('/servicios'), label: 'Servicios' },
   { href: url('/contacto'), label: 'Contacto' }
 ];
@@ -250,6 +252,7 @@ function Rutas() {
   if (partes[0] === 'servicios' && partes.length === 1) return <Servicios />;
   if (partes[0] === 'servicios' && partes[1]) return <ServicioDetalle slug={decodeURIComponent(partes[1])} />;
   if (partes[0] === 'contacto') return <Contacto />;
+  if (partes[0] === 'ofertas') return <Ofertas />;
   if (partes[0] === 'cotizar' || partes[0] === 'pedido') return <Cotizar />;
   return <NoEncontrado />;
 }

@@ -8,6 +8,7 @@ import { urlEvidencia } from '../../lib/repo';
 import { reservadoEnPedidos, useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { hoyLocal } from '../../lib/fechas';
+import { conPreciosVigentes } from '../../lib/ofertas';
 import { docDePedido, imprimir } from './documentosVenta';
 
 const COLUMNAS: { estado: EstadoPedido; titulo: string; color: string }[] = [
@@ -186,7 +187,8 @@ export default function Pedidos() {
 export function NuevoPedidoModal() {
   const { state, actions } = useErp();
   const { close } = useUi();
-  const { products, pedidos } = state;
+  const { pedidos } = state;
+  const products = conPreciosVigentes(state.products, state.eventos, hoyLocal());
   const reservado = reservadoEnPedidos(pedidos);
 
   const [canal, setCanal] = useState<CanalVenta>('WhatsApp');

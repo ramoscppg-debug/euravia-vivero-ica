@@ -19,6 +19,7 @@ import Proyectos from '../modules/servicios/Proyectos';
 import Honorarios from '../modules/servicios/Honorarios';
 import CierreEjercicio from '../modules/admin/CierreEjercicio';
 import Combos from '../modules/ventas/Combos';
+import OfertasEventos from '../modules/ventas/OfertasEventos';
 import Recordatorios from '../modules/clientes/Recordatorios';
 import ResenasPanel from '../modules/clientes/ResenasPanel';
 import Caja from '../modules/ventas/Caja';
@@ -54,6 +55,7 @@ const SCREENS: Record<TabId, ComponentType> = {
   honorarios: Honorarios,
   cierre: CierreEjercicio,
   combos: Combos,
+  ofertas: OfertasEventos,
   recordatorios: Recordatorios,
   resenas: ResenasPanel,
   crm: Clientes,

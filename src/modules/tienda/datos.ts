@@ -10,13 +10,16 @@ import {
   type Category,
   type Combo,
   type ConfigTienda,
+  type EventoPromocion,
   type ProductoPublico,
   type ServicioPublico,
   type SolicitudTienda,
   type TarifaDelivery
 } from '../../domain/types';
 import { soles } from '../../lib/formato';
-import { configTiendaDesdeFila, servicioPublicoDesdeFila, tarifaDesdeFila } from '../../lib/repo';
+import { configTiendaDesdeFila, eventoDesdeFila, servicioPublicoDesdeFila, tarifaDesdeFila } from '../../lib/repo';
+import { esNuevo, precioVigente } from '../../lib/ofertas';
+import { hoyLocal } from '../../lib/fechas';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export interface ResenaPublica {
@@ -35,7 +38,14 @@ export interface DatosTienda {
   config: ConfigTienda;
   tarifas: TarifaDelivery[];
   resenas: ResenaPublica[];
+  eventos: EventoPromocion[]; // activos y próximos (visibles)
 }
+
+/** Orden de vitrina: ofertas primero, luego lo nuevo, luego lo destacado. */
+export const ordenVitrina = (a: ProductoPublico, b: ProductoPublico) => {
+  const oferta = (p: ProductoPublico) => ((p.precioRegular ?? 0) > p.precio ? 1 : 0);
+  return oferta(b) - oferta(a) || Number(!!b.esNuevo) - Number(!!a.esNuevo) || Number(b.destacado) - Number(a.destacado);
+};
 
 /** Un combo en la vitrina: se agrega como un producto más; alcanza para lo que permita su producto más escaso. */
 export function comboPublico(c: Combo, productos: { sku: string; nombre: string; stock: number }[]): ProductoPublico | null {
@@ -89,7 +99,11 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
           familia: p.botanicalFamily || undefined,
           descripcion: p.description || undefined,
           imagen: p.fullImage || undefined,
-          precio: p.price,
+          ...(() => {
+            const v = precioVigente(p, s.eventos ?? [], hoyLocal());
+            return { precio: v.precio, precioRegular: v.enOferta ? v.regular : undefined, eventos: v.eventos };
+          })(),
+          esNuevo: esNuevo(p.creadoAt, hoyLocal()),
           disponibilidad: disponibilidadDe(p.stock, p.minStock),
           stock: Math.max(0, p.stock),
           luz: p.careLight,
@@ -97,7 +111,7 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
           esPlantaViva: p.isLivePlant,
           destacado: !!p.destacado
         }))
-        .sort((a, b) => Number(b.destacado) - Number(a.destacado) || a.nombre.localeCompare(b.nombre));
+        .sort((a, b) => ordenVitrina(a, b) || a.nombre.localeCompare(b.nombre));
     const todos = s.products.map(p => ({ sku: p.sku, nombre: p.name, stock: p.stock }));
     const combos = (s.combos ?? []).filter(c => c.visible).map(c => comboPublico(c, todos)).filter((c): c is ProductoPublico => !!c);
     return {
@@ -105,21 +119,23 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
       servicios: s.serviciosPublicos.filter(x => x.visible).sort((a, b) => a.orden - b.orden),
       config: s.tiendaConfig,
       tarifas: (s.tarifasDelivery ?? []).filter(t => t.activo),
+      eventos: (s.eventos ?? []).filter(e => e.visible && e.hasta >= hoyLocal()),
       resenas: (s.resenas ?? []).filter(r => r.aprobada).map(r => ({ id: r.id, nombre: r.nombre, estrellas: r.estrellas, texto: r.texto, sku: r.productoSku, foto: r.foto, fecha: r.fecha }))
     };
   }
 
   const sb = await getSupabase();
   if (!sb) throw new Error('Sin conexión con la tienda.');
-  const [catalogo, servicios, config, tarifas, combos, resenas] = await Promise.all([
+  const [catalogo, servicios, config, tarifas, combos, resenas, eventos] = await Promise.all([
     sb.rpc('catalogo_publico'),
     sb.from('servicios_publicos').select('slug, nombre, resumen, descripcion, imagen_url, orden, visible, precio_desde').eq('visible', true).order('orden'),
     sb.from('tienda_config').select('whatsapp, email, direccion, horario, mensaje_portada, delivery_gratis_desde').eq('id', 1).maybeSingle(),
     sb.from('tarifas_delivery').select('distrito, costo, activo').eq('activo', true).order('distrito'),
     sb.rpc('combos_publicos'),
-    sb.rpc('resenas_publicas')
+    sb.rpc('resenas_publicas'),
+    sb.from('eventos_promocion').select('*').eq('visible', true).gte('hasta', hoyLocal()).order('desde')
   ]);
-  const error = catalogo.error ?? servicios.error ?? config.error ?? tarifas.error ?? combos.error ?? resenas.error;
+  const error = catalogo.error ?? servicios.error ?? config.error ?? tarifas.error ?? combos.error ?? resenas.error ?? eventos.error;
   if (error) throw new Error(error.message);
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,8 +154,11 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
       luz: r.cuidado_luz ?? undefined,
       riego: r.cuidado_riego ?? undefined,
       esPlantaViva: !!r.es_planta_viva,
-      destacado: !!r.destacado
-    })),
+      destacado: !!r.destacado,
+      precioRegular: Number(r.precio_regular) > Number(r.precio) ? Number(r.precio_regular) : undefined,
+      esNuevo: !!r.es_nuevo,
+      eventos: r.eventos ?? []
+    })).sort((a, b) => ordenVitrina(a, b) || a.nombre.localeCompare(b.nombre)),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...(combos.data as any[] ?? []).map((r): ProductoPublico => ({
       sku: r.codigo, nombre: r.nombre, categoria: 'accesorios', categoriaNombre: 'Combo', descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined,
@@ -149,6 +168,8 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
     servicios: (servicios.data ?? []).map(servicioPublicoDesdeFila),
     config: configTiendaDesdeFila(config.data),
     tarifas: (tarifas.data ?? []).map(tarifaDesdeFila),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    eventos: (eventos.data ?? []).map(eventoDesdeFila),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resenas: (resenas.data as any[] ?? []).map(r => ({ id: String(r.id), nombre: r.nombre, estrellas: r.estrellas, texto: r.texto, sku: r.producto_sku ?? undefined, foto: r.foto_url ?? undefined, fecha: r.fecha }))
   };

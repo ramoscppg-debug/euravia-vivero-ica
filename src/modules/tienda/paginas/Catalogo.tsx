@@ -3,7 +3,8 @@ import { Search, X } from 'lucide-react';
 import { navegar, useUbicacion } from '../../../app/router';
 import { EstadoVacio, Esqueleto } from '../../../components/ui';
 import type { ProductoPublico } from '../../../domain/types';
-import { esPlanta } from '../datos';
+import { esPlanta, ordenVitrina } from '../datos';
+import { BannerEventos } from '../Eventos';
 import { TarjetaProducto, Titulo } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useTienda } from '../TiendaApp';
@@ -29,6 +30,8 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
   const q = query.get('q') ?? '';
   const cat = query.get('cat') ?? '';
   const soloDisponibles = query.get('disp') === '1';
+  const soloOfertas = query.get('ofertas') === '1';
+  const soloNuevos = query.get('nuevos') === '1';
   const orden = (query.get('orden') as Orden) || 'relevancia';
   const t = TEXTO[grupo];
 
@@ -48,14 +51,17 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
   const lista = delGrupo
     .filter(p => !cat || p.categoria === cat)
     .filter(p => !soloDisponibles || p.stock > 0)
+    .filter(p => !soloOfertas || (p.precioRegular ?? 0) > p.precio)
+    .filter(p => !soloNuevos || p.esNuevo)
     .filter(p => !texto || sinTildes([p.nombre, p.nombreCientifico, p.categoriaNombre, p.descripcion].filter(Boolean).join(' ')).includes(texto))
     .sort((a: ProductoPublico, b: ProductoPublico) =>
-      orden === 'precio-asc' ? a.precio - b.precio : orden === 'precio-desc' ? b.precio - a.precio : orden === 'nombre' ? a.nombre.localeCompare(b.nombre) : Number(b.destacado) - Number(a.destacado));
+      orden === 'precio-asc' ? a.precio - b.precio : orden === 'precio-desc' ? b.precio - a.precio : orden === 'nombre' ? a.nombre.localeCompare(b.nombre) : ordenVitrina(a, b));
 
   const chip = (activo: boolean) => `min-h-[40px] px-4 rounded-full text-sm font-semibold border transition-colors ${activo ? 'bg-hoja-700 text-white border-hoja-700' : 'bg-white text-slate-700 border-slate-300 hover:border-hoja-600'}`;
 
   return (
     <Pagina className="py-10">
+      {!!datos?.eventos.length && <div className="mb-6"><BannerEventos eventos={datos.eventos} compacto /></div>}
       <div className="mb-6"><Titulo nivel="h1" antetitulo="Catálogo" titulo={t.titulo} bajada={`${t.bajada} Ves el stock real; si necesitas más, un asesor te atiende.`} /></div>
 
       <div className="space-y-3 mb-6">
@@ -69,7 +75,7 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
           <label className="flex items-center gap-2 text-sm font-semibold">
             <span className="shrink-0">Ordenar</span>
             <select value={orden} onChange={e => fijar({ orden: e.target.value === 'relevancia' ? '' : e.target.value })} className="min-h-[48px] px-3 rounded-full bg-white border border-slate-300">
-              <option value="relevancia">Destacados</option>
+              <option value="relevancia">Ofertas y novedades</option>
               <option value="precio-asc">Precio: menor a mayor</option>
               <option value="precio-desc">Precio: mayor a menor</option>
               <option value="nombre">Nombre</option>
@@ -81,6 +87,8 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
           {categorias.map(([id, nombre]) => (
             <button key={id} className={`${chip(cat === id)} shrink-0`} aria-pressed={cat === id} onClick={() => fijar({ cat: cat === id ? '' : id })}>{nombre}</button>
           ))}
+          <button className={`${chip(soloOfertas)} shrink-0`} aria-pressed={soloOfertas} onClick={() => fijar({ ofertas: soloOfertas ? '' : '1' })}>Ofertas</button>
+          <button className={`${chip(soloNuevos)} shrink-0`} aria-pressed={soloNuevos} onClick={() => fijar({ nuevos: soloNuevos ? '' : '1' })}>Nuevos</button>
           <button className={`${chip(soloDisponibles)} shrink-0`} aria-pressed={soloDisponibles} onClick={() => fijar({ disp: soloDisponibles ? '' : '1' })}>Sólo disponibles</button>
         </div>
       </div>

@@ -2,13 +2,14 @@
 import type { Cotizacion, Pedido, SolicitudTienda } from '../../domain/types';
 import { imprimirDocumento, type DocumentoComercial, type TipoDocumento } from '../../lib/documentos';
 import { hoyLocal, sumarDias } from '../../lib/fechas';
+import { conPreciosVigentes } from '../../lib/ofertas';
 import { calcularCarrito } from '../../lib/pos';
 import type { ErpState } from '../../store/ErpStore';
 
 const contacto = (s: ErpState) => ({ whatsapp: s.tiendaConfig.whatsapp, email: s.tiendaConfig.email || s.company.email, telefono: s.company.telefono });
 
 export function docDeCotizacion(s: ErpState, c: Cotizacion, tipo: TipoDocumento = 'COTIZACIÓN'): DocumentoComercial {
-  const carrito = calcularCarrito(c.lineas, s.products, c.descuentoGlobal);
+  const carrito = calcularCarrito(c.lineas, conPreciosVigentes(s.products, s.eventos, hoyLocal()), c.descuentoGlobal);
   return {
     tipo, numero: c.id, fecha: c.fecha, vence: c.vence, empresa: s.company, contacto: contacto(s),
     cliente: { nombre: c.cliente.nombre, doc: c.cliente.doc, telefono: c.cliente.telefono },

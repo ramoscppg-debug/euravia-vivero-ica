@@ -17,6 +17,7 @@ import {
   Lock,
   MessageCircle,
   Package,
+  Percent,
   Star,
   LineChart,
   QrCode,
@@ -62,6 +63,7 @@ export type TabId =
   | 'recordatorios'
   | 'resenas'
   | 'combos'
+  | 'ofertas'
   | 'finanzas'
   | 'libro-diario'
   | 'sunat'
@@ -114,6 +116,7 @@ export const NAV_BLOCKS: NavBlock[] = [
       { id: 'catalogo', label: 'Catálogo', icon: Store },
       { id: 'servicios-tienda', label: 'Servicios de la tienda', icon: Shovel },
       { id: 'combos', label: 'Combos', icon: Package },
+      { id: 'ofertas', label: 'Ofertas y eventos', icon: Percent },
       { id: 'kardex', label: 'Kardex y stock', icon: Boxes, badge: s => cuenta(s.products.filter(p => p.stock <= p.minStock).length) },
       { id: 'produccion', label: 'Producción propia', icon: Factory },
       { id: 'conteo', label: 'Conteo físico', icon: ClipboardList },
@@ -209,6 +212,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   recordatorios: VENTAS,
   resenas: VENTAS,
   combos: VENTAS,
+  ofertas: VENTAS,
   finanzas: DUENO,
   'libro-diario': DUENO,
   sunat: VENTAS,

@@ -86,6 +86,8 @@ export function FichaProductoModal({ sku, duplicarDe }: { sku?: string; duplicar
           </select>
         </F>
         <F label="Precio de venta (S/, con IGV)"><input aria-label="Precio de venta" type="number" min={0} step="0.1" value={p.price || ''} onChange={e => set({ price: Number(e.target.value) || 0 })} className={campo} /></F>
+        <F label="Precio de oferta (S/, con IGV)" ayuda="Opcional. La tienda lo muestra primero, con el precio anterior tachado."><input aria-label="Precio de oferta" type="number" min={0} step="0.1" value={p.precioOferta ?? ''} onChange={e => set({ precioOferta: Number(e.target.value) > 0 ? Number(e.target.value) : undefined })} className={campo} /></F>
+        <F label="Oferta hasta" ayuda="Vacío = hasta que la quites."><input aria-label="Oferta hasta" type="date" value={p.ofertaHasta ?? ''} disabled={!p.precioOferta} onChange={e => set({ ofertaHasta: e.target.value || undefined })} className={campo} /></F>
         <F label="Costo unitario (S/, sin IGV)" ayuda="Privado: no se muestra en la tienda."><input aria-label="Costo unitario" type="number" min={0} step="0.1" value={p.cost || ''} onChange={e => set({ cost: Number(e.target.value) || 0 })} className={campo} /></F>
         <div className="text-xs font-bold text-tinta">Margen
           <div className="mt-1 min-h-[40px] flex items-center gap-2">

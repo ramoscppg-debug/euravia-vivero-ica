@@ -13,6 +13,8 @@ import { calcularCarrito, resumirPagos } from '../../lib/pos';
 import { aplicarPromociones } from '../../store/ErpStore';
 import type { PosPreset } from '../../store/UiStore';
 import { useErp } from '../../store/ErpStore';
+import { hoyLocal } from '../../lib/fechas';
+import { conPreciosVigentes } from '../../lib/ofertas';
 import { useUi } from '../../store/UiStore';
 
 // ============================================================
@@ -22,7 +24,8 @@ export function PosModal({ presetSku, preset }: { presetSku?: string; preset?: P
   const { state, actions } = useErp();
   const { open, close } = useUi();
   const { busy, consultar } = useDocLookup();
-  const { products, company, invoices, crmClients, puntosSaldo } = state;
+  const { company, invoices, crmClients, puntosSaldo } = state;
+  const products = conPreciosVigentes(state.products, state.eventos, hoyLocal()); // ofertas y eventos vigentes
 
   const [lineas, setLineas] = useState<LineaCarrito[]>(preset?.lineas ?? (presetSku ? [{ sku: presetSku, qty: 1, descuentoPct: 0 }] : []));
   const [busqueda, setBusqueda] = useState('');
@@ -151,7 +154,7 @@ export function PosModal({ presetSku, preset }: { presetSku?: string; preset?: P
                   <span className="min-w-0">
                     <span className="block font-bold text-tinta truncate">{p.name}</span>
                     <span className="block font-mono text-[10px] text-tinta-suave">{p.sku} · stock {p.stock - enCarrito}</span>
-                    <span className="block font-serif font-bold text-bosque-700">S/ {p.price.toFixed(2)}</span>
+                    <span className="block font-serif font-bold text-bosque-700">S/ {p.price.toFixed(2)}{(state.products.find(x => x.sku === p.sku)?.price ?? p.price) > p.price && <span className="ml-1 text-[10px] font-sans text-terracota">oferta</span>}</span>
                   </span>
                 </button>
               );

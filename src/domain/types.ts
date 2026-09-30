@@ -71,6 +71,23 @@ export interface CatalogProduct extends Product {
   unidadMedida?: string; // SUNAT Tabla 6
   tipoExistencia?: string; // SUNAT Tabla 5
   destacado?: boolean; // aparece en la portada
+  precioOferta?: number; // oferta (IGV incluido); se cobra mientras esté vigente
+  ofertaHasta?: string; // último día de la oferta (vacío = hasta quitarla)
+  creadoAt?: string; // alta en el catálogo (lo nuevo se muestra primero en la tienda)
+}
+
+/** Evento con promoción (Día de la Madre, Navidad…): banner en la tienda y % de descuento. */
+export interface EventoPromocion {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  imagen?: string;
+  desde: string;
+  hasta: string;
+  descuentoPct: number; // 0 = sólo vitrina
+  categorias: string[]; // vacío y sin productos = todo el catálogo
+  skus: string[];
+  visible: boolean;
 }
 
 export type MovementType =
@@ -471,6 +488,9 @@ export interface ProductoPublico {
   riego?: string;
   esPlantaViva: boolean;
   destacado: boolean;
+  precioRegular?: number; // precio de lista si hoy está en oferta
+  esNuevo?: boolean;
+  eventos?: string[]; // eventos activos que lo incluyen
   /** Si es un combo: los productos que trae (se vende como uno y se separa al registrar el pedido). */
   combo?: { sku: string; nombre: string; cantidad: number }[];
 }

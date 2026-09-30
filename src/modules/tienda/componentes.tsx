@@ -3,6 +3,7 @@ import { Check, Leaf, Minus, Plus, Share2, UserRound } from 'lucide-react';
 import { Enlace } from '../../app/router';
 import type { ProductoPublico } from '../../domain/types';
 import { soles } from '../../lib/formato';
+import { pctDescuento } from '../../lib/ofertas';
 import { url } from './datos';
 import { MAX_CANTIDAD, useTienda } from './TiendaApp';
 
@@ -66,7 +67,11 @@ export function TarjetaProducto({ p }: { p: ProductoPublico }) {
     <article className="group bg-white rounded-3xl border border-slate-200 overflow-hidden flex flex-col hover:border-hoja-300 hover:shadow-xl hover:shadow-hoja-900/5 transition">
       <Enlace href={href} className="block relative" aria-label={`${p.nombre}, ver detalle`}>
         <Imagen src={p.imagen} alt={p.nombre} className="w-full aspect-[4/5] group-hover:scale-[1.02] transition-transform duration-500" />
-        {p.destacado && <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/95 text-hoja-800 text-[11px] font-bold shadow">Destacado</span>}
+        <span className="absolute top-3 left-3 flex flex-col items-start gap-1">
+          {pctDescuento(p.precio, p.precioRegular) > 0 && <span className="px-2.5 py-1 rounded-full bg-rose-600 text-white text-[11px] font-extrabold shadow">-{pctDescuento(p.precio, p.precioRegular)}%</span>}
+          {p.esNuevo && <span className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-900 text-[11px] font-extrabold shadow">Nuevo</span>}
+          {p.destacado && <span className="px-2.5 py-1 rounded-full bg-white/95 text-hoja-800 text-[11px] font-bold shadow">Destacado</span>}
+        </span>
       </Enlace>
       <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{p.categoriaNombre}</p>
@@ -75,7 +80,10 @@ export function TarjetaProducto({ p }: { p: ProductoPublico }) {
         </h3>
         <ChipStock p={p} />
         <div className="mt-auto pt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-lg sm:text-xl font-extrabold text-slate-900 whitespace-nowrap">{soles(p.precio)}</span>
+          <span className="whitespace-nowrap">
+            {!!p.precioRegular && <s className="block text-xs text-slate-400" aria-label={`Antes ${soles(p.precioRegular)}`}>{soles(p.precioRegular)}</s>}
+            <span className={`text-lg sm:text-xl font-extrabold ${p.precioRegular ? 'text-rose-700' : 'text-slate-900'}`}>{soles(p.precio)}</span>
+          </span>
           <button
             onClick={() => agregar(p.sku)}
             className={`min-h-[40px] px-4 rounded-full text-sm font-bold inline-flex items-center justify-center gap-1.5 transition-colors ${enSeleccion ? 'bg-hoja-50 text-hoja-800 border border-hoja-200' : 'bg-hoja-700 hover:bg-hoja-800 text-white'}`}

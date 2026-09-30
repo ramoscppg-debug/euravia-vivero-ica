@@ -50,7 +50,10 @@ export default function Producto({ sku }: { sku: string }) {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-3xl font-extrabold text-slate-900">{soles(p.precio)}</span>
+            {!!p.precioRegular && <s className="text-lg text-slate-400">{soles(p.precioRegular)}</s>}
+            <span className={`text-3xl font-extrabold ${p.precioRegular ? 'text-rose-700' : 'text-slate-900'}`}>{soles(p.precio)}</span>
+            {!!p.precioRegular && <span className="px-2.5 py-1 rounded-full bg-rose-600 text-white text-xs font-extrabold">Oferta -{Math.round((1 - p.precio / p.precioRegular) * 100)}%</span>}
+            {p.esNuevo && <span className="px-2.5 py-1 rounded-full bg-amber-400 text-slate-900 text-xs font-extrabold">Nuevo</span>}
             <ChipStock p={p} />
           </div>
           <p className="text-xs text-slate-500 -mt-3">Precio unitario con IGV.</p>

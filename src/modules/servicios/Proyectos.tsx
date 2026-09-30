@@ -3,6 +3,8 @@ import { AlertTriangle, Boxes, ChevronRight, MapPin, PlusCircle, Receipt, Trash2
 import { ModalShell } from '../../components/shared';
 import type { GardeningMaterialItem, GardeningProject, ProjectStatus } from '../../domain/types';
 import { calcularDetraccion, round2, validarRuc } from '../../lib/peru';
+import { hoyLocal } from '../../lib/fechas';
+import { conPreciosVigentes } from '../../lib/ofertas';
 import { useAuth } from '../../store/AuthStore';
 import { useErp } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
@@ -174,7 +176,8 @@ const TIPOS: GardeningProject['type'][] = ['Diseño Paisajista', 'Mantenimiento 
 export function NuevaCotizacionModal() {
   const { state, actions } = useErp();
   const { close } = useUi();
-  const { products, company } = state;
+  const { company } = state;
+  const products = conPreciosVigentes(state.products, state.eventos, hoyLocal());
 
   const [client, setClient] = useState('');
   const [doc, setDoc] = useState('');
