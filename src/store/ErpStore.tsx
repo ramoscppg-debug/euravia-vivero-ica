@@ -18,6 +18,8 @@ import type {
   ServicioJardinero,
   Ejercicio,
   AperturaEjercicio,
+  Combo,
+  Resena,
   ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
@@ -102,6 +104,9 @@ export interface ErpState {
   jardineros: Jardinero[];
   serviciosJardinero: ServicioJardinero[];
   ejercicios: Ejercicio[];
+  combos: Combo[];
+  resenas: Resena[];
+  recordatoriosEnviados: Record<string, string>; // clave → fecha en que se envió
 }
 
 export type JardineroInput = Omit<Jardinero, 'id'> & { id?: string };
@@ -290,7 +295,10 @@ function nubeVacia(): ErpState {
     asientosExtra: [],
     jardineros: [],
     serviciosJardinero: [],
-    ejercicios: []
+    ejercicios: [],
+    combos: [],
+    resenas: [],
+    recordatoriosEnviados: {}
   };
 }
 
@@ -657,14 +665,17 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios] = await Promise.all([
+          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados] = await Promise.all([
             repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
             repo.cargarGastos().catch(() => []),
             repo.cargarJardineros().catch(() => []), // dueño y ventas
             repo.cargarServiciosJardinero().catch(() => []),
-            repo.cargarEjercicios().catch(() => [])
+            repo.cargarEjercicios().catch(() => []),
+            repo.cargarCombos().catch(() => []),
+            repo.cargarResenas().catch(() => []),
+            repo.cargarRecordatoriosEnviados().catch(() => ({}))
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios });
+          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -868,10 +879,17 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         const sol = s.solicitudes.find(x => x.id === id);
         if (!sol || sol.tipo !== 'PEDIDO') return { ok: false, error: 'Sólo las solicitudes de pedido se convierten en pedido.' };
         if (sol.pedidoId) return { ok: false, error: `Esta solicitud ya es el pedido ${sol.pedidoId}.` };
-        const items = sol.items.map(it => {
+        const porSku = new Map<string, { sku: string; name: string; qty: number; importe: number }>();
+        for (const it of sol.items) {
           const prod = s.products.find(pr => pr.sku === it.sku);
-          return { sku: it.sku, name: prod?.name ?? it.nombre, qty: it.cantidad, unitPrice: prod?.price ?? it.precio };
-        });
+          // En un combo manda el precio repartido del combo; suelto, el precio vigente del catálogo
+          const precio = it.combo ? it.precio : prod?.price ?? it.precio;
+          const l = porSku.get(it.sku) ?? { sku: it.sku, name: prod?.name ?? it.nombre, qty: 0, importe: 0 };
+          l.qty += it.cantidad;
+          l.importe += it.cantidad * precio;
+          porSku.set(it.sku, l);
+        }
+        const items = [...porSku.values()].map(l => ({ sku: l.sku, name: l.name, qty: l.qty, unitPrice: Math.round((l.importe / l.qty) * 10000) / 10000 }));
         const r = await acciones.crearPedido({
           canal: 'Web', cliente: { nombre: sol.nombre, telefono: sol.telefono, doc: sol.docCliente }, direccion: datos.direccion, distrito: datos.distrito || sol.distrito || '',
           fechaEntrega: datos.fechaEntrega, items, costoDelivery: datos.costoDelivery, notas: sol.mensaje,
@@ -916,7 +934,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
       },
 
       /** Foto para el catálogo o un servicio: se reduce a JPEG liviano; en la nube se sube al almacenamiento público. */
-      async subirFoto(archivo: File, carpeta: 'productos' | 'servicios', nombre: string): Promise<Result<{ url: string }>> {
+      async subirFoto(archivo: File, carpeta: repo.CarpetaFoto, nombre: string): Promise<Result<{ url: string }>> {
         try {
           const jpeg = await fotoComoJpeg(archivo);
           if (!nube) return { ok: true, url: jpeg.dataUrl };
@@ -1578,6 +1596,62 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const cur = get();
           commit({ ...cur, gastos, serviciosJardinero: cur.serviciosJardinero.map(x => (x.id === id ? { ...x, rxhSerie: serieN, rxhNumero: numeroN, gastoId } : x)) });
           return { ok: true, retencion };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- COMBOS, RESEÑAS Y RECORDATORIOS ----------------
+      async guardarCombo(c: Combo): Promise<Result<{ combo: Combo }>> {
+        const s = get();
+        const codigo = c.codigo.trim().toUpperCase();
+        const items = c.items.filter(i => i.sku && i.cantidad > 0);
+        if (!/^CMB-[A-Z0-9-]{1,20}$/.test(codigo)) return { ok: false, error: 'El código debe empezar con CMB- (ej. CMB-001).' };
+        if (c.nombre.trim().length < 3) return { ok: false, error: 'Ponle un nombre al combo.' };
+        if (!(c.precio > 0)) return { ok: false, error: 'Indica el precio del combo (IGV incluido).' };
+        if (items.length < 2) return { ok: false, error: 'Un combo lleva al menos 2 productos.' };
+        if (new Set(items.map(i => i.sku)).size !== items.length) return { ok: false, error: 'Hay un producto repetido: súmalo en una sola línea.' };
+        if (items.some(i => !Number.isInteger(i.cantidad) || !s.products.some(p => p.sku === i.sku))) return { ok: false, error: 'Revisa los productos y cantidades (enteras) del combo.' };
+        const combo: Combo = { ...c, codigo, items, nombre: c.nombre.trim(), descripcion: c.descripcion?.trim() || undefined };
+        try {
+          if (nube) await repo.guardarCombo(combo);
+          const cur = get();
+          commit({ ...cur, combos: [...cur.combos.filter(x => x.codigo !== codigo), combo].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)) });
+          return { ok: true, combo };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async guardarResena(r: Resena): Promise<Result> {
+        try {
+          if (nube) await repo.guardarResena(r);
+          const cur = get();
+          commit({ ...cur, resenas: cur.resenas.map(x => (x.id === r.id ? r : x)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async eliminarResena(id: string): Promise<Result> {
+        try {
+          if (nube) await repo.eliminarResena(id);
+          const cur = get();
+          commit({ ...cur, resenas: cur.resenas.filter(x => x.id !== id) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Anota que el recordatorio ya se envió por WhatsApp (no vuelve a aparecer). */
+      async marcarRecordatorio(clave: string): Promise<Result> {
+        try {
+          if (nube) await repo.marcarRecordatorio(clave, usuario);
+          const cur = get();
+          commit({ ...cur, recordatoriosEnviados: { ...cur.recordatoriosEnviados, [clave]: new Date().toISOString() } });
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

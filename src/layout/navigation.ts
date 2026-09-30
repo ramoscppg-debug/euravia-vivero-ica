@@ -15,6 +15,9 @@ import {
   Inbox,
   Landmark,
   Lock,
+  MessageCircle,
+  Package,
+  Star,
   LineChart,
   QrCode,
   Receipt,
@@ -33,6 +36,8 @@ import {
 } from 'lucide-react';
 import type { Rol } from '../domain/types';
 import type { ErpState } from '../store/ErpStore';
+import { recordatoriosDelDia } from '../modules/clientes/Recordatorios';
+import { hoyLocal } from '../lib/fechas';
 
 export type TabId =
   | 'dashboard'
@@ -54,6 +59,9 @@ export type TabId =
   | 'contratos'
   | 'honorarios'
   | 'crm'
+  | 'recordatorios'
+  | 'resenas'
+  | 'combos'
   | 'finanzas'
   | 'libro-diario'
   | 'sunat'
@@ -105,6 +113,7 @@ export const NAV_BLOCKS: NavBlock[] = [
     items: [
       { id: 'catalogo', label: 'Catálogo', icon: Store },
       { id: 'servicios-tienda', label: 'Servicios de la tienda', icon: Shovel },
+      { id: 'combos', label: 'Combos', icon: Package },
       { id: 'kardex', label: 'Kardex y stock', icon: Boxes, badge: s => cuenta(s.products.filter(p => p.stock <= p.minStock).length) },
       { id: 'produccion', label: 'Producción propia', icon: Factory },
       { id: 'conteo', label: 'Conteo físico', icon: ClipboardList },
@@ -130,7 +139,11 @@ export const NAV_BLOCKS: NavBlock[] = [
     label: 'Clientes',
     hint: 'ficha única y seguimiento',
     icon: Users,
-    items: [{ id: 'crm', label: 'Clientes y seguimiento', icon: CalendarClock, badge: s => cuenta(s.tareas.filter(t => !t.hecha).length) }]
+    items: [
+      { id: 'crm', label: 'Clientes y seguimiento', icon: CalendarClock, badge: s => cuenta(s.tareas.filter(t => !t.hecha).length) },
+      { id: 'recordatorios', label: 'Recordatorios WhatsApp', icon: MessageCircle, badge: s => cuenta(recordatoriosDelDia(s, hoyLocal(), '').length) },
+      { id: 'resenas', label: 'Opiniones de clientes', icon: Star, badge: s => cuenta(s.resenas.filter(r => !r.aprobada).length) }
+    ]
   },
   {
     id: 'contable',
@@ -193,6 +206,9 @@ const PERMISOS: Record<TabId, Rol[]> = {
   contratos: TODOS,
   honorarios: VENTAS,
   crm: TODOS,
+  recordatorios: VENTAS,
+  resenas: VENTAS,
+  combos: VENTAS,
   finanzas: DUENO,
   'libro-diario': DUENO,
   sunat: VENTAS,

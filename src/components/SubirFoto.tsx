@@ -1,9 +1,10 @@
 import { useId, useState } from 'react';
 import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { useErp } from '../store/ErpStore';
+import type { CarpetaFoto } from '../lib/repo';
 
 /** Subir foto desde la computadora o el celular (se reduce y se publica en el catálogo), o pegar un enlace. */
-export function SubirFoto({ valor, cambiar, carpeta, nombre }: { valor?: string; cambiar: (url: string) => void; carpeta: 'productos' | 'servicios'; nombre: string }) {
+export function SubirFoto({ valor, cambiar, carpeta, nombre }: { valor?: string; cambiar: (url: string) => void; carpeta: CarpetaFoto; nombre: string }) {
   const { actions } = useErp();
   const id = useId();
   const [subiendo, setSubiendo] = useState(false);

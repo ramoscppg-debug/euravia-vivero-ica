@@ -33,6 +33,8 @@ import type {
   ServicioJardinero,
   Ejercicio,
   AperturaEjercicio,
+  Combo,
+  Resena,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -474,7 +476,10 @@ export function servicioPublicoDesdeFila(r: Row): ServicioPublico {
 
 export function configTiendaDesdeFila(r: Row | null): ConfigTienda {
   if (!r) return {};
-  return { whatsapp: r.whatsapp ?? undefined, email: r.email ?? undefined, direccion: r.direccion ?? undefined, horario: r.horario ?? undefined, mensajePortada: r.mensaje_portada ?? undefined };
+  return {
+    whatsapp: r.whatsapp ?? undefined, email: r.email ?? undefined, direccion: r.direccion ?? undefined, horario: r.horario ?? undefined, mensajePortada: r.mensaje_portada ?? undefined,
+    deliveryGratisDesde: r.delivery_gratis_desde != null ? num(r.delivery_gratis_desde) : undefined
+  };
 }
 
 function solicitudDesdeFila(r: Row): SolicitudTienda {
@@ -983,7 +988,7 @@ export async function guardarConfigTienda(c: ConfigTienda) {
   const sb = await db();
   ok(await sb.from('tienda_config').update({
     whatsapp: c.whatsapp || null, email: c.email || null, direccion: c.direccion || null, horario: c.horario || null,
-    mensaje_portada: c.mensajePortada || null, updated_at: new Date().toISOString()
+    mensaje_portada: c.mensajePortada || null, delivery_gratis_desde: c.deliveryGratisDesde ?? null, updated_at: new Date().toISOString()
   }).eq('id', 1));
 }
 
@@ -1073,6 +1078,56 @@ export async function cargarGastos(): Promise<Gasto[]> {
     tipoComprobante: r.tipo_comprobante, serie: r.serie ?? undefined, numero: r.numero ?? undefined, base: num(r.base), igv: num(r.igv), total: num(r.total),
     medioPago: r.medio_pago ?? undefined, operacion: r.operacion ?? undefined, fechaPago: r.fecha_pago ?? undefined, retencion: num(r.retencion ?? 0)
   }));
+}
+
+// ---------------- COMBOS, RESEÑAS Y RECORDATORIOS ----------------
+export type CarpetaFoto = 'productos' | 'servicios' | 'combos' | 'resenas';
+
+export const comboDesdeFila = (r: Row): Combo => ({
+  codigo: r.codigo, nombre: r.nombre, descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined, precio: num(r.precio),
+  items: (r.items ?? []).map((x: Row) => ({ sku: x.sku, cantidad: Number(x.cantidad) })), visible: !!r.visible, orden: r.orden ?? 0
+});
+
+export async function cargarCombos(): Promise<Combo[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('combos').select('*').order('orden').order('nombre')).map(comboDesdeFila);
+}
+
+export async function guardarCombo(c: Combo) {
+  const sb = await db();
+  ok(await sb.from('combos').upsert({
+    codigo: c.codigo, nombre: c.nombre, descripcion: c.descripcion || null, imagen_url: c.imagen || null, precio: c.precio,
+    items: c.items, visible: c.visible, orden: c.orden, updated_at: new Date().toISOString()
+  }, { onConflict: 'codigo' }));
+}
+
+export async function cargarResenas(): Promise<Resena[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('resenas').select('*').order('created_at', { ascending: false }).limit(300)).map(r => ({
+    id: String(r.id), nombre: r.nombre, telefono: r.telefono ?? undefined, estrellas: r.estrellas, texto: r.texto, productoSku: r.producto_sku ?? undefined,
+    foto: r.foto_url ?? undefined, aprobada: !!r.aprobada, fecha: String(r.created_at).slice(0, 10)
+  }));
+}
+
+export async function guardarResena(r: Resena) {
+  const sb = await db();
+  ok(await sb.from('resenas').update({ aprobada: r.aprobada, foto_url: r.foto || null, texto: r.texto }).eq('id', Number(r.id)));
+}
+
+export async function eliminarResena(id: string) {
+  const sb = await db();
+  ok(await sb.from('resenas').delete().eq('id', Number(id)));
+}
+
+export async function cargarRecordatoriosEnviados(): Promise<Record<string, string>> {
+  const sb = await db();
+  const desde = new Date(Date.now() - 60 * 86_400_000).toISOString();
+  return Object.fromEntries(ok<Row[]>(await sb.from('recordatorios_enviados').select('clave, enviado_at').gte('enviado_at', desde)).map(r => [r.clave, r.enviado_at]));
+}
+
+export async function marcarRecordatorio(clave: string, usuario: string) {
+  const sb = await db();
+  ok(await sb.from('recordatorios_enviados').upsert({ clave, enviado_at: new Date().toISOString(), usuario }, { onConflict: 'clave' }));
 }
 
 // ---------------- CIERRE ANUAL ----------------
@@ -1261,7 +1316,7 @@ export async function eliminarServicioPublico(slug: string) {
 }
 
 /** Sube una foto al catálogo público (sólo el dueño) y devuelve su enlace https. */
-export async function subirFotoCatalogo(archivo: Blob, carpeta: 'productos' | 'servicios', nombre: string): Promise<string> {
+export async function subirFotoCatalogo(archivo: Blob, carpeta: CarpetaFoto, nombre: string): Promise<string> {
   const sb = await db();
   const ruta = `${carpeta}/${nombre.replace(/[^a-zA-Z0-9-]/g, '-')}-${Date.now()}.jpg`;
   ok(await sb.storage.from('catalogo').upload(ruta, archivo, { contentType: 'image/jpeg', upsert: false }));

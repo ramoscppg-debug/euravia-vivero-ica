@@ -3,11 +3,12 @@
 // Sólo información de vitrina. Nube: función catalogo_publico() y tablas públicas (RLS para anon).
 // Demo: el mismo estado del navegador que usa el panel. Nunca se cargan costos, clientes ni ventas.
 // ==========================================
-import { agregarSolicitudDemo, cargarEstadoDemo } from '../../data/estadoDemo';
+import { agregarResenaDemo, agregarSolicitudDemo, cargarEstadoDemo } from '../../data/estadoDemo';
 import {
   CATEGORIAS_PLANTAS,
   disponibilidadDe,
   type Category,
+  type Combo,
   type ConfigTienda,
   type ProductoPublico,
   type ServicioPublico,
@@ -18,12 +19,51 @@ import { soles } from '../../lib/formato';
 import { configTiendaDesdeFila, servicioPublicoDesdeFila, tarifaDesdeFila } from '../../lib/repo';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 
+export interface ResenaPublica {
+  id: string;
+  nombre: string;
+  estrellas: number;
+  texto: string;
+  sku?: string;
+  foto?: string;
+  fecha: string;
+}
+
 export interface DatosTienda {
-  productos: ProductoPublico[];
+  productos: ProductoPublico[]; // incluye los combos (con su contenido)
   servicios: ServicioPublico[];
   config: ConfigTienda;
   tarifas: TarifaDelivery[];
+  resenas: ResenaPublica[];
 }
+
+/** Un combo en la vitrina: se agrega como un producto más; alcanza para lo que permita su producto más escaso. */
+export function comboPublico(c: Combo, productos: { sku: string; nombre: string; stock: number }[]): ProductoPublico | null {
+  const partes = c.items.map(i => ({ ...i, p: productos.find(p => p.sku === i.sku) }));
+  if (partes.some(x => !x.p)) return null;
+  const stock = Math.min(...partes.map(x => Math.floor(Math.max(0, x.p!.stock) / x.cantidad)));
+  return {
+    sku: c.codigo, nombre: c.nombre, categoria: 'accesorios', categoriaNombre: 'Combo', descripcion: c.descripcion, imagen: c.imagen, precio: c.precio,
+    disponibilidad: stock <= 0 ? 'AGOTADO' : stock <= 2 ? 'POCAS' : 'DISPONIBLE', stock, esPlantaViva: false, destacado: false,
+    combo: partes.map(x => ({ sku: x.sku, nombre: x.p!.nombre, cantidad: x.cantidad }))
+  };
+}
+
+/** Separa un combo en sus productos con el precio del combo repartido según el precio de lista (igual que el servidor). */
+export function expandirCombo(combo: ProductoPublico, catalogo: ProductoPublico[], cantidad: number) {
+  const partes = (combo.combo ?? []).map(i => ({ ...i, p: catalogo.find(x => x.sku === i.sku)! }));
+  const peso = partes.reduce((a, x) => a + x.cantidad * x.p.precio, 0);
+  let acumulado = 0;
+  return partes.map((x, i) => {
+    const linea = i === partes.length - 1 ? Math.round((combo.precio - acumulado) * 100) / 100 : Math.round(combo.precio * x.cantidad * x.p.precio / peso * 100) / 100;
+    acumulado += linea;
+    return { sku: x.sku, nombre: x.p.nombre, cantidad: cantidad * x.cantidad, precio: Math.round(linea / x.cantidad * 10000) / 10000, stock: x.p.stock, combo: combo.nombre };
+  });
+}
+
+/** Delivery gratis desde el monto que fija el dueño (el servidor aplica la misma regla). */
+export const deliveryConPromo = (costo: number | undefined, total: number, gratisDesde?: number) =>
+  costo !== undefined && gratisDesde !== undefined && total >= gratisDesde ? 0 : costo;
 
 /** Costo de delivery del distrito (sin tarifa = a coordinar). El servidor aplica la misma regla. */
 export const tarifaDe = (tarifas: TarifaDelivery[], distrito?: string) =>
@@ -38,8 +78,7 @@ export const esPlanta = (p: { categoria: Category }) => CATEGORIAS_PLANTAS.inclu
 export async function cargarDatosTienda(): Promise<DatosTienda> {
   if (!isSupabaseConfigured) {
     const s = cargarEstadoDemo();
-    return {
-      productos: s.products
+    const productos: ProductoPublico[] = s.products
         .filter(p => p.visibleTienda !== false)
         .map(p => ({
           sku: p.sku,
@@ -58,26 +97,33 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
           esPlantaViva: p.isLivePlant,
           destacado: !!p.destacado
         }))
-        .sort((a, b) => Number(b.destacado) - Number(a.destacado) || a.nombre.localeCompare(b.nombre)),
+        .sort((a, b) => Number(b.destacado) - Number(a.destacado) || a.nombre.localeCompare(b.nombre));
+    const todos = s.products.map(p => ({ sku: p.sku, nombre: p.name, stock: p.stock }));
+    const combos = (s.combos ?? []).filter(c => c.visible).map(c => comboPublico(c, todos)).filter((c): c is ProductoPublico => !!c);
+    return {
+      productos: [...productos, ...combos],
       servicios: s.serviciosPublicos.filter(x => x.visible).sort((a, b) => a.orden - b.orden),
       config: s.tiendaConfig,
-      tarifas: (s.tarifasDelivery ?? []).filter(t => t.activo)
+      tarifas: (s.tarifasDelivery ?? []).filter(t => t.activo),
+      resenas: (s.resenas ?? []).filter(r => r.aprobada).map(r => ({ id: r.id, nombre: r.nombre, estrellas: r.estrellas, texto: r.texto, sku: r.productoSku, foto: r.foto, fecha: r.fecha }))
     };
   }
 
   const sb = await getSupabase();
   if (!sb) throw new Error('Sin conexión con la tienda.');
-  const [catalogo, servicios, config, tarifas] = await Promise.all([
+  const [catalogo, servicios, config, tarifas, combos, resenas] = await Promise.all([
     sb.rpc('catalogo_publico'),
     sb.from('servicios_publicos').select('slug, nombre, resumen, descripcion, imagen_url, orden, visible, precio_desde').eq('visible', true).order('orden'),
-    sb.from('tienda_config').select('whatsapp, email, direccion, horario, mensaje_portada').eq('id', 1).maybeSingle(),
-    sb.from('tarifas_delivery').select('distrito, costo, activo').eq('activo', true).order('distrito')
+    sb.from('tienda_config').select('whatsapp, email, direccion, horario, mensaje_portada, delivery_gratis_desde').eq('id', 1).maybeSingle(),
+    sb.from('tarifas_delivery').select('distrito, costo, activo').eq('activo', true).order('distrito'),
+    sb.rpc('combos_publicos'),
+    sb.rpc('resenas_publicas')
   ]);
-  const error = catalogo.error ?? servicios.error ?? config.error ?? tarifas.error;
+  const error = catalogo.error ?? servicios.error ?? config.error ?? tarifas.error ?? combos.error ?? resenas.error;
   if (error) throw new Error(error.message);
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    productos: (catalogo.data as any[]).map(r => ({
+    productos: [...(catalogo.data as any[]).map((r): ProductoPublico => ({
       sku: r.sku,
       nombre: r.nombre,
       nombreCientifico: r.nombre_cientifico ?? undefined,
@@ -94,9 +140,17 @@ export async function cargarDatosTienda(): Promise<DatosTienda> {
       esPlantaViva: !!r.es_planta_viva,
       destacado: !!r.destacado
     })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(combos.data as any[] ?? []).map((r): ProductoPublico => ({
+      sku: r.codigo, nombre: r.nombre, categoria: 'accesorios', categoriaNombre: 'Combo', descripcion: r.descripcion ?? undefined, imagen: r.imagen_url ?? undefined,
+      precio: Number(r.precio), stock: Math.max(0, Number(r.stock ?? 0)), disponibilidad: Number(r.stock) <= 0 ? 'AGOTADO' : Number(r.stock) <= 2 ? 'POCAS' : 'DISPONIBLE',
+      esPlantaViva: false, destacado: false, combo: r.contenido ?? []
+    }))],
     servicios: (servicios.data ?? []).map(servicioPublicoDesdeFila),
     config: configTiendaDesdeFila(config.data),
-    tarifas: (tarifas.data ?? []).map(tarifaDesdeFila)
+    tarifas: (tarifas.data ?? []).map(tarifaDesdeFila),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resenas: (resenas.data as any[] ?? []).map(r => ({ id: String(r.id), nombre: r.nombre, estrellas: r.estrellas, texto: r.texto, sku: r.producto_sku ?? undefined, foto: r.foto_url ?? undefined, fecha: r.fecha }))
   };
 }
 
@@ -143,7 +197,7 @@ export function validarSolicitud(s: NuevaSolicitud): string | null {
 }
 
 /** Envía la solicitud. En la nube el servidor valida todo y toma los precios de la base. */
-export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPublico[], tarifas: TarifaDelivery[] = []): Promise<string> {
+export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPublico[], tarifas: TarifaDelivery[] = [], gratisDesde?: number): Promise<string> {
   const error = validarSolicitud(s);
   if (error) throw new Error(error);
   const nombre = s.nombre.trim();
@@ -153,19 +207,21 @@ export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPubli
   const entrega = s.entrega ?? 'RECOJO';
 
   if (!isSupabaseConfigured) {
-    const items = (s.items ?? []).map(it => {
+    const items = (s.items ?? []).flatMap(it => {
       const p = catalogo.find(x => x.sku === it.sku);
       if (!p) throw new Error('Producto no disponible.');
-      return { sku: p.sku, nombre: p.nombre, cantidad: it.cantidad, precio: p.precio, stock: p.stock };
+      if (p.combo) return expandirCombo(p, catalogo, it.cantidad);
+      return [{ sku: p.sku, nombre: p.nombre, cantidad: it.cantidad, precio: p.precio, stock: p.stock }];
     });
+    const valor = (s.items ?? []).reduce((a, it) => a + it.cantidad * (catalogo.find(x => x.sku === it.sku)?.precio ?? 0), 0);
     const id = `WEB-${Date.now().toString(36).toUpperCase()}`;
     agregarSolicitudDemo({
       id, tipo: s.tipo, nombre, telefono, email: s.email || undefined, distrito: s.distrito || undefined, mensaje: s.mensaje || undefined,
-      servicioSlug: s.servicio, items, totalReferencial: items.reduce((a, it) => a + it.cantidad * it.precio, 0),
-      igvReferencial: igvIncluido(items.reduce((a, it) => a + it.cantidad * it.precio, 0)), estado: 'NUEVA', createdAt: new Date().toISOString(),
+      servicioSlug: s.servicio, items, totalReferencial: Math.round(valor * 100) / 100,
+      igvReferencial: igvIncluido(valor), estado: 'NUEVA', createdAt: new Date().toISOString(),
       comprobante, docCliente: doc, razonSocial: s.razonSocial?.trim() || undefined, entrega, direccion: s.direccion?.trim() || undefined,
       requiereAsesor: items.some(it => it.cantidad > it.stock),
-      costoDelivery: s.tipo === 'PEDIDO' && entrega === 'DELIVERY' ? tarifaDe(tarifas, s.distrito)?.costo : undefined
+      costoDelivery: s.tipo === 'PEDIDO' && entrega === 'DELIVERY' ? deliveryConPromo(tarifaDe(tarifas, s.distrito)?.costo, valor, gratisDesde) : undefined
     });
     return id;
   }
@@ -180,6 +236,25 @@ export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPubli
   });
   if (errorRpc) throw new Error(errorRpc.message);
   return String(data);
+}
+
+/** El cliente deja su reseña: queda por aprobar (no se publica sola). */
+export async function enviarResena(r: { nombre: string; telefono: string; estrellas: number; texto: string; sku?: string }): Promise<void> {
+  const nombre = r.nombre.trim();
+  const telefono = r.telefono.replace(/[^0-9+]/g, '');
+  const texto = r.texto.trim();
+  if (nombre.length < 2) throw new Error('Indica tu nombre.');
+  if (!/^\+?[0-9]{7,15}$/.test(telefono)) throw new Error('Indica tu teléfono o WhatsApp.');
+  if (!(r.estrellas >= 1 && r.estrellas <= 5)) throw new Error('Elige de 1 a 5 estrellas.');
+  if (texto.length < 5 || texto.length > 600) throw new Error('Cuéntanos tu experiencia (hasta 600 caracteres).');
+  if (!isSupabaseConfigured) {
+    agregarResenaDemo({ id: `RES-${Date.now().toString(36).toUpperCase()}`, nombre, telefono, estrellas: r.estrellas, texto, productoSku: r.sku, aprobada: false, fecha: new Date().toISOString().slice(0, 10) });
+    return;
+  }
+  const sb = await getSupabase();
+  if (!sb) throw new Error('Sin conexión con la tienda.');
+  const { error } = await sb.rpc('crear_resena', { p: { nombre, telefono, estrellas: r.estrellas, texto, sku: r.sku } });
+  if (error) throw new Error(error.message);
 }
 
 /** Enlace de WhatsApp sólo si el dueño configuró un número real; si no, null (nunca un enlace falso). */

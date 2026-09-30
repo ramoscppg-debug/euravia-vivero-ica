@@ -1256,6 +1256,106 @@ test.describe('Tienda pública AUREVIA (/tienda)', () => {
     expect(errores).toHaveLength(0);
   });
 
+  test('T10. Combo: se arma en el panel, se vende como uno en la tienda y el pedido llega separado en sus productos', async ({ page }) => {
+    await page.goto('/#combos');
+    await page.getByRole('button', { name: 'Nuevo combo' }).click();
+    await page.getByLabel('Nombre del combo').fill('Kit Monstera lista');
+    await page.getByLabel('Precio del combo').fill('160');
+    await page.getByLabel('Producto 1 del combo').selectOption('AUR-001');
+    await page.getByLabel('Producto 2 del combo').selectOption('AUR-002');
+    await page.getByLabel('Cantidad del producto 2').fill('2');
+    await expect(page.getByText(/Precio por separado: S\/ 181\.00/)).toBeVisible(); // 85 + 2 × 48
+    await page.getByRole('button', { name: 'Guardar combo' }).click();
+    await expect(page.getByRole('article').filter({ hasText: 'Kit Monstera lista' })).toContainText('ahorra S/ 21.00');
+
+    await page.goto('/tienda');
+    await page.getByRole('link', { name: 'Kit Monstera lista' }).first().click();
+    await expect(page.getByRole('region', { name: 'Contenido del combo' })).toContainText('2 × Sansevieria Laurentii');
+    await expect(page.getByText('Por separado: S/ 181.00 · ahorras S/ 21.00')).toBeVisible();
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirmar pedido' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByLabel('Nombre *').fill('Lucía Paz');
+    await page.getByLabel('WhatsApp *').fill('956444555');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Confirmar pedido' }).click();
+    await expect(page.getByText('¡Pedido registrado!')).toBeVisible();
+
+    await page.goto('/#solicitudes');
+    const sol = page.getByRole('article').filter({ hasText: 'Lucía Paz' });
+    await expect(sol).toContainText('Monstera Deliciosa');
+    await expect(sol).toContainText('2× Sansevieria Laurentii');
+    await expect(sol).toContainText('Total referencial: S/ 160.00');
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T11. Delivery gratis desde un monto y opiniones que se publican sólo al aprobarlas', async ({ page }) => {
+    await page.goto('/#configuracion');
+    await page.getByLabel('Distrito nuevo', { exact: true }).fill('Parcona');
+    await page.getByLabel('Costo del distrito nuevo').fill('12');
+    await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+    await page.getByLabel('Delivery gratis desde').fill('100');
+    await page.getByLabel('Delivery gratis desde').blur();
+
+    await page.goto('/tienda/producto/AUR-002'); // 48: no llega
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await expect(page.getByRole('dialog').getByText('Te faltan S/ 52.00 para el delivery gratis.')).toBeVisible();
+    await page.goto('/tienda/producto/AUR-003'); // + 120 = 168
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await expect(page.getByRole('dialog').getByText('¡Tu pedido tiene delivery gratis!')).toBeVisible();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirmar pedido' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByLabel('Nombre *').fill('Pedro Soto');
+    await page.getByLabel('WhatsApp *').fill('956777888');
+    await page.getByRole('button', { name: /Delivery/ }).click();
+    await page.getByLabel('Dirección *').fill('Jr. Lima 200');
+    await page.getByLabel('Distrito *').selectOption('Parcona');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page.getByRole('row', { name: /Delivery a Parcona/ })).toContainText('Gratis');
+    await expect(page.getByRole('row', { name: /Total referencial/ })).toContainText('S/ 168.00');
+
+    // Opinión: queda por aprobar y se publica desde el panel
+    await page.goto('/tienda');
+    await page.getByRole('button', { name: 'Dejar mi opinión' }).click();
+    const form = page.getByRole('region', { name: 'Deja tu opinión' });
+    await form.getByRole('radio', { name: '4 estrella(s)' }).click();
+    await form.getByLabel('Nombre *').fill('Rosa Quispe');
+    await form.getByLabel(/WhatsApp/).fill('956123123');
+    await form.getByLabel('Tu opinión *').fill('Las suculentas llegaron perfectas y bien empacadas.');
+    await form.getByRole('button', { name: 'Enviar opinión' }).click();
+    await expect(page.getByText(/La publicaremos después de revisarla/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByText('Las suculentas llegaron perfectas y bien empacadas.')).toHaveCount(0);
+
+    await page.goto('/#resenas');
+    await page.getByRole('region', { name: 'Opiniones por aprobar' }).getByRole('button', { name: 'Publicar' }).click();
+    await expect(page.getByRole('region', { name: 'Opiniones publicadas' })).toContainText('Rosa Quispe');
+    await page.goto('/tienda');
+    await expect(page.getByText(/Las suculentas llegaron perfectas/)).toBeVisible();
+    expect(errores).toHaveLength(0);
+  });
+
+  test('T12. Recordatorios: un pedido web sin cerrar aparece al día siguiente con su mensaje listo', async ({ page }) => {
+    await page.goto('/tienda/producto/AUR-002');
+    await page.getByRole('button', { name: /Agregar a mi cotización/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirmar pedido' }).click();
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByLabel('Nombre *').fill('Marta Díaz');
+    await page.getByLabel('WhatsApp *').fill('956999000');
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Confirmar pedido' }).click();
+    await expect(page.getByText('¡Pedido registrado!')).toBeVisible();
+
+    await page.clock.setFixedTime(new Date(Date.now() + 2 * 86_400_000));
+    await page.goto('/#recordatorios');
+    const item = page.getByRole('listitem').filter({ hasText: 'Marta Díaz' });
+    await expect(item).toContainText('Pedido web sin cerrar');
+    await expect(item).toContainText('Hola Marta');
+    await item.getByRole('button', { name: 'Ya lo atendí' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: 'Marta Díaz' })).toHaveCount(0);
+    expect(errores).toHaveLength(0);
+  });
+
   test('T8. Delivery por distrito: el cliente ve la tarifa y el pedido llega con ese costo', async ({ page }) => {
     await page.goto('/#configuracion');
     await page.getByLabel('Distrito nuevo', { exact: true }).fill('Parcona');

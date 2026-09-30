@@ -6,6 +6,7 @@ import { esPlanta, url } from '../datos';
 import { Imagen, TarjetaProducto, Titulo } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useTienda } from '../TiendaApp';
+import { FormResena, ListaResenas } from '../Resenas';
 
 const PASOS = [
   { Icono: ShoppingBag, titulo: 'Elige', detalle: 'Arma tu cotización con plantas, insumos o un servicio. Ves el stock real de cada producto.' },
@@ -21,7 +22,8 @@ export default function Inicio() {
     descripcion: 'Plantas de interior y exterior, macetas, sustratos e insumos, y servicios de jardinería. Mira el stock y cotiza en línea.'
   }), []);
 
-  const productos = datos?.productos ?? [];
+  const productos = (datos?.productos ?? []).filter(p => !p.combo);
+  const combos = (datos?.productos ?? []).filter(p => p.combo);
   // Destacados que marcó el dueño; si no marcó ninguno, lo que tiene stock
   const destacados = (productos.some(p => p.destacado) ? productos.filter(p => p.destacado) : productos.filter(p => p.stock > 0)).slice(0, 8);
   const portada = destacados.find(p => p.imagen) ?? productos.find(p => p.imagen);
@@ -117,6 +119,14 @@ export default function Inicio() {
         )}
       </Pagina>
 
+      {/* Combos */}
+      {combos.length > 0 && (
+        <Pagina className="pt-10 pb-6">
+          <div className="mb-6"><Titulo antetitulo="Ahorra llevando todo" titulo="Combos" /></div>
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">{combos.map(p => <TarjetaProducto key={p.sku} p={p} />)}</div>
+        </Pagina>
+      )}
+
       {/* Servicios */}
       {!!datos?.servicios.length && (
         <section className="mt-14 bg-hoja-950 text-white">
@@ -134,6 +144,15 @@ export default function Inicio() {
             </div>
           </Pagina>
         </section>
+      )}
+
+      {/* Opiniones */}
+      {datos && (
+        <Pagina className="py-14 space-y-6">
+          <Titulo antetitulo="Clientes felices" titulo="Lo que dicen de nosotros" />
+          <ListaResenas resenas={datos.resenas.slice(0, 9)} />
+          <FormResena />
+        </Pagina>
       )}
     </>
   );

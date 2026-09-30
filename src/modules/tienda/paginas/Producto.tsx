@@ -6,6 +6,7 @@ import { esPlanta, url } from '../datos';
 import { BotonCompartir, ChipStock, Contador, Imagen, NotaStock, soles, TarjetaProducto } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useTienda } from '../TiendaApp';
+import { FormResena, ListaResenas } from '../Resenas';
 
 export default function Producto({ sku }: { sku: string }) {
   const { datos, agregar, setPanel } = useTienda();
@@ -25,8 +26,11 @@ export default function Producto({ sku }: { sku: string }) {
     );
   }
 
-  const volver = esPlanta(p) ? { href: url('/plantas'), label: 'Plantas' } : { href: url('/productos'), label: 'Productos e insumos' };
-  const relacionados = datos.productos.filter(x => x.sku !== p.sku && esPlanta(x) === esPlanta(p) && x.stock > 0).slice(0, 4);
+  const volver = p.combo ? { href: url(), label: 'Inicio' } : esPlanta(p) ? { href: url('/plantas'), label: 'Plantas' } : { href: url('/productos'), label: 'Productos e insumos' };
+  const relacionados = datos.productos.filter(x => x.sku !== p.sku && !x.combo && (p.combo ? p.combo.some(c => c.sku === x.sku) : esPlanta(x) === esPlanta(p)) && x.stock > 0).slice(0, 4);
+  const opiniones = datos.resenas.filter(r => r.sku === p.sku);
+  // Lo que costaría comprar por separado lo que trae el combo
+  const separado = p.combo?.reduce((a, c) => a + c.cantidad * (datos.productos.find(x => x.sku === c.sku)?.precio ?? 0), 0) ?? 0;
   const hayCuidados = !!(p.luz || p.riego);
 
   return (
@@ -52,6 +56,14 @@ export default function Producto({ sku }: { sku: string }) {
           <p className="text-xs text-slate-500 -mt-3">Precio unitario con IGV.</p>
 
           {p.descripcion && <p className="text-base leading-relaxed text-slate-700">{p.descripcion}</p>}
+
+          {p.combo && (
+            <section aria-label="Contenido del combo" className="p-4 rounded-3xl border border-hoja-100 bg-hoja-50/60 space-y-2">
+              <h2 className="text-lg font-extrabold text-slate-900">Este combo trae</h2>
+              <ul className="text-sm space-y-1">{p.combo.map(c => <li key={c.sku}>• {c.cantidad} × {c.nombre}</li>)}</ul>
+              {separado > p.precio && <p className="text-sm font-bold text-hoja-800">Por separado: {soles(separado)} · ahorras {soles(separado - p.precio)}</p>}
+            </section>
+          )}
 
           {/* Selección: se puede pedir más que el stock; esa parte la coordina un asesor */}
           <div className="p-4 sm:p-5 rounded-3xl bg-slate-50 space-y-3">
@@ -84,6 +96,12 @@ export default function Producto({ sku }: { sku: string }) {
           <BotonCompartir titulo={p.nombre} />
         </div>
       </div>
+
+      <section aria-label="Opiniones" className="mt-16 space-y-4">
+        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">Opiniones</h2>
+        {opiniones.length ? <ListaResenas resenas={opiniones} /> : <p className="text-slate-600">Aún no hay opiniones de este producto.</p>}
+        <FormResena sku={p.combo ? undefined : p.sku} />
+      </section>
 
       {relacionados.length > 0 && (
         <section className="mt-16">

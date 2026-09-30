@@ -471,6 +471,33 @@ export interface ProductoPublico {
   riego?: string;
   esPlantaViva: boolean;
   destacado: boolean;
+  /** Si es un combo: los productos que trae (se vende como uno y se separa al registrar el pedido). */
+  combo?: { sku: string; nombre: string; cantidad: number }[];
+}
+
+/** Combo de productos con precio final (IGV incluido). */
+export interface Combo {
+  codigo: string; // CMB-001
+  nombre: string;
+  descripcion?: string;
+  imagen?: string;
+  precio: number;
+  items: { sku: string; cantidad: number }[];
+  visible: boolean;
+  orden: number;
+}
+
+/** Reseña de un cliente: sólo se publica si el dueño la aprueba. */
+export interface Resena {
+  id: string;
+  nombre: string;
+  telefono?: string; // privado
+  estrellas: number;
+  texto: string;
+  productoSku?: string;
+  foto?: string;
+  aprobada: boolean;
+  fecha: string;
 }
 
 export interface ServicioPublico {
@@ -491,6 +518,7 @@ export interface ConfigTienda {
   direccion?: string;
   horario?: string;
   mensajePortada?: string;
+  deliveryGratisDesde?: number; // compra mínima (IGV incluido) para no cobrar delivery
 }
 
 /** Tarifa fija de delivery por distrito (la tienda la muestra y el servidor la aplica). */
@@ -517,7 +545,7 @@ export interface SolicitudTienda {
   distrito?: string;
   mensaje?: string;
   servicioSlug?: string;
-  items: { sku: string; nombre: string; cantidad: number; precio: number; stock?: number }[];
+  items: { sku: string; nombre: string; cantidad: number; precio: number; stock?: number; combo?: string }[];
   totalReferencial: number;
   comprobante: 'BOLETA' | 'FACTURA' | 'RXH'; // RXH: servicio cobrado por el jardinero con recibo por honorarios
   docCliente?: string; // DNI (boleta, opcional) o RUC (factura)

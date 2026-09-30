@@ -28,7 +28,7 @@ import {
   INITIAL_SERVICIOS_PUBLICOS
 } from './seed';
 import type { ErpState } from '../store/ErpStore';
-import type { SolicitudTienda } from '../domain/types';
+import type { Resena, SolicitudTienda } from '../domain/types';
 import { hoyLocal } from '../lib/fechas';
 
 export const STORAGE_KEY = 'aurevia.erp.v1';
@@ -67,6 +67,9 @@ export function seedState(): ErpState {
     jardineros: [],
     serviciosJardinero: [],
     ejercicios: [],
+    combos: [],
+    resenas: [],
+    recordatoriosEnviados: {},
     gastosCaja: INITIAL_CASH_REGISTER.egresos.map(e => ({ id: `${hoyLocal()}-${e.id}`, fecha: hoyLocal(), motivo: e.motivo, monto: e.monto, responsable: e.responsable }))
   };
 }
@@ -98,6 +101,11 @@ export function guardarEstadoDemo(state: ErpState) {
 }
 
 /** La tienda demo deja su solicitud en el mismo almacenamiento; el panel la ve al instante (evento storage). */
+export function agregarResenaDemo(r: Resena) {
+  const s = cargarEstadoDemo();
+  guardarEstadoDemo({ ...s, resenas: [r, ...(s.resenas ?? [])] });
+}
+
 export function agregarSolicitudDemo(sol: SolicitudTienda) {
   const s = cargarEstadoDemo();
   guardarEstadoDemo({ ...s, solicitudes: [sol, ...s.solicitudes] });

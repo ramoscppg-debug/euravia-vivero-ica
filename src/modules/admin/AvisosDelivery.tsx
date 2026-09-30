@@ -91,6 +91,16 @@ export function TarifasDelivery() {
         <Boton variante="secundario" onClick={() => void agregar()}>Agregar</Boton>
       </div>
       {!state.tarifasDelivery.length && <p className="text-[11px] text-tinta-suave">Ejemplo: Ica {soles(10)}, Parcona {soles(12)}, La Tinguiña {soles(12)}. Tú defines los precios.</p>}
+      <label className="flex flex-wrap items-center gap-2 pt-2 border-t border-crema-300">
+        <span className="font-bold text-tinta">Delivery gratis desde S/</span>
+        <input aria-label="Delivery gratis desde" type="number" min={0} step="1" defaultValue={state.tiendaConfig.deliveryGratisDesde ?? ''} placeholder="Sin promoción"
+          onBlur={e => {
+            const v = e.target.value.trim() === '' ? undefined : Number(e.target.value);
+            if (v !== state.tiendaConfig.deliveryGratisDesde) void actions.guardarConfigTienda({ ...state.tiendaConfig, deliveryGratisDesde: v && v > 0 ? v : undefined }).then(r => { if (!r.ok) alert(r.error); });
+          }}
+          className="w-28 min-h-[36px] px-2 rounded-control border border-crema-300 text-right font-bold" />
+        <span className="text-[11px] text-tinta-suave">Compra mínima (IGV incluido) para no cobrar el delivery. Vacío = sin promoción.</span>
+      </label>
     </Tarjeta>
   );
 }

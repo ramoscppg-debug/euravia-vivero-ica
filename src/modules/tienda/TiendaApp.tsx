@@ -125,7 +125,7 @@ function Encabezado() {
 
 /** Panel lateral "Mi cotización": se revisa y ajusta la selección sin salir de la página. */
 function PanelCotizacion() {
-  const { panel, setPanel, cambiarCantidad } = useTienda();
+  const { panel, setPanel, cambiarCantidad, datos } = useTienda();
   const { lineas, total, unidades } = useLineas();
   const cerrarRef = useRef<HTMLButtonElement>(null);
 
@@ -174,6 +174,11 @@ function PanelCotizacion() {
                 <span className="text-slate-600 text-sm">Total referencial (con IGV)</span>
                 <span className="text-2xl font-extrabold text-slate-900">{soles(total)}</span>
               </div>
+              {datos?.config.deliveryGratisDesde !== undefined && (
+                <p className="text-xs font-semibold text-hoja-900 bg-hoja-50 rounded-xl p-2">
+                  {total >= datos.config.deliveryGratisDesde ? '¡Tu pedido tiene delivery gratis!' : `Te faltan ${soles(datos.config.deliveryGratisDesde - total)} para el delivery gratis.`}
+                </p>
+              )}
               <button onClick={() => { setPanel(false); navegar(url('/cotizar')); }} className="w-full min-h-[52px] rounded-full bg-hoja-700 hover:bg-hoja-800 text-white font-bold inline-flex items-center justify-center gap-2">
                 Confirmar pedido <ArrowRight className="w-5 h-5" aria-hidden />
               </button>

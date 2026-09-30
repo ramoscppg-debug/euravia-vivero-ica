@@ -18,6 +18,9 @@ import Kardex from '../modules/inventario/Kardex';
 import Proyectos from '../modules/servicios/Proyectos';
 import Honorarios from '../modules/servicios/Honorarios';
 import CierreEjercicio from '../modules/admin/CierreEjercicio';
+import Combos from '../modules/ventas/Combos';
+import Recordatorios from '../modules/clientes/Recordatorios';
+import ResenasPanel from '../modules/clientes/ResenasPanel';
 import Caja from '../modules/ventas/Caja';
 import Catalogo from '../modules/ventas/Catalogo';
 import Pedidos from '../modules/ventas/Pedidos';
@@ -50,6 +53,9 @@ const SCREENS: Record<TabId, ComponentType> = {
   jardineria: Proyectos,
   honorarios: Honorarios,
   cierre: CierreEjercicio,
+  combos: Combos,
+  recordatorios: Recordatorios,
+  resenas: ResenasPanel,
   crm: Clientes,
   kardex: Kardex,
   bajas: Bajas,

@@ -42,7 +42,7 @@ export default function Catalogo({ grupo }: { grupo: 'plantas' | 'insumos' }) {
     navegar(`${ruta}${qs ? `?${qs}` : ''}`, { reemplazar: true });
   };
 
-  const delGrupo = (datos?.productos ?? []).filter(p => (grupo === 'plantas' ? esPlanta(p) : !esPlanta(p)));
+  const delGrupo = (datos?.productos ?? []).filter(p => !p.combo && (grupo === 'plantas' ? esPlanta(p) : !esPlanta(p)));
   const categorias = [...new Set(delGrupo.map(p => p.categoria))].map(id => [id, NOMBRE_CATEGORIA[id] ?? id] as const);
   const texto = sinTildes(q.trim());
   const lista = delGrupo

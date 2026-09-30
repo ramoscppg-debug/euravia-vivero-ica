@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, FileText, MessageCircle, St
 import { Enlace, useUbicacion } from '../../../app/router';
 import { Esqueleto } from '../../../components/ui';
 import type { SolicitudTienda } from '../../../domain/types';
-import { AVISO_IGV, enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
+import { AVISO_IGV, deliveryConPromo, enlaceWhatsapp, enviarSolicitud, mensajePedido, tarifaDe, url, validarSolicitud, type NuevaSolicitud } from '../datos';
 import { Contador, Imagen, NotaStock, soles } from '../componentes';
 import { fijarMetadatos } from '../seo';
 import { Pagina, useLineas, useTienda } from '../TiendaApp';
@@ -73,7 +73,10 @@ export default function Cotizar() {
 
   if (!datos) return <Pagina className="py-10"><Esqueleto className="h-72 !rounded-3xl" /></Pagina>;
   const tarifa = !modoServicio && f.entrega === 'DELIVERY' ? tarifaDe(datos.tarifas, f.distrito) : undefined;
-  const totalConDelivery = total + (tarifa?.costo ?? 0);
+  const gratisDesde = datos.config.deliveryGratisDesde;
+  const costoDelivery = deliveryConPromo(tarifa?.costo, total, gratisDesde);
+  const faltaGratis = gratisDesde !== undefined && total < gratisDesde ? gratisDesde - total : 0;
+  const totalConDelivery = total + (costoDelivery ?? 0);
   if (enviado) return <Exito enviado={enviado} modoServicio={modoServicio} />;
 
   if (modoServicio && !servicio) {
@@ -106,8 +109,8 @@ export default function Cotizar() {
     setEnviando(true);
     setError(null);
     try {
-      const numero = await enviarSolicitud(solicitud, datos.productos, datos.tarifas);
-      const texto = mensajePedido(numero, solicitud, lineas.map(l => ({ nombre: l.p.nombre, cantidad: l.cantidad, precio: l.p.precio, stock: l.p.stock })), servicio?.nombre, tarifa?.costo);
+      const numero = await enviarSolicitud(solicitud, datos.productos, datos.tarifas, gratisDesde);
+      const texto = mensajePedido(numero, solicitud, lineas.map(l => ({ nombre: l.p.nombre, cantidad: l.cantidad, precio: l.p.precio, stock: l.p.stock })), servicio?.nombre, costoDelivery);
       try { localStorage.setItem(CLAVE_DATOS, JSON.stringify({ nombre: f.nombre, telefono: f.telefono, email: f.email })); } catch { /* sin almacenamiento */ }
       setEnviado({ numero, whatsapp: enlaceWhatsapp(datos.config, texto), telefono: f.telefono });
       if (!modoServicio) vaciar();
@@ -289,7 +292,7 @@ export default function Cotizar() {
                       ))}
                     </tbody>
                     <tfoot>
-                      {tarifa && <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Delivery a {tarifa.distrito}</td><td className="text-right px-5 font-semibold">{soles(tarifa.costo)}</td></tr>}
+                      {tarifa && <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-2">Delivery a {tarifa.distrito}</td><td className="text-right px-5 font-semibold">{costoDelivery === 0 ? 'Gratis' : soles(tarifa.costo)}</td></tr>}
                       <tr className="border-t border-slate-200"><td colSpan={2} className="px-5 py-3 font-bold">Total referencial (IGV incluido)</td><td className="text-right px-5 font-extrabold text-lg">{soles(totalConDelivery)}</td></tr>
                     </tfoot>
                   </table>
@@ -324,7 +327,8 @@ export default function Cotizar() {
           ) : (
             <>
               <p className="flex justify-between"><span className="text-slate-600">{lineas.length} producto(s)</span><span className="font-bold">{soles(total)}</span></p>
-              <p className="flex justify-between"><span className="text-slate-600">Delivery</span><span className="font-bold">{f.entrega !== 'DELIVERY' ? '—' : tarifa ? soles(tarifa.costo) : 'A coordinar'}</span></p>
+              <p className="flex justify-between"><span className="text-slate-600">Delivery</span><span className="font-bold">{f.entrega !== 'DELIVERY' ? '—' : tarifa ? (costoDelivery === 0 ? 'Gratis' : soles(tarifa.costo)) : 'A coordinar'}</span></p>
+              {faltaGratis > 0 && <p className="p-2.5 rounded-xl bg-hoja-50 text-hoja-900 text-xs font-semibold">Te faltan {soles(faltaGratis)} para el delivery gratis.</p>}
               <p className="flex justify-between border-t border-slate-200 pt-3 text-base"><span className="font-bold">Total referencial</span><span className="font-extrabold">{soles(totalConDelivery)}</span></p>
               <p className="text-xs text-slate-500">{AVISO_IGV}</p>
               {hayAsesor && <p className="p-2.5 rounded-xl bg-amber-50 text-amber-900 text-xs font-semibold">Parte de tu pedido supera el stock: un asesor de ventas lo coordina contigo.</p>}
