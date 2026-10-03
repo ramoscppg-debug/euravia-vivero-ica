@@ -99,6 +99,7 @@ export interface Libro131 {
   descripcion: string;
   tipoExistencia: string;
   unidad: string;
+  codigoUnspsc?: string;
   saldoInicial: Saldo;
   filas: Fila131[];
   totales: { entradas: number; costoEntradas: number; salidas: number; costoSalidas: number };
@@ -145,7 +146,7 @@ export function libro131(productos: CatalogProduct[], kardex: KardexMovement[], 
     }
     const suma = (k: 'entrada' | 'salida', c: 'cantidad' | 'costoTotal') => r4(filas.reduce((a, f) => a + (f[k]?.[c] ?? 0), 0));
     return {
-      sku: p.sku, descripcion: p.name, tipoExistencia: p.tipoExistencia ?? '01', unidad: p.unidadMedida ?? 'NIU',
+      sku: p.sku, descripcion: p.name, tipoExistencia: p.tipoExistencia ?? '01', unidad: p.unidadMedida ?? 'NIU', codigoUnspsc: p.codigoUnspsc,
       saldoInicial: saldoInicial ?? saldo, filas,
       totales: { entradas: suma('entrada', 'cantidad'), costoEntradas: suma('entrada', 'costoTotal'), salidas: suma('salida', 'cantidad'), costoSalidas: suma('salida', 'costoTotal') }
     };

@@ -261,7 +261,11 @@ const today = () => hoyLocal();
 export const textoPagos = (pagos: Pago[]) => pagos.filter(p => p.monto > 0).map(p => `${p.medio}${p.operacion ? ` (op. ${p.operacion})` : ''}`).join(' + ');
 
 /** Id corto y único entre cajas: prefijo-año-sufijo base36 del reloj. */
-const nuevoId = (prefijo: string) => `${prefijo}-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+/** 2 caracteres al azar: evita choques si dos registros se crean en el mismo milisegundo (o desde otra caja). */
+const azar = () => Math.random().toString(36).slice(2, 4).toUpperCase().padEnd(2, '0');
+const nuevoId = (prefijo: string) => `${prefijo}-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}${azar()}`;
+/** Id de un registro del modo demo (en la nube lo pone la base). */
+const idDemo = (prefijo: string) => `${prefijo}-${Date.now().toString(36).toUpperCase()}${azar()}`;
 
 /** Estado mientras llegan los datos de Supabase: nada de datos demo mezclados con los reales. */
 function nubeVacia(): ErpState {
@@ -350,7 +354,7 @@ function moverStock(s: ErpState, m: repo.MovimientoNuevo, extra: { fecha?: strin
   };
 }
 
-const nuevoIdPedido = () => `PED-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+const nuevoIdPedido = () => `PED-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase().slice(-6)}${azar()}`;
 
 /** Unidades comprometidas en pedidos que aún no se cobran (el stock recién baja al cobrar). */
 export function reservadoEnPedidos(pedidos: Pedido[]): Map<string, number> {
@@ -846,7 +850,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           });
           if (nube && detraccion) await repo.guardarDetraccion(detraccion);
           const visitas: Tarea = {
-            id: `TAR-${Date.now().toString(36).toUpperCase()}`,
+            id: idDemo('TAR'),
             titulo: `${con.visitasMes} visita(s) de mantenimiento ${mes} · ${con.cliente.nombre}`,
             vence: `${periodo}-28`, asignadoA: con.jardinero, hecha: false, creadoPor: responsable('Administración')
           };
@@ -961,6 +965,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (nuevo && s.products.some(x => x.sku === sku)) return { ok: false, error: `Ya existe el SKU ${sku}.` };
         const inicial = nuevo ? Math.max(0, Math.floor(stockInicial || 0)) : 0;
         if (inicial > 0 && !(p.cost > 0)) return { ok: false, error: 'Para registrar stock inicial indica el costo unitario (valoriza el inventario).' };
+        if (p.codigoUnspsc && !/^\d{8}$/.test(p.codigoUnspsc)) return { ok: false, error: 'El código UNSPSC tiene 8 dígitos (ej. 10161500).' };
         if (p.precioOferta !== undefined && !(p.precioOferta > 0 && p.precioOferta < p.price)) return { ok: false, error: 'La oferta debe ser menor que el precio de venta.' };
         const ficha: CatalogProduct = { ...p, sku, name: p.name.trim(), stock: nuevo ? 0 : p.stock, creadoAt: nuevo ? new Date().toISOString() : p.creadoAt };
         try {
@@ -1013,7 +1018,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const previo = id ? s.crmClients.find(c => c.id === id) : undefined;
           const cliente: CrmClient = nube
             ? await repo.guardarFichaCliente(datos, id)
-            : { ...(previo ?? { id: `CRM-${Date.now().toString(36).toUpperCase()}`, lastPurchaseDate: '' }), ...datos } as CrmClient;
+            : { ...(previo ?? { id: idDemo('CRM'), lastPurchaseDate: '' }), ...datos } as CrmClient;
           const cur = get();
           commit({ ...cur, crmClients: id ? cur.crmClients.map(c => (c.id === id ? cliente : c)) : [...cur.crmClients, cliente] });
           return { ok: true, cliente };
@@ -1044,7 +1049,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
               const previo = f.doc ? lista.find(c => c.doc === f.doc) : undefined;
               if (previo) lista = lista.map(c => (c.id === previo.id ? { ...c, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) } : c));
               else lista = [...lista, {
-                id: `CRM-${Date.now().toString(36).toUpperCase()}-${i}`, name: f.name!, doc: f.doc, phone: f.phone ?? '', email: f.email, address: f.address,
+                id: `${idDemo('CRM')}-${i}`, name: f.name!, doc: f.doc, phone: f.phone ?? '', email: f.email, address: f.address,
                 district: f.district ?? '', canal: f.canal, plantsOwned: [], lastPurchaseDate: '',
                 seasonalAlert: '🌱 Aún sin alerta de temporada registrada.', recommendedAction: 'Registrar las plantas del cliente para personalizar sus cuidados.', urgency: 'ESTACIONAL'
               }];
@@ -1062,7 +1067,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         try {
           const nota: NotaCliente = nube
             ? await repo.agregarNota(clienteId, texto.trim(), usuario)
-            : { id: `NOTA-${Date.now().toString(36).toUpperCase()}`, clienteId, texto: texto.trim(), autor: responsable('Administración'), fecha: new Date().toISOString() };
+            : { id: idDemo('NOTA'), clienteId, texto: texto.trim(), autor: responsable('Administración'), fecha: new Date().toISOString() };
           const s = get();
           commit({ ...s, notasClientes: [nota, ...s.notasClientes] });
           return { ok: true };
@@ -1076,7 +1081,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!t.vence) return { ok: false, error: 'Indica la fecha.' };
         const base = { clienteId: t.clienteId, titulo: t.titulo.trim(), vence: t.vence, asignadoA: t.asignadoA?.trim() || undefined, creadoPor: responsable('Administración') };
         try {
-          const tarea: Tarea = nube ? await repo.crearTarea(base) : { ...base, id: `TAR-${Date.now().toString(36).toUpperCase()}`, hecha: false };
+          const tarea: Tarea = nube ? await repo.crearTarea(base) : { ...base, id: idDemo('TAR'), hecha: false };
           const s = get();
           commit({ ...s, tareas: [...s.tareas, tarea] });
           return { ok: true };
@@ -1432,7 +1437,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           return { ok: false, error: `⚠️ No hay suficiente efectivo en caja (S/ ${s.cashRegister.conteoRealEfectivo.toFixed(2)}). Elige otro medio o regístralo por pagar.` };
         }
         try {
-          const id = nube ? await repo.registrarGasto({ ...g, total, igv, usuario }) : `GAS-${Date.now().toString(36).toUpperCase()}`;
+          const id = nube ? await repo.registrarGasto({ ...g, total, igv, usuario }) : idDemo('GAS');
           const gasto: Gasto = { ...g, id, total, igv, base: round2(total - igv), descripcion: g.descripcion.trim(), fechaPago: g.medioPago ? g.fecha : undefined };
           const cur = get();
           const caja = cur.cashRegister;
@@ -1487,7 +1492,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (j.comisionPct !== undefined && !(j.comisionPct >= 0 && j.comisionPct <= 100)) return { ok: false, error: 'La comisión debe estar entre 0 y 100%.' };
         try {
           const datos = { ...j, nombre, ruc, dni, telefono: j.telefono?.trim() || undefined };
-          const id = nube ? await repo.guardarJardinero(datos) : j.id ?? `JAR-${Date.now().toString(36).toUpperCase()}`;
+          const id = nube ? await repo.guardarJardinero(datos) : j.id ?? idDemo('JAR');
           const jardinero: Jardinero = { ...datos, id };
           const cur = get();
           commit({ ...cur, jardineros: j.id ? cur.jardineros.map(x => (x.id === j.id ? jardinero : x)) : [...cur.jardineros, jardinero] });
@@ -1519,7 +1524,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const servicio: ServicioJardinero = nube
             ? await repo.registrarServicioJardinero({ ...datos, usuario })
             : {
-                ...datos, id: `SJ-${Date.now().toString(36).toUpperCase()}`, comisionPct: pct, comision: round2(valor * pct / 100),
+                ...datos, id: idDemo('SJ'), comisionPct: pct, comision: round2(valor * pct / 100),
                 rxhSerie: p.modalidad === 'RXH_CLIENTE' ? p.rxhSerie?.trim().toUpperCase() || undefined : undefined,
                 rxhNumero: p.modalidad === 'RXH_CLIENTE' ? p.rxhNumero?.trim() || undefined : undefined
               };
@@ -1540,6 +1545,14 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (sv.comprobanteId) return { ok: false, error: `Este servicio ya tiene el comprobante ${sv.comprobanteId}.` };
         if (sv.modalidad === 'RXH_CLIENTE') return { ok: false, error: 'Con recibo por honorarios cobra el jardinero: la empresa no emite comprobante.' };
         const precio = round2(conIgv(sv.valor));
+        // Factura de servicios mayor a S/ 700: el cliente deposita la detracción en la cuenta del Banco de la Nación
+        const esFactura = sv.modalidad === 'FACTURA';
+        const det = calcularDetraccion(precio, s.company.tasaDetraccionServicios);
+        const conDetraccion = esFactura && det.aplica;
+        if (conDetraccion) {
+          const [primero] = pagos;
+          pagos = [{ ...primero, monto: det.netoACobrar }, { medio: 'Transferencia', monto: det.montoDetraccion, operacion: 'Detracción BN' }];
+        }
         const r = await venderYGuardar({
           lineas: [{ sku: 'SRV-JARDIN', name: `Servicio de jardinería: ${sv.descripcion}`, qty: 1, precioUnitNeto: precio, esProducto: false }],
           total: precio,
@@ -1553,12 +1566,23 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         });
         if (!r.ok) return r;
         let aviso: string | undefined;
+        const fecha = today();
+        const detraccion: DetraccionRecord | null = conDetraccion
+          ? { id: nuevoId('DET'), facturaId: r.invoice.id, cliente: sv.clienteNombre, rucCliente: sv.clienteDoc ?? '', fechaEmision: fecha,
+              fechaVencimientoBn: vencimientoDetraccion(fecha), montoFactura: precio, tasa: s.company.tasaDetraccionServicios,
+              montoDetraccion: det.montoDetraccion, estado: 'PENDIENTE' }
+          : null;
         try {
           if (nube) await repo.vincularComprobanteServicio(id, r.invoice.id);
+          if (nube && detraccion) await repo.guardarDetraccion(detraccion);
         } catch (e) {
           aviso = errorNube(e);
         }
-        commit({ ...r.next, serviciosJardinero: r.next.serviciosJardinero.map(x => (x.id === id ? { ...x, comprobanteId: r.invoice.id } : x)) });
+        commit({
+          ...r.next,
+          detracciones: detraccion ? [detraccion, ...r.next.detracciones] : r.next.detracciones,
+          serviciosJardinero: r.next.serviciosJardinero.map(x => (x.id === id ? { ...x, comprobanteId: r.invoice.id } : x))
+        });
         if (aviso) return { ok: false, error: `Se emitió ${r.invoice.id}, pero no se pudo enlazar al servicio: ${aviso}` };
         return { ok: true, invoice: r.invoice, vuelto: r.vuelto };
       },
@@ -1594,7 +1618,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             gastoId = await repo.registrarRxhJardinero({ id, serie: serieN, numero: numeroN, fecha, usuario });
             if (gastoId) gastos = await repo.cargarGastos();
           } else if (factura) {
-            gastoId = `GAS-${Date.now().toString(36).toUpperCase()}`;
+            gastoId = idDemo('GAS');
             gastos = [{
               id: gastoId, fecha, cuenta: CONFIG_CONTABLE.HONORARIOS.cuenta, descripcion: `Honorarios: ${sv.descripcion}`.slice(0, 200), proveedorRuc: j.ruc, proveedor: j.nombre,
               tipoComprobante: '02', serie: serieN, numero: numeroN, base: monto, igv: 0, total: monto, retencion
@@ -1615,7 +1639,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!(e.descuentoPct >= 0 && e.descuentoPct <= 90)) return { ok: false, error: 'El descuento va de 0 a 90%.' };
         const datos = { ...e, nombre: e.nombre.trim(), descripcion: e.descripcion?.trim() || undefined };
         try {
-          const evento = nube ? await repo.guardarEvento(datos) : { ...datos, id: e.id.startsWith('nuevo') ? `EV-${Date.now().toString(36).toUpperCase()}` : e.id };
+          const evento = nube ? await repo.guardarEvento(datos) : { ...datos, id: e.id.startsWith('nuevo') ? idDemo('EV') : e.id };
           const cur = get();
           commit({ ...cur, eventos: [evento, ...cur.eventos.filter(x => x.id !== e.id)].sort((a, b) => b.desde.localeCompare(a.desde)) });
           return { ok: true, evento };

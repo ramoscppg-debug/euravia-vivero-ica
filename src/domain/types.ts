@@ -74,6 +74,7 @@ export interface CatalogProduct extends Product {
   precioOferta?: number; // oferta (IGV incluido); se cobra mientras esté vigente
   ofertaHasta?: string; // último día de la oferta (vacío = hasta quitarla)
   creadoAt?: string; // alta en el catálogo (lo nuevo se muestra primero en la tienda)
+  codigoUnspsc?: string; // 8 dígitos, tercer nivel UNSPSC (PLE 13.1 campos 8 y 9)
 }
 
 /** Evento con promoción (Día de la Madre, Navidad…): banner en la tienda y % de descuento. */

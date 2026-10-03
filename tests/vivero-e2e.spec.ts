@@ -20,6 +20,8 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     page.on('pageerror', (exception) => {
       consoleErrors.push(exception.message);
     });
+    // Los datos del demo tienen fechas fijas de septiembre de 2026: el reloj se fija para que las pruebas no dependan del día
+    await page.clock.setFixedTime(new Date('2026-09-20T10:00:00-05:00'));
     await page.goto('/');
     // Check main branding
     await expect(page.getByRole('heading', { name: 'AUREVIA', exact: true })).toBeVisible();
@@ -924,6 +926,13 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(fila).toMatch(/20609876541\|AUREVIA BOTANICAL S\.A\.C\.\|\d{6}\|\|\d{2}\/\d{2}\/\d{4}\|/); // RUC|razón social|periodo|CAR vacío|fecha
     expect(fila.slice(fila.indexOf('20609876541|')).split('|').length - 1).toBe(33); // 33 campos, cada uno cierra con "|"
 
+    // Código UNSPSC en la ficha → campos 8 (catálogo 1 = Naciones Unidas) y 9 del 13.1
+    await ir(page, 'catalogo');
+    await page.getByRole('button', { name: 'Editar Monstera Deliciosa' }).click();
+    await page.getByLabel('Código UNSPSC').fill('10161500');
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.getByLabel('Código UNSPSC')).toHaveCount(0);
+
     await ir(page, 'kardex');
     const libro = page.getByRole('region', { name: 'Formato 13.1' });
     await libro.getByLabel('Existencia del libro').selectOption('AUR-001');
@@ -933,6 +942,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     const lineas131 = (await leer(ple131)).trim().split(/\r\n/);
     expect(lineas131[0].split('|').length - 1).toBe(27);
     expect(lineas131[0].split('|')[13]).toBe('16'); // la primera tupla es el saldo inicial
+    expect(lineas131[0].split('|').slice(7, 9)).toEqual(['1', '10161500']);
 
     await ir(page, 'libro-diario');
     const [diario] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PLE 5.1 + 5.3' }).click()]);
@@ -994,6 +1004,7 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(nuevo.getByLabel('Resumen del servicio')).toContainText('S/ 1,472.00');
     await nuevo.getByRole('button', { name: 'Registrar servicio' }).click();
     const diseno = lista.getByRole('listitem').filter({ hasText: 'Diseño de jardín corporativo' });
+    await expect(diseno.getByText(/el cliente paga S\/ 2,076\.80 y deposita S\/ 283\.20/)).toBeVisible(); // detracción 12%
     await diseno.getByLabel('N° de operación del servicio Diseño de jardín corporativo').fill('778899');
     await diseno.getByRole('button', { name: 'Emitir factura' }).click();
     await expect(page.getByText('FACTURA ELECTRÓNICA')).toBeVisible();
@@ -1005,6 +1016,8 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await diseno.getByRole('button', { name: 'Pagar' }).click();
     await expect(diseno.getByText(/Pagado S\/ 1,472.00/)).toBeVisible();
 
+    await ir(page, 'detracciones');
+    await expect(page.getByText('Empresa Agrícola SAC').first()).toBeVisible();
     await ir(page, 'libro-diario');
     const rxh = page.getByRole('listitem').filter({ hasText: 'Honorarios: Diseño de jardín corporativo' }).first();
     await expect(rxh).toContainText('633');

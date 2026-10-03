@@ -193,6 +193,7 @@ function Libro() {
     if (!/^\d{11}$/.test(company.ruc)) return alert('Configura el RUC de la empresa en Ajustes antes de generar el PLE.');
     const r = generarPle131(company, libros, periodo);
     descargar(nombrePle(company.ruc, periodo, '130100', r.registros > 0), r.contenido);
+    if (r.omitidos.length) alert(`PLE 13.1 descargado. Revisa antes de presentarlo: SUNAT pide el código UNSPSC de las mercaderías y productos terminados (ficha del producto):\n\n• ${r.omitidos.slice(0, 15).join('\n• ')}${r.omitidos.length > 15 ? `\n… y ${r.omitidos.length - 15} más` : ''}`);
   };
 
   const imprimir = () => {

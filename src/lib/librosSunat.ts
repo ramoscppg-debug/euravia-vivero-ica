@@ -118,8 +118,12 @@ export function generarPle131(empresa: EmpresaConfig, libros: Libro131[], period
   const est = (empresa.codigoEstablecimiento || '0000').padStart(4, '0');
   const filas: string[] = [];
   const primerDia = `${periodo}-01`;
+  const omitidos: string[] = [];
   for (const l of libros) {
-    const comunes = (cuo: string, correlativo: number) => [per, cuo, `M${correlativo}`, est, '9', l.tipoExistencia, texto(l.sku, 24), '', ''];
+    // Campos 8 y 9: catálogo UNSPSC (Tabla 13 = 1) y código; obligatorios para mercaderías (01) y productos terminados (02)
+    const unspsc = l.codigoUnspsc && /^\d{8}$/.test(l.codigoUnspsc) ? l.codigoUnspsc : '';
+    if (!unspsc && (l.tipoExistencia === '01' || l.tipoExistencia === '02')) omitidos.push(`${l.sku} ${l.descripcion}: falta el código UNSPSC`);
+    const comunes = (cuo: string, correlativo: number) => [per, cuo, `M${correlativo}`, est, '9', l.tipoExistencia, texto(l.sku, 24), unspsc ? '1' : '', unspsc];
     const cierre = (desc: string) => [texto(desc, 80), l.unidad, '1'];
     let n = 1;
     // La primera tupla es el saldo inicial (operación 16)
@@ -135,7 +139,7 @@ export function generarPle131(empresa: EmpresaConfig, libros: Libro131[], period
         nq(f.saldo.cantidad), nq(f.saldo.costoUnitario), n2(f.saldo.costoTotal), '1']));
     }
   }
-  return { contenido: filas.join('\r\n') + (filas.length ? '\r\n' : ''), registros: filas.length, omitidos: [] };
+  return { contenido: filas.join('\r\n') + (filas.length ? '\r\n' : ''), registros: filas.length, omitidos };
 }
 
 // ---------------- ZIP (sin compresión) para subir al SIRE ----------------

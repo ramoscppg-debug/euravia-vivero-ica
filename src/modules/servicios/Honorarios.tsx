@@ -9,7 +9,7 @@ import { Boton, EstadoVacio, Insignia, Tarjeta } from '../../components/ui';
 import { MEDIOS_PAGO, type Jardinero, type MedioPago, type ServicioJardinero } from '../../domain/types';
 import { soles } from '../../lib/formato';
 import { hoyLocal } from '../../lib/fechas';
-import { conIgv, round2 } from '../../lib/peru';
+import { calcularDetraccion, conIgv, round2 } from '../../lib/peru';
 import { useErp, type JardineroInput } from '../../store/ErpStore';
 import { useUi } from '../../store/UiStore';
 import { Bloque } from '../admin/comunes';
@@ -239,6 +239,7 @@ function FilaServicio({ s }: { s: ServicioJardinero }) {
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const montoComprobante = round2(conIgv(s.valor));
+  const det = s.modalidad === 'FACTURA' ? calcularDetraccion(montoComprobante, state.company.tasaDetraccionServicios) : null;
 
   const correr = async (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setOcupado(true);
@@ -287,6 +288,7 @@ function FilaServicio({ s }: { s: ServicioJardinero }) {
           : factura
             ? <span className="flex flex-wrap items-center gap-2 p-2 rounded-control bg-aviso-fondo">
                 <b>Emitir {nombreDoc} al cliente: {soles(montoComprobante)}</b>
+                {det?.aplica && <span className="basis-full">Detracción {Math.round(state.company.tasaDetraccionServicios * 100)}%: el cliente paga <b>{soles(det.netoACobrar)}</b> y deposita <b>{soles(det.montoDetraccion)}</b> en tu cuenta del Banco de la Nación.</span>}
                 {selectorPago}
                 <Boton tamano="sm" cargando={ocupado} onClick={() => void emitir()}>Emitir {nombreDoc}</Boton>
               </span>

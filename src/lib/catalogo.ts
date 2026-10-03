@@ -45,7 +45,7 @@ export function pendientesDe(p: CatalogProduct): string[] {
 }
 
 // ---------------- CSV ----------------
-export const COLUMNAS = ['sku', 'nombre', 'categoria', 'precio', 'costo', 'stock_inicial', 'stock_minimo', 'descripcion', 'nombre_cientifico', 'luz', 'riego', 'ubicacion', 'foto_url', 'visible', 'destacado'] as const;
+export const COLUMNAS = ['sku', 'nombre', 'categoria', 'precio', 'costo', 'stock_inicial', 'stock_minimo', 'descripcion', 'nombre_cientifico', 'luz', 'riego', 'ubicacion', 'foto_url', 'visible', 'destacado', 'unspsc'] as const;
 
 /** Plantilla con encabezados y una fila de guía (los valores son un ejemplo que el dueño reemplaza). */
 export function plantillaCsv(): string {
@@ -83,7 +83,7 @@ const siNo = (t: string, def: boolean) => (!t.trim() ? def : /^(si|sí|s|1|true|
 
 const ALIAS: Record<string, (typeof COLUMNAS)[number]> = {
   codigo: 'sku', producto: 'nombre', precio_venta: 'precio', costo_unitario: 'costo', stock: 'stock_inicial', cantidad: 'stock_inicial',
-  minimo: 'stock_minimo', foto: 'foto_url', imagen: 'foto_url', imagen_url: 'foto_url', descripción: 'descripcion'
+  minimo: 'stock_minimo', codigo_unspsc: 'unspsc', foto: 'foto_url', imagen: 'foto_url', imagen_url: 'foto_url', descripción: 'descripcion'
 };
 
 export interface FilaImportada {
@@ -131,6 +131,8 @@ export function interpretarCsv(texto: string, existentes: CatalogProduct[]): { f
     if (!Number.isInteger(minimo) || minimo < 0) errores.push('stock mínimo inválido');
     const foto = v('foto_url');
     if (foto && !/^https:\/\//.test(foto)) errores.push('la foto debe ser un enlace https');
+    const unspsc = v('unspsc').replace(/\D/g, '');
+    if (unspsc && unspsc.length !== 8) errores.push('el código UNSPSC tiene 8 dígitos');
 
     filas.push({
       linea: i + 2,
@@ -140,7 +142,8 @@ export function interpretarCsv(texto: string, existentes: CatalogProduct[]): { f
         sku, name: nombre, category: categoria.id, categoryName: categoria.nombre, isLivePlant: categoria.viva,
         price: precio || 0, cost: costo || 0, stock: 0, minStock: Math.max(0, Math.floor(minimo || 0)),
         description: v('descripcion'), scientificName: v('nombre_cientifico') || undefined, careLight: v('luz') || undefined, careWater: v('riego') || undefined,
-        location: v('ubicacion'), fullImage: foto, botanicalFamily: '', visibleTienda: siNo(v('visible'), true), destacado: siNo(v('destacado'), false)
+        location: v('ubicacion'), fullImage: foto, botanicalFamily: '', visibleTienda: siNo(v('visible'), true), destacado: siNo(v('destacado'), false),
+        codigoUnspsc: unspsc || undefined
       }
     });
   });

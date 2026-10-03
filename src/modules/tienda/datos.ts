@@ -235,7 +235,7 @@ export async function enviarSolicitud(s: NuevaSolicitud, catalogo: ProductoPubli
       return [{ sku: p.sku, nombre: p.nombre, cantidad: it.cantidad, precio: p.precio, stock: p.stock }];
     });
     const valor = (s.items ?? []).reduce((a, it) => a + it.cantidad * (catalogo.find(x => x.sku === it.sku)?.precio ?? 0), 0);
-    const id = `WEB-${Date.now().toString(36).toUpperCase()}`;
+    const id = `WEB-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`;
     agregarSolicitudDemo({
       id, tipo: s.tipo, nombre, telefono, email: s.email || undefined, distrito: s.distrito || undefined, mensaje: s.mensaje || undefined,
       servicioSlug: s.servicio, items, totalReferencial: Math.round(valor * 100) / 100,
@@ -269,7 +269,7 @@ export async function enviarResena(r: { nombre: string; telefono: string; estrel
   if (!(r.estrellas >= 1 && r.estrellas <= 5)) throw new Error('Elige de 1 a 5 estrellas.');
   if (texto.length < 5 || texto.length > 600) throw new Error('Cuéntanos tu experiencia (hasta 600 caracteres).');
   if (!isSupabaseConfigured) {
-    agregarResenaDemo({ id: `RES-${Date.now().toString(36).toUpperCase()}`, nombre, telefono, estrellas: r.estrellas, texto, productoSku: r.sku, aprobada: false, fecha: new Date().toISOString().slice(0, 10) });
+    agregarResenaDemo({ id: `RES-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 4).toUpperCase()}`, nombre, telefono, estrellas: r.estrellas, texto, productoSku: r.sku, aprobada: false, fecha: new Date().toISOString().slice(0, 10) });
     return;
   }
   const sb = await getSupabase();

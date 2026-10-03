@@ -218,6 +218,7 @@ function productoDesdeFila(r: Row): CatalogProduct {
     precioOferta: r.precio_oferta != null ? num(r.precio_oferta) : undefined,
     ofertaHasta: r.oferta_hasta ?? undefined,
     creadoAt: r.created_at ?? undefined,
+    codigoUnspsc: r.codigo_unspsc ?? undefined,
     valorInventario: r.valor_inventario != null ? num(r.valor_inventario) : undefined,
     costoPromedio: r.costo_promedio != null ? num(r.costo_promedio) : undefined,
     unidadMedida: r.unidad_medida ?? undefined,
@@ -1358,6 +1359,7 @@ export async function guardarProductoCatalogo(p: CatalogProduct, nuevo: boolean)
     ubicacion_estante: p.location || null, costo_unitario: p.cost, precio_venta: p.price, stock_minimo: p.minStock,
     cuidado_luz: p.careLight || null, cuidado_riego: p.careWater || null, es_planta_viva: p.isLivePlant,
     visible_tienda: p.visibleTienda ?? true, destacado: !!p.destacado,
+    codigo_unspsc: p.codigoUnspsc || null,
     precio_oferta: p.precioOferta ?? null, oferta_hasta: p.precioOferta ? p.ofertaHasta || null : null,
     tipo_existencia: p.tipoExistencia ?? (['sustratos', 'fertilizantes'].includes(p.category) ? '03' : '01'),
     unidad_medida: p.unidadMedida ?? 'NIU'
