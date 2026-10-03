@@ -555,6 +555,16 @@ export interface AvisosWhatsapp {
   apikey?: string;
   activo: boolean;
   ultimoEnvio?: string;
+  resumenDiario?: boolean; // resumen de cada mañana (8:00 a. m.)
+  diasAnticipacion?: number; // con cuántos días avisar los vencimientos
+}
+
+/** Vencimiento que anota el dueño (cronograma SUNAT según su RUC, alquiler, préstamos…). */
+export interface Vencimiento {
+  id: string;
+  fecha: string;
+  descripcion: string;
+  hecho: boolean;
 }
 
 export interface SolicitudTienda {

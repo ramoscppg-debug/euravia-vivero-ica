@@ -36,6 +36,7 @@ import type {
   Combo,
   Resena,
   EventoPromocion,
+  Vencimiento,
   Pedido,
   ProjectStatus,
   Purchase,
@@ -133,7 +134,7 @@ export async function cargarTodo(): Promise<DatosNube> {
     sb.from('caja_movimientos').select('id, fecha, concepto, monto, responsable, cuenta_gasto').eq('tipo', 'EGRESO').is('comprobante_id', null).is('gasto_id', null)
       .gte('fecha', new Date(Date.now() - 400 * 86_400_000).toISOString()).order('fecha', { ascending: false }).limit(2000),
     sb.from('tarifas_delivery').select('*').order('distrito'),
-    sb.from('notificaciones_config').select('whatsapp, apikey, activo, ultimo_envio').eq('id', 1).maybeSingle() // sólo el dueño la ve (RLS)
+    sb.from('notificaciones_config').select('whatsapp, apikey, activo, ultimo_envio, resumen_diario, dias_anticipacion').eq('id', 1).maybeSingle() // sólo el dueño la ve (RLS)
   ]);
 
   const empresaRow = ok<Row | null>(empresa);
@@ -1007,12 +1008,14 @@ export async function guardarServicioPublico(sv: ServicioPublico) {
 
 export const tarifaDesdeFila = (r: Row): TarifaDelivery => ({ distrito: r.distrito, costo: num(r.costo), activo: !!r.activo });
 const avisosDesdeFila = (r: Row | null): AvisosWhatsapp =>
-  r ? { whatsapp: r.whatsapp ?? undefined, apikey: r.apikey ?? undefined, activo: !!r.activo, ultimoEnvio: r.ultimo_envio ?? undefined } : { activo: false };
+  r ? { whatsapp: r.whatsapp ?? undefined, apikey: r.apikey ?? undefined, activo: !!r.activo, ultimoEnvio: r.ultimo_envio ?? undefined,
+        resumenDiario: !!r.resumen_diario, diasAnticipacion: r.dias_anticipacion ?? 3 } : { activo: false };
 
 export async function guardarAvisos(a: AvisosWhatsapp) {
   const sb = await db();
   ok(await sb.from('notificaciones_config').update({
-    whatsapp: a.whatsapp || null, apikey: a.apikey || null, activo: a.activo, url_panel: window.location.origin, updated_at: new Date().toISOString()
+    whatsapp: a.whatsapp || null, apikey: a.apikey || null, activo: a.activo, url_panel: window.location.origin,
+    resumen_diario: !!a.resumenDiario, dias_anticipacion: a.diasAnticipacion ?? 3, updated_at: new Date().toISOString()
   }).eq('id', 1));
 }
 
@@ -1155,6 +1158,43 @@ export async function cargarRecordatoriosEnviados(): Promise<Record<string, stri
 export async function marcarRecordatorio(clave: string, usuario: string) {
   const sb = await db();
   ok(await sb.from('recordatorios_enviados').upsert({ clave, enviado_at: new Date().toISOString(), usuario }, { onConflict: 'clave' }));
+}
+
+// ---------------- OFICINA VIRTUAL ----------------
+export async function cargarMetas(): Promise<Record<string, number>> {
+  const sb = await db();
+  return Object.fromEntries(ok<Row[]>(await sb.from('metas_venta').select('periodo, monto')).map(r => [r.periodo, num(r.monto)]));
+}
+
+export async function guardarMeta(periodo: string, monto: number) {
+  const sb = await db();
+  ok(await sb.from('metas_venta').upsert({ periodo, monto, updated_at: new Date().toISOString() }, { onConflict: 'periodo' }));
+}
+
+export async function cargarVencimientos(): Promise<Vencimiento[]> {
+  const sb = await db();
+  const desde = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+  return ok<Row[]>(await sb.from('vencimientos').select('*').gte('fecha', desde).order('fecha')).map(r => ({ id: String(r.id), fecha: r.fecha, descripcion: r.descripcion, hecho: !!r.hecho }));
+}
+
+export async function agregarVencimiento(v: Omit<Vencimiento, 'id' | 'hecho'>): Promise<string> {
+  const sb = await db();
+  return String(ok<Row>(await sb.from('vencimientos').insert({ fecha: v.fecha, descripcion: v.descripcion }).select('id').single()).id);
+}
+
+export async function marcarVencimiento(id: string, hecho: boolean) {
+  const sb = await db();
+  ok(await sb.from('vencimientos').update({ hecho }).eq('id', Number(id)));
+}
+
+export async function eliminarVencimiento(id: string) {
+  const sb = await db();
+  ok(await sb.from('vencimientos').delete().eq('id', Number(id)));
+}
+
+export async function verResumenDiario(enviar: boolean): Promise<{ texto: string; enviado: boolean }> {
+  const sb = await db();
+  return ok<{ texto: string; enviado: boolean }>(await sb.rpc('ver_resumen_diario', { p_enviar: enviar }));
 }
 
 // ---------------- CIERRE ANUAL ----------------

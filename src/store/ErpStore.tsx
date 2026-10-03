@@ -21,6 +21,7 @@ import type {
   Combo,
   Resena,
   EventoPromocion,
+  Vencimiento,
   ParteProduccion,
   TarifaDelivery,
   AvisosWhatsapp,
@@ -67,6 +68,7 @@ import { csvAClientes } from '../lib/crm';
 import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
 import { conPreciosVigentes } from '../lib/ofertas';
+import { resumenTexto } from '../lib/oficina';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
@@ -110,6 +112,8 @@ export interface ErpState {
   eventos: EventoPromocion[];
   resenas: Resena[];
   recordatoriosEnviados: Record<string, string>; // clave → fecha en que se envió
+  metasVenta: Record<string, number>; // periodo AAAA-MM → meta en soles
+  vencimientos: Vencimiento[];
 }
 
 export type JardineroInput = Omit<Jardinero, 'id'> & { id?: string };
@@ -306,7 +310,9 @@ function nubeVacia(): ErpState {
     combos: [],
     eventos: [],
     resenas: [],
-    recordatoriosEnviados: {}
+    recordatoriosEnviados: {},
+    metasVenta: {},
+    vencimientos: []
   };
 }
 
@@ -674,7 +680,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos] = await Promise.all([
+          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos] = await Promise.all([
             repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
             repo.cargarGastos().catch(() => []),
             repo.cargarJardineros().catch(() => []), // dueño y ventas
@@ -683,9 +689,11 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             repo.cargarCombos().catch(() => []),
             repo.cargarResenas().catch(() => []),
             repo.cargarRecordatoriosEnviados().catch(() => ({})),
-            repo.cargarEventos().catch(() => [])
+            repo.cargarEventos().catch(() => []),
+            repo.cargarMetas().catch(() => ({})),
+            repo.cargarVencimientos().catch(() => []) // sólo el dueño
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos });
+          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -1627,6 +1635,66 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const cur = get();
           commit({ ...cur, gastos, serviciosJardinero: cur.serviciosJardinero.map(x => (x.id === id ? { ...x, rxhSerie: serieN, rxhNumero: numeroN, gastoId } : x)) });
           return { ok: true, retencion };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- OFICINA VIRTUAL ----------------
+      async guardarMeta(periodo: string, monto: number): Promise<Result> {
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) return { ok: false, error: 'Periodo inválido.' };
+        if (!(monto > 0)) return { ok: false, error: 'La meta debe ser mayor a cero.' };
+        try {
+          if (nube) await repo.guardarMeta(periodo, round2(monto));
+          const cur = get();
+          commit({ ...cur, metasVenta: { ...cur.metasVenta, [periodo]: round2(monto) } });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async agregarVencimiento(fecha: string, descripcion: string): Promise<Result> {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { ok: false, error: 'Indica la fecha.' };
+        if (descripcion.trim().length < 3) return { ok: false, error: 'Describe el vencimiento (ej. PDT 621 de setiembre).' };
+        try {
+          const id = nube ? await repo.agregarVencimiento({ fecha, descripcion: descripcion.trim() }) : idDemo('VEN');
+          const cur = get();
+          commit({ ...cur, vencimientos: [...cur.vencimientos, { id, fecha, descripcion: descripcion.trim(), hecho: false }].sort((a, b) => a.fecha.localeCompare(b.fecha)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async marcarVencimiento(id: string, hecho: boolean): Promise<Result> {
+        try {
+          if (nube) await repo.marcarVencimiento(id, hecho);
+          const cur = get();
+          commit({ ...cur, vencimientos: cur.vencimientos.map(v => (v.id === id ? { ...v, hecho } : v)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async eliminarVencimiento(id: string): Promise<Result> {
+        try {
+          if (nube) await repo.eliminarVencimiento(id);
+          const cur = get();
+          commit({ ...cur, vencimientos: cur.vencimientos.filter(v => v.id !== id) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** El resumen de la mañana; con enviar=true lo manda ahora por WhatsApp (prueba). */
+      async verResumenDiario(enviar = false): Promise<Result<{ texto: string; enviado: boolean }>> {
+        const s = get();
+        if (!nube) return { ok: true, texto: resumenTexto(s, today(), s.avisos.diasAnticipacion ?? 3), enviado: false };
+        try {
+          return { ok: true, ...(await repo.verResumenDiario(enviar)) };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

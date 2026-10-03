@@ -18,6 +18,9 @@ import Kardex from '../modules/inventario/Kardex';
 import Proyectos from '../modules/servicios/Proyectos';
 import Honorarios from '../modules/servicios/Honorarios';
 import CierreEjercicio from '../modules/admin/CierreEjercicio';
+import TableroDia from '../modules/oficina/TableroDia';
+import AvisosAgenda from '../modules/oficina/AvisosAgenda';
+import MetasVenta from '../modules/oficina/MetasVenta';
 import Combos from '../modules/ventas/Combos';
 import OfertasEventos from '../modules/ventas/OfertasEventos';
 import Recordatorios from '../modules/clientes/Recordatorios';
@@ -54,6 +57,9 @@ const SCREENS: Record<TabId, ComponentType> = {
   jardineria: Proyectos,
   honorarios: Honorarios,
   cierre: CierreEjercicio,
+  hoy: TableroDia,
+  agenda: AvisosAgenda,
+  metas: MetasVenta,
   combos: Combos,
   ofertas: OfertasEventos,
   recordatorios: Recordatorios,

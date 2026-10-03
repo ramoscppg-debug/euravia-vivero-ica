@@ -5,6 +5,9 @@
 // ==========================================
 import {
   BarChart3,
+  BellRing,
+  Briefcase,
+  Target,
   Boxes,
   Calculator,
   CalendarCheck,
@@ -38,10 +41,14 @@ import {
 import type { Rol } from '../domain/types';
 import type { ErpState } from '../store/ErpStore';
 import { recordatoriosDelDia } from '../modules/clientes/Recordatorios';
+import { pendientesDelDia } from '../lib/oficina';
 import { hoyLocal } from '../lib/fechas';
 
 export type TabId =
   | 'dashboard'
+  | 'hoy'
+  | 'agenda'
+  | 'metas'
   | 'caja'
   | 'pedidos'
   | 'solicitudes'
@@ -84,7 +91,7 @@ export interface NavItem {
 }
 
 export interface NavBlock {
-  id: 'ventas' | 'catalogo' | 'servicios' | 'clientes' | 'contable' | 'reportes' | 'ajustes';
+  id: 'oficina' | 'ventas' | 'catalogo' | 'servicios' | 'clientes' | 'contable' | 'reportes' | 'ajustes';
   label: string;
   hint: string;
   icon: LucideIcon;
@@ -94,6 +101,17 @@ export interface NavBlock {
 const cuenta = (n: number) => (n > 0 ? String(n) : null);
 
 export const NAV_BLOCKS: NavBlock[] = [
+  {
+    id: 'oficina',
+    label: 'Oficina virtual',
+    hint: 'tu día, avisos y metas',
+    icon: Briefcase,
+    items: [
+      { id: 'hoy', label: 'Tablero del día', icon: ClipboardList, badge: s => cuenta(pendientesDelDia(s, hoyLocal(), s.avisos.diasAnticipacion ?? 3).filter(p => p.urgente).length) },
+      { id: 'agenda', label: 'Avisos por WhatsApp', icon: BellRing },
+      { id: 'metas', label: 'Metas de venta', icon: Target }
+    ]
+  },
   {
     id: 'ventas',
     label: 'Ventas',
@@ -191,6 +209,9 @@ const DUENO: Rol[] = ['dueno'];
 
 const PERMISOS: Record<TabId, Rol[]> = {
   dashboard: DUENO,
+  hoy: VENTAS,
+  agenda: DUENO,
+  metas: VENTAS,
   caja: VENTAS,
   pedidos: VENTAS,
   solicitudes: VENTAS,

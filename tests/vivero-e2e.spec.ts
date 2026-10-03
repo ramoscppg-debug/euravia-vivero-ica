@@ -1068,6 +1068,39 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('51. Oficina virtual: meta del mes, tablero del día con lo pendiente y resumen para WhatsApp con vencimientos', async ({ page }) => {
+    await ir(page, 'metas');
+    await page.getByLabel('Meta del mes').fill('20000');
+    await page.getByRole('button', { name: 'Guardar meta' }).click();
+    await expect(page.getByLabel('Avance de la meta')).toContainText('de S/ 20,000.00');
+
+    // Una venta de hoy se ve en el tablero y deja un comprobante por emitir
+    await page.click('button:has-text("Nueva venta")');
+    await page.locator('.fixed button:has-text("Monstera Deliciosa")').click();
+    await page.click('button:has-text("Emitir Comprobante SUNAT")');
+    await page.locator('button:has(svg.lucide-x)').first().click();
+    await ir(page, 'hoy');
+    await expect(page.getByText('Ventas de hoy').locator('..')).toContainText('S/ 85.00');
+    await expect(page.getByText(/para llegar vende/)).toBeVisible();
+    const pendientes = page.getByRole('list', { name: 'Pendientes del día' });
+    await pendientes.getByRole('button', { name: /por emitir en SUNAT/ }).click();
+    await expect(page).toHaveURL(/#finanzas/);
+
+    // Vencimiento anotado: sale en el resumen de la mañana
+    await ir(page, 'agenda');
+    await page.getByLabel('Fecha del vencimiento').fill('2026-09-21');
+    await page.getByLabel('Descripción del vencimiento').fill('PDT 621 de agosto');
+    await page.getByRole('button', { name: 'Agregar' }).click();
+    await page.getByRole('button', { name: 'Ver el resumen de hoy' }).click();
+    const resumen = page.getByLabel('Vista previa del resumen');
+    await expect(resumen).toContainText('21/09 PDT 621 de agosto');
+    await expect(resumen).toContainText('Meta del mes');
+    await expect(resumen).toContainText('por emitir en SUNAT');
+    await page.getByRole('list', { name: 'Vencimientos pendientes' }).getByRole('button', { name: 'Hecho' }).click();
+    await expect(page.getByText('No hay vencimientos pendientes.')).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();
