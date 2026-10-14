@@ -22,6 +22,10 @@ export interface LineaPrecotizacion {
 
 export interface PagoPrecotizacion { fecha: string; monto: number; medio: string; operacion?: string }
 
+/** Comprobante emitido en el portal SUNAT: se anota su número y el enlace (Drive) del PDF. */
+export interface ComprobantePrecotizacion { tipo: '01' | '03'; numero: string; fecha: string; url: string; enviadoAt?: string }
+export const NOMBRE_CPE = { '01': 'Factura', '03': 'Boleta' } as const;
+
 export interface Precotizacion {
   id: string;
   numero: string;
@@ -40,6 +44,7 @@ export interface Precotizacion {
   total: number;
   estado: 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'PAGADA' | 'RECHAZADA';
   pagos: PagoPrecotizacion[];
+  comprobantes: ComprobantePrecotizacion[];
 }
 
 export const TASA = 0.18;
@@ -133,8 +138,22 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
         <tr><td>${pag ? 'SALDO A PAGAR' : 'TOTAL A PAGAR'}</td><td class="d">${dinero(pag ? calc.total - pag : calc.total)}</td></tr>
       </tbody></table>
     </div>
+    ${c.comprobantes?.length ? `<p style="margin-top:14px"><b>Comprobantes emitidos:</b> ${c.comprobantes.map(x => `${NOMBRE_CPE[x.tipo]} ${esc(x.numero)}`).join(' · ')}</p>` : ''}
     <p style="margin-top:22px;text-align:center;color:#64748b;font-size:10px">Este documento no es un comprobante de pago · ${esc(nombre)}</p>
   </div>`;
+}
+
+/** Mensaje con el comprobante (enlace de Drive) para el cliente. */
+export function mensajeComprobante(c: Precotizacion, cp: ComprobantePrecotizacion, empresa: string): string {
+  const pag = pagado(c);
+  return [
+    `Hola ${c.cliente.nombre.split(' ')[0]}, te saluda ${empresa} 🌿`,
+    `Te enviamos tu ${NOMBRE_CPE[cp.tipo].toLowerCase()} *${cp.numero}* de la cotización N° ${c.numero}.`,
+    `Total: ${dinero(c.total)}${pag ? ` · Pagado: ${dinero(pag)}` : ''}${saldo(c) > 0 ? ` · Saldo: ${dinero(saldo(c))}` : ''}`,
+    '',
+    `Descárgala aquí: ${cp.url}`,
+    '¡Gracias por tu compra!'
+  ].join('\n');
 }
 
 /** Mensaje de WhatsApp para el cliente, con el enlace a su cotización. */

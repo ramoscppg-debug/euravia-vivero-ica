@@ -1160,6 +1160,30 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await tarjeta.getByRole('button', { name: 'Confirmar' }).click();
     await expect(tarjeta).toContainText('PAGADA');
 
+    // Comprobante emitido en el portal SUNAT: se anota con el enlace de Drive y se envía al cliente
+    await page.evaluate(() => { (window as unknown as { abiertos: string[] }).abiertos = []; window.open = (u?: string | URL) => { (window as unknown as { abiertos: string[] }).abiertos.push(String(u)); return null; }; });
+    await ir(page, 'hoy');
+    await expect(page.getByRole('list', { name: 'Pendientes del día' })).toContainText('sin comprobante registrado');
+    await ir(page, 'precotizaciones');
+    await tarjeta.getByRole('button', { name: 'Registrar comprobante emitido' }).click();
+    await tarjeta.getByLabel(/Tipo de comprobante/).selectOption('01');
+    await tarjeta.getByLabel(/Número del comprobante/).fill('F001-120');
+    await tarjeta.getByLabel(/Enlace del comprobante/).fill('https://drive.google.com/file/d/abc123/view');
+    await tarjeta.getByRole('button', { name: 'Guardar' }).click();
+    await expect(tarjeta.getByRole('alert')).toContainText('La factura necesita el RUC del cliente'); // sin RUC no hay factura
+    await tarjeta.getByLabel(/Tipo de comprobante/).selectOption('03');
+    await tarjeta.getByLabel(/Número del comprobante/).fill('B001-120');
+    await tarjeta.getByRole('button', { name: 'Guardar' }).click();
+    await expect(tarjeta).toContainText('por enviar');
+    await tarjeta.getByRole('button', { name: 'Enviar al cliente' }).click();
+    await expect(tarjeta).toContainText('enviado');
+    const envio = await page.evaluate(() => (window as unknown as { abiertos: string[] }).abiertos[0]);
+    expect(decodeURIComponent(envio)).toContain('boleta *B001-120*');
+    expect(decodeURIComponent(envio)).toContain('https://drive.google.com/file/d/abc123/view');
+    await page.goto(enlace);
+    await expect(page.getByRole('link', { name: 'Boleta B001-120' })).toHaveAttribute('href', 'https://drive.google.com/file/d/abc123/view');
+    await page.goto('/#precotizaciones');
+
     // Contabilidad simple: el libro diario se oculta del menú hasta activarlo en Ajustes
     await expect(page.getByRole('button', { name: 'Libro diario PCGE' })).toHaveCount(0);
     await ir(page, 'configuracion');

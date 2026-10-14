@@ -72,6 +72,10 @@ export function pendientesDelDia(s: ErpState, hoy: string, dias = 3): Pendiente[
   if (cot) p.push({ clave: 'COT', icono: '📝', texto: `${cot} cotización(es) esperando respuesta`, tab: 'cotizaciones' });
   const porPagar = s.gastos.filter(g => !g.medioPago);
   if (porPagar.length) p.push({ clave: 'CXP', icono: '💳', texto: `${porPagar.length} cuenta(s) por pagar: ${soles(porPagar.reduce((a, g) => a + g.total - (g.retencion ?? 0), 0))}`, tab: 'finanzas' });
+  const sinCpe = s.precotizaciones.filter(c => (c.estado === 'PAGADA' || c.estado === 'ACEPTADA') && !c.comprobantes.length).length;
+  if (sinCpe) p.push({ clave: 'PCZ', icono: '🧾', texto: `${sinCpe} cotización(es) aceptada(s) sin comprobante registrado`, tab: 'precotizaciones' });
+  const sinEnviar = s.precotizaciones.flatMap(c => c.comprobantes.filter(x => !x.enviadoAt)).length;
+  if (sinEnviar) p.push({ clave: 'PCZ-ENV', icono: '📤', texto: `${sinEnviar} comprobante(s) por enviar al cliente`, tab: 'precotizaciones' });
   const stock = s.products.filter(x => x.stock <= x.minStock).length;
   if (stock) p.push({ clave: 'STOCK', icono: '🌱', texto: `${stock} producto(s) con stock bajo`, tab: 'kardex' });
   return p.sort((a, b) => Number(!!b.urgente) - Number(!!a.urgente));

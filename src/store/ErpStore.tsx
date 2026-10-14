@@ -69,7 +69,7 @@ import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
 import { conPreciosVigentes } from '../lib/ofertas';
 import { resumenTexto } from '../lib/oficina';
-import { calcularPrecotizacion, saldo as saldoPrecotizacion, type Precotizacion } from '../lib/precotizacion';
+import { calcularPrecotizacion, saldo as saldoPrecotizacion, type ComprobantePrecotizacion, type Precotizacion } from '../lib/precotizacion';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
@@ -1669,6 +1669,42 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const cur = get();
           commit({ ...cur, precotizaciones: [guardada, ...cur.precotizaciones.filter(x => x.id !== c.id)] });
           return { ok: true, precotizacion: guardada };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Anota la factura o boleta emitida en el portal SUNAT con el enlace (Drive) de su PDF. */
+      async agregarComprobantePrecotizacion(id: string, cp: Omit<ComprobantePrecotizacion, 'enviadoAt'>): Promise<Result> {
+        const s = get();
+        const c = s.precotizaciones.find(x => x.id === id);
+        if (!c) return { ok: false, error: 'Cotización no encontrada.' };
+        const numero = cp.numero.trim().toUpperCase();
+        const url = cp.url.trim();
+        if (!/^[A-Z0-9]{4}-\d{1,8}$/.test(numero)) return { ok: false, error: 'Escribe el número como lo dio SUNAT: SERIE-NÚMERO (ej. F001-245).' };
+        if (cp.tipo === '01' && !/^\d{11}$/.test(c.cliente.doc ?? '')) return { ok: false, error: 'La factura necesita el RUC del cliente: agrégalo en la cotización.' };
+        if (!/^https:\/\/\S+$/.test(url)) return { ok: false, error: 'Pega el enlace https del PDF (por ejemplo, de Google Drive).' };
+        if (s.precotizaciones.some(x => x.comprobantes.some(y => y.numero === numero))) return { ok: false, error: `El comprobante ${numero} ya está registrado.` };
+        const comprobantes = [...c.comprobantes, { tipo: cp.tipo, numero, fecha: cp.fecha || today(), url }];
+        try {
+          if (nube) await repo.guardarComprobantesPrecotizacion(id, comprobantes);
+          const cur = get();
+          commit({ ...cur, precotizaciones: cur.precotizaciones.map(x => (x.id === id ? { ...x, comprobantes } : x)) });
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      async marcarComprobantePrecotizacionEnviado(id: string, numero: string): Promise<Result> {
+        const c = get().precotizaciones.find(x => x.id === id);
+        if (!c) return { ok: false, error: 'Cotización no encontrada.' };
+        const comprobantes = c.comprobantes.map(x => (x.numero === numero ? { ...x, enviadoAt: new Date().toISOString() } : x));
+        try {
+          if (nube) await repo.guardarComprobantesPrecotizacion(id, comprobantes);
+          const cur = get();
+          commit({ ...cur, precotizaciones: cur.precotizaciones.map(x => (x.id === id ? { ...x, comprobantes } : x)) });
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

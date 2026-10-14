@@ -46,7 +46,7 @@ import { emisorDe } from '../domain/types';
 import { EMPRESA_VACIA } from '../data/seed';
 import type { Rol } from '../domain/types';
 import { round2 } from './peru';
-import type { Precotizacion } from './precotizacion';
+import type { ComprobantePrecotizacion, Precotizacion } from './precotizacion';
 import { getSupabase } from './supabase';
 import type { Asiento, Cuenta, CuentasExistencia, LineaAsiento } from './contabilidad';
 import { hoyLocal } from './fechas';
@@ -1169,8 +1169,16 @@ export const precotizacionDesdeFila = (r: Row): Precotizacion => ({
   cliente: { nombre: r.cliente_nombre, doc: r.cliente_doc ?? undefined, telefono: r.cliente_telefono ?? undefined, direccion: r.cliente_direccion ?? undefined },
   conIgv: !!r.con_igv, lineas: (r.lineas ?? []).map((l: Row) => ({ ...l, cantidad: Number(l.cantidad), precio: Number(l.precio) })), condiciones: r.condiciones ?? [], notas: r.notas ?? undefined,
   opGravadas: num(r.op_gravadas), opExoneradas: num(r.op_exoneradas), opInafectas: num(r.op_inafectas), igv: num(r.igv), total: num(r.total),
-  estado: r.estado, pagos: (r.pagos ?? []).map((p: Row) => ({ fecha: p.fecha, monto: Number(p.monto), medio: p.medio, operacion: p.operacion ?? undefined }))
+  estado: r.estado, pagos: (r.pagos ?? []).map((p: Row) => ({ fecha: p.fecha, monto: Number(p.monto), medio: p.medio, operacion: p.operacion ?? undefined })),
+  comprobantes: (r.comprobantes ?? []).map((x: Row) => ({ tipo: x.tipo, numero: x.numero, fecha: x.fecha, url: x.url, enviadoAt: x.enviado_at ?? undefined }))
 });
+
+export async function guardarComprobantesPrecotizacion(id: string, comprobantes: ComprobantePrecotizacion[]) {
+  const sb = await db();
+  ok(await sb.from('precotizaciones').update({
+    comprobantes: comprobantes.map(c => ({ tipo: c.tipo, numero: c.numero, fecha: c.fecha, url: c.url, enviado_at: c.enviadoAt ?? null })), updated_at: new Date().toISOString()
+  }).eq('id', Number(id)));
+}
 
 export async function cargarPrecotizaciones(): Promise<Precotizacion[]> {
   const sb = await db();

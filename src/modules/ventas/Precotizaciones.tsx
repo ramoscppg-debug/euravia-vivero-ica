@@ -11,8 +11,8 @@ import { imprimirHtml } from '../../lib/documentos';
 import { hoyLocal } from '../../lib/fechas';
 import { soles } from '../../lib/formato';
 import {
-  AFECTACIONES, calcularPrecotizacion, condicionesBase, empresaDoc, ESTILO_PRECOTIZACION, htmlPrecotizacion, mensajePrecotizacion, pagado, saldo, UNIDADES,
-  type LineaPrecotizacion, type Precotizacion
+  AFECTACIONES, calcularPrecotizacion, condicionesBase, empresaDoc, ESTILO_PRECOTIZACION, htmlPrecotizacion, mensajeComprobante, mensajePrecotizacion, NOMBRE_CPE, pagado, saldo, UNIDADES,
+  type ComprobantePrecotizacion, type LineaPrecotizacion, type Precotizacion
 } from '../../lib/precotizacion';
 import { useErp } from '../../store/ErpStore';
 import { enlaceWa } from '../clientes/Recordatorios';
@@ -27,7 +27,7 @@ export default function Precotizaciones() {
   const [editando, setEditando] = useState<Precotizacion | null>(null);
   const nueva = (): Precotizacion => ({
     id: `nueva-${Date.now()}`, numero: '', token: '', fecha: hoyLocal(), validezDias: 15, cliente: { nombre: '' }, conIgv: true,
-    lineas: [lineaVacia()], condiciones: condicionesBase(true, 15), opGravadas: 0, opExoneradas: 0, opInafectas: 0, igv: 0, total: 0, estado: 'BORRADOR', pagos: []
+    lineas: [lineaVacia()], condiciones: condicionesBase(true, 15), opGravadas: 0, opExoneradas: 0, opInafectas: 0, igv: 0, total: 0, estado: 'BORRADOR', pagos: [], comprobantes: []
   });
 
   if (editando) return <Editor inicial={editando} cerrar={() => setEditando(null)} />;
@@ -60,11 +60,26 @@ function useAccionesPrecotizacion(c: Precotizacion) {
     window.open(url, '_blank', 'noopener');
     return null;
   };
-  return { pdf, whatsapp, actions, c };
+  /** Envía el comprobante (enlace de Drive) al WhatsApp del cliente y lo marca como enviado. */
+  const enviarComprobante = async (x: Precotizacion, cp: ComprobantePrecotizacion) => {
+    const texto = mensajeComprobante(x, cp, empresa);
+    window.open(enlaceWa(x.cliente.telefono ?? '', texto) ?? `https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+    const r = await actions.marcarComprobantePrecotizacionEnviado(x.id, cp.numero);
+    return r.ok ? null : r.error;
+  };
+  return { pdf, whatsapp, enviarComprobante, actions, c };
 }
 
 function Tarjeta_({ c, editar }: { c: Precotizacion; editar: () => void }) {
-  const { pdf, whatsapp, actions } = useAccionesPrecotizacion(c);
+  const { pdf, whatsapp, enviarComprobante, actions } = useAccionesPrecotizacion(c);
+  const [cpe, setCpe] = useState<{ tipo: '01' | '03'; numero: string; url: string } | null>(null);
+  const agregarCpe = async () => {
+    if (!cpe) return;
+    setError(null);
+    const r = await actions.agregarComprobantePrecotizacion(c.id, { ...cpe, fecha: hoyLocal() });
+    if (!r.ok) return setError(r.error);
+    setCpe(null);
+  };
   const [pago, setPago] = useState<{ monto: string; medio: MedioPago; operacion: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -109,6 +124,29 @@ function Tarjeta_({ c, editar }: { c: Precotizacion; editar: () => void }) {
         </div>
       )}
       {c.pagos.length > 0 && <ul className="text-xs text-tinta-suave">{c.pagos.map((p, i) => <li key={i}>{p.fecha} · {i === 0 ? 'Adelanto' : 'Pago'} {soles(p.monto)} · {p.medio}{p.operacion ? ` op. ${p.operacion}` : ''}</li>)}</ul>}
+
+      {/* Comprobantes emitidos en el portal SUNAT (control): número y enlace del PDF */}
+      {(c.estado === 'ACEPTADA' || c.estado === 'PAGADA' || c.comprobantes.length > 0) && (
+        <div aria-label={`Comprobantes de ${c.numero}`} className="pt-2 border-t border-crema-200 space-y-1.5">
+          {c.comprobantes.map(cp => (
+            <div key={cp.numero} className="flex flex-wrap items-center gap-2 text-xs">
+              <a href={cp.url} target="_blank" rel="noreferrer" className="font-bold text-bosque-700 underline">{NOMBRE_CPE[cp.tipo]} {cp.numero}</a>
+              {cp.enviadoAt ? <Insignia tono="exito">enviado {cp.enviadoAt.slice(0, 10)}</Insignia> : <Insignia tono="aviso">por enviar</Insignia>}
+              <Boton tamano="sm" variante="secundario" onClick={() => void enviarComprobante(c, cp).then(e => setError(e))}><MessageCircle className="w-4 h-4" aria-hidden /> Enviar al cliente</Boton>
+            </div>
+          ))}
+          {!c.comprobantes.length && !cpe && <p className="text-xs text-aviso font-bold">Falta registrar el comprobante emitido en SUNAT.</p>}
+          {cpe ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <select aria-label={`Tipo de comprobante de ${c.numero}`} value={cpe.tipo} onChange={e => setCpe({ ...cpe, tipo: e.target.value as '01' | '03' })} className={`${campo} w-28`}><option value="01">Factura</option><option value="03">Boleta</option></select>
+              <input aria-label={`Número del comprobante de ${c.numero}`} placeholder="F001-245" value={cpe.numero} onChange={e => setCpe({ ...cpe, numero: e.target.value.toUpperCase() })} className={`${campo} w-32 font-mono`} />
+              <input aria-label={`Enlace del comprobante de ${c.numero}`} placeholder="Enlace de Drive del PDF" value={cpe.url} onChange={e => setCpe({ ...cpe, url: e.target.value })} className={`${campo} flex-1 min-w-[200px]`} />
+              <Boton tamano="sm" onClick={() => void agregarCpe()}>Guardar</Boton>
+              <button aria-label="Cancelar comprobante" onClick={() => setCpe(null)} className="p-2"><X className="w-4 h-4" /></button>
+            </div>
+          ) : <Boton tamano="sm" variante="secundario" onClick={() => setCpe({ tipo: c.cliente.doc?.length === 11 ? '01' : '03', numero: '', url: '' })}><Plus className="w-4 h-4" aria-hidden /> Registrar comprobante emitido</Boton>}
+        </div>
+      )}
       {error && <p role="alert" className="text-error font-bold text-xs">{error}</p>}
     </Tarjeta>
   );
