@@ -20,6 +20,9 @@ export interface LineaPrecotizacion {
   sku?: string; // si viene del catálogo
 }
 
+export type ComprobanteSolicitado = 'NINGUNO' | 'BOLETA' | 'FACTURA';
+export const COMPROBANTE_SOLICITADO: Record<ComprobanteSolicitado, string> = { NINGUNO: 'Sin comprobante (sin IGV)', BOLETA: 'Boleta', FACTURA: 'Factura' };
+
 export interface PagoPrecotizacion { fecha: string; monto: number; medio: string; operacion?: string }
 
 /** Comprobante emitido en el portal SUNAT: se anota su número y el enlace (Drive) del PDF. */
@@ -33,6 +36,8 @@ export interface Precotizacion {
   fecha: string;
   validezDias: number;
   cliente: { nombre: string; doc?: string; telefono?: string; direccion?: string };
+  /** NINGUNO = sin IGV; BOLETA o FACTURA = con IGV (la factura exige RUC). */
+  comprobante: ComprobanteSolicitado;
   conIgv: boolean;
   lineas: LineaPrecotizacion[];
   condiciones: string[];
@@ -116,8 +121,9 @@ export const ESTILO_PRECOTIZACION = `
 export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: EmpresaDoc): string {
   const calc = calcularPrecotizacion(c.lineas, c.conIgv);
   const nombre = e.nombreComercial?.split(' - ')[0] || e.razonSocial || 'AUREVIA';
+  // Sin IGV no se muestran la afectación ni el IGV: sólo precio y total
   const filas = calc.filas.map((f, i) => `<tr><td class="c">${i + 1}</td><td>${esc(f.concepto.toUpperCase())}</td><td class="c">${esc(f.unidad)}</td><td class="c">${f.cantidad}</td>
-    <td class="d">${dinero(f.precio)}</td><td class="c ${f.afectacion !== 'GRAVADO' ? 'ex' : ''}">${f.afectacion}</td><td class="d">${dinero(f.valor)}</td><td class="d">${dinero(f.igv)}</td><td class="d">${dinero(f.total)}</td></tr>`).join('');
+    <td class="d">${dinero(f.precio)}</td>${c.conIgv ? `<td class="c ${f.afectacion !== 'GRAVADO' ? 'ex' : ''}">${f.afectacion}</td><td class="d">${dinero(f.valor)}</td><td class="d">${dinero(f.igv)}</td>` : ''}<td class="d">${dinero(f.total)}</td></tr>`).join('');
   const exon = calc.filas.filter(f => f.afectacion === 'EXONERADO').map(f => f.concepto.toLowerCase());
   const pag = pagado(c);
   return `<div class="pc">
@@ -131,21 +137,21 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
     </header>
     <table style="margin-bottom:14px"><tr>
       <td style="width:60%;background:#f8fafc;padding:10px 12px;border-radius:10px"><b>Cliente:</b> ${esc(c.cliente.nombre)}${c.cliente.doc ? ` · ${c.cliente.doc.length === 11 ? 'RUC' : 'DNI'} ${esc(c.cliente.doc)}` : ''}${c.cliente.direccion ? `<br>${esc(c.cliente.direccion)}` : ''}</td>
-      <td style="background:#f8fafc;padding:10px 12px;border-radius:10px">Fecha: <b>${ddmmaaaa(c.fecha)}</b><br>Válida hasta: <b>${ddmmaaaa(venceEl(c.fecha, c.validezDias))}</b></td>
+      <td style="background:#f8fafc;padding:10px 12px;border-radius:10px">Fecha: <b>${ddmmaaaa(c.fecha)}</b><br>Válida hasta: <b>${ddmmaaaa(venceEl(c.fecha, c.validezDias))}</b><br>Comprobante: <b>${COMPROBANTE_SOLICITADO[c.comprobante ?? (c.conIgv ? 'BOLETA' : 'NINGUNO')]}</b></td>
     </tr></table>
-    <table class="det"><thead><tr><th>N°</th><th>Concepto</th><th>Und.</th><th>Cant.</th><th>Precio unit.</th><th>Afectación</th><th>Valor venta</th><th>IGV (18%)</th><th>Total</th></tr></thead>
+    <table class="det"><thead><tr><th>N°</th><th>Concepto</th><th>Und.</th><th>Cant.</th><th>Precio unit.${c.conIgv ? '' : ' (sin IGV)'}</th>${c.conIgv ? '<th>Afectación</th><th>Valor venta</th><th>IGV (18%)</th>' : ''}<th>Total</th></tr></thead>
       <tbody>${filas}</tbody>
-      <tfoot class="tot"><tr><td colspan="6" class="d" style="text-align:center">TOTALES</td><td class="d">${dinero(calc.valor)}</td><td class="d">${dinero(calc.igv)}</td><td class="d">${dinero(calc.total)}</td></tr></tfoot></table>
+      <tfoot class="tot"><tr><td colspan="${c.conIgv ? 6 : 5}" class="d" style="text-align:center">TOTALES</td>${c.conIgv ? `<td class="d">${dinero(calc.valor)}</td><td class="d">${dinero(calc.igv)}</td>` : ''}<td class="d">${dinero(calc.total)}</td></tr></tfoot></table>
     <div style="display:flex;justify-content:space-between;gap:24px;margin-top:18px;align-items:flex-start">
       <div style="flex:1"><div style="font-weight:800;font-size:14px;margin-bottom:6px">Condiciones:</div>
         <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">${c.condiciones.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
         ${c.notas ? `<p style="margin-top:10px"><b>Observaciones:</b> ${esc(c.notas)}</p>` : ''}
         ${e.cuentaBcp ? `<p style="margin-top:10px"><b>Cuenta BCP:</b> ${esc(e.cuentaBcp)}</p>` : ''}</div>
       <table class="res" style="width:380px"><tbody>
-        <tr><td>Op. gravadas</td><td class="d">${dinero(calc.opGravadas)}</td></tr>
+        ${c.conIgv ? `<tr><td>Op. gravadas</td><td class="d">${dinero(calc.opGravadas)}</td></tr>
         ${calc.opExoneradas ? `<tr><td>Op. exoneradas${exon.length ? ` (${esc(exon.join(', '))})` : ''}</td><td class="d">${dinero(calc.opExoneradas)}</td></tr>` : ''}
         ${calc.opInafectas ? `<tr><td>Op. inafectas</td><td class="d">${dinero(calc.opInafectas)}</td></tr>` : ''}
-        <tr><td>IGV (18%) sobre op. gravadas</td><td class="d">${c.conIgv ? dinero(calc.igv) : 'No incluido'}</td></tr>
+        <tr><td>IGV (18%) sobre op. gravadas</td><td class="d">${dinero(calc.igv)}</td></tr>` : '<tr><td>Precios sin IGV</td><td class="d">Sin comprobante</td></tr>'}
         ${pag ? `<tr><td>Adelanto recibido</td><td class="d">− ${dinero(pag)}</td></tr>` : ''}
         <tr><td>${pag ? 'SALDO A PAGAR' : 'TOTAL A PAGAR'}</td><td class="d">${dinero(pag ? calc.total - pag : calc.total)}</td></tr>
       </tbody></table>
@@ -173,13 +179,13 @@ export function mensajePrecotizacion(c: Precotizacion, empresa: string, enlace: 
   const calc = calcularPrecotizacion(c.lineas, c.conIgv);
   return [
     `Hola ${c.cliente.nombre.split(' ')[0]}, te saluda ${empresa} 🌿`,
-    `Te enviamos tu cotización *N° ${c.numero}*:`,
+    `Te enviamos tu cotización *N° ${c.numero}* (${COMPROBANTE_SOLICITADO[c.comprobante ?? (c.conIgv ? 'BOLETA' : 'NINGUNO')].toLowerCase()}):`,
     ...calc.filas.slice(0, 12).map(f => `• ${f.cantidad} ${f.unidad} ${f.concepto} — ${dinero(f.total)}`),
     ...(calc.filas.length > 12 ? [`• … y ${calc.filas.length - 12} ítem(s) más`] : []),
     '',
-    `Op. gravadas: ${dinero(calc.opGravadas)}`,
-    ...(calc.opExoneradas ? [`Op. exoneradas: ${dinero(calc.opExoneradas)}`] : []),
-    c.conIgv ? `IGV (18%): ${dinero(calc.igv)}` : 'Precios sin IGV (si requieres boleta o factura se agrega el 18%).',
+    ...(c.conIgv
+      ? [`Op. gravadas: ${dinero(calc.opGravadas)}`, ...(calc.opExoneradas ? [`Op. exoneradas: ${dinero(calc.opExoneradas)}`] : []), `IGV (18%): ${dinero(calc.igv)}`]
+      : ['Precios sin IGV (si requieres boleta o factura se agrega el 18%).']),
     `*Total: ${dinero(calc.total)}*`,
     `Válida hasta el ${ddmmaaaa(venceEl(c.fecha, c.validezDias))}.`,
     '',

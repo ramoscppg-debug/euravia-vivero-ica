@@ -27,7 +27,7 @@ async function cargar(token: string): Promise<Datos | null> {
   const pagado = Number(r.pagado ?? 0);
   return {
     c: {
-      numero: r.numero, fecha: r.fecha, validezDias: r.validez_dias, estado: r.estado, conIgv: !!r.con_igv, notas: r.notas ?? undefined,
+      numero: r.numero, fecha: r.fecha, validezDias: r.validez_dias, estado: r.estado, comprobante: r.comprobante ?? (r.con_igv ? 'BOLETA' : 'NINGUNO'), conIgv: !!r.con_igv, notas: r.notas ?? undefined,
       cliente: { nombre: r.cliente_nombre, doc: r.cliente_doc ?? undefined, direccion: r.cliente_direccion ?? undefined },
       lineas: (r.lineas ?? []).map((l: Record<string, unknown>) => ({ ...l, cantidad: Number(l.cantidad), precio: Number(l.precio) })), condiciones: r.condiciones ?? [],
       opGravadas: Number(r.op_gravadas), opExoneradas: Number(r.op_exoneradas), opInafectas: Number(r.op_inafectas), igv: Number(r.igv), total: Number(r.total),

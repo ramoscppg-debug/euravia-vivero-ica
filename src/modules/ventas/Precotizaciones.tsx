@@ -11,7 +11,8 @@ import { imprimirHtml } from '../../lib/documentos';
 import { hoyLocal } from '../../lib/fechas';
 import { soles } from '../../lib/formato';
 import {
-  AFECTACIONES, calcularPrecotizacion, condicionesBase, empresaDoc, ESTILO_PRECOTIZACION, htmlPrecotizacion, mensajeComprobante, mensajePrecotizacion, NOMBRE_CPE, pagado, saldo, seEliminaEl, UNIDADES,
+  AFECTACIONES, calcularPrecotizacion, condicionesBase, empresaDoc, ESTILO_PRECOTIZACION, htmlPrecotizacion, mensajeComprobante, mensajePrecotizacion, COMPROBANTE_SOLICITADO, NOMBRE_CPE, pagado, saldo, seEliminaEl, UNIDADES,
+  type ComprobanteSolicitado,
   type ComprobantePrecotizacion, type LineaPrecotizacion, type Precotizacion
 } from '../../lib/precotizacion';
 import { useErp } from '../../store/ErpStore';
@@ -26,7 +27,7 @@ export default function Precotizaciones() {
   const { state } = useErp();
   const [editando, setEditando] = useState<Precotizacion | null>(null);
   const nueva = (): Precotizacion => ({
-    id: `nueva-${Date.now()}`, numero: '', token: '', fecha: hoyLocal(), validezDias: 15, cliente: { nombre: '' }, conIgv: true,
+    id: `nueva-${Date.now()}`, numero: '', token: '', fecha: hoyLocal(), validezDias: 15, cliente: { nombre: '' }, comprobante: 'BOLETA', conIgv: true,
     lineas: [lineaVacia()], condiciones: condicionesBase(true, 15), opGravadas: 0, opExoneradas: 0, opInafectas: 0, igv: 0, total: 0, estado: 'BORRADOR', pagos: [], comprobantes: []
   });
 
@@ -99,7 +100,7 @@ function Tarjeta_({ c, editar }: { c: Precotizacion; editar: () => void }) {
   return (
     <Tarjeta as="article" className="p-4 space-y-2 text-sm">
       <div className="flex items-start justify-between gap-2">
-        <span><b className="text-tinta">{c.numero}</b> · {c.cliente.nombre}<span className="block text-xs text-tinta-suave">{c.fecha} · {c.lineas.length} ítem(s) · {c.conIgv ? 'con IGV' : 'sin IGV'}</span></span>
+        <span><b className="text-tinta">{c.numero}</b> · {c.cliente.nombre}<span className="block text-xs text-tinta-suave">{c.fecha} · {c.lineas.length} ítem(s) · {COMPROBANTE_SOLICITADO[c.comprobante ?? (c.conIgv ? 'BOLETA' : 'NINGUNO')]}</span></span>
         <Insignia tono={TONO[c.estado]}>{c.estado}</Insignia>
       </div>
       {seEliminaEl(c) && <p className="text-[11px] text-aviso font-bold">Si no se acepta, se elimina el {seEliminaEl(c)}</p>}
@@ -145,7 +146,7 @@ function Tarjeta_({ c, editar }: { c: Precotizacion; editar: () => void }) {
               <Boton tamano="sm" onClick={() => void agregarCpe()}>Guardar</Boton>
               <button aria-label="Cancelar comprobante" onClick={() => setCpe(null)} className="p-2"><X className="w-4 h-4" /></button>
             </div>
-          ) : <Boton tamano="sm" variante="secundario" onClick={() => setCpe({ tipo: c.cliente.doc?.length === 11 ? '01' : '03', numero: '', url: '' })}><Plus className="w-4 h-4" aria-hidden /> Registrar comprobante emitido</Boton>}
+          ) : <Boton tamano="sm" variante="secundario" onClick={() => setCpe({ tipo: c.comprobante === 'FACTURA' ? '01' : '03', numero: '', url: '' })}><Plus className="w-4 h-4" aria-hidden /> Registrar comprobante emitido</Boton>}
         </div>
       )}
       {error && <p role="alert" className="text-error font-bold text-xs">{error}</p>}
@@ -187,15 +188,20 @@ function Editor({ inicial, cerrar }: { inicial: Precotizacion; cerrar: () => voi
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <input aria-label="Cliente de la pre-cotización" placeholder="Cliente *" value={c.cliente.nombre} onChange={e => set({ cliente: { ...c.cliente, nombre: e.target.value } })} className={campo} />
-        <input aria-label="DNI o RUC del cliente" placeholder="DNI o RUC" inputMode="numeric" value={c.cliente.doc ?? ''} onChange={e => set({ cliente: { ...c.cliente, doc: e.target.value.replace(/\D/g, '').slice(0, 11) } })} className={`${campo} font-mono`} />
+        <input aria-label="DNI o RUC del cliente" placeholder={c.comprobante === 'FACTURA' ? 'RUC *' : 'DNI o RUC'} inputMode="numeric" value={c.cliente.doc ?? ''} onChange={e => set({ cliente: { ...c.cliente, doc: e.target.value.replace(/\D/g, '').slice(0, 11) } })} className={`${campo} font-mono`} />
         <input aria-label="WhatsApp del cliente" placeholder="WhatsApp (9 dígitos)" value={c.cliente.telefono ?? ''} onChange={e => set({ cliente: { ...c.cliente, telefono: e.target.value } })} className={campo} />
         <input aria-label="Dirección del cliente" placeholder="Dirección / obra" value={c.cliente.direccion ?? ''} onChange={e => set({ cliente: { ...c.cliente, direccion: e.target.value } })} className={campo} />
       </div>
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 font-bold p-2 rounded-control border border-bosque-200 bg-bosque-50">
-          <input type="checkbox" checked={c.conIgv} onChange={e => set({ conIgv: e.target.checked, condiciones: condicionesBase(e.target.checked, c.validezDias, hayExonerados) })} />
-          Considerar IGV (el cliente pide boleta o factura)
-        </label>
+        <div role="radiogroup" aria-label="Comprobante que pide el cliente" className="inline-flex rounded-control border border-bosque-200 bg-bosque-50 p-1 gap-1">
+          {(['NINGUNO', 'BOLETA', 'FACTURA'] as ComprobanteSolicitado[]).map(op => (
+            <button key={op} type="button" role="radio" aria-checked={c.comprobante === op}
+              onClick={() => set({ comprobante: op, conIgv: op !== 'NINGUNO', condiciones: condicionesBase(op !== 'NINGUNO', c.validezDias, hayExonerados) })}
+              className={`min-h-[36px] px-3 rounded-control text-xs font-bold ${c.comprobante === op ? 'bg-bosque-950 text-oro' : 'text-tinta'}`}>
+              {op === 'NINGUNO' ? 'Sin comprobante · sin IGV' : `${COMPROBANTE_SOLICITADO[op]} · con IGV`}
+            </button>
+          ))}
+        </div>
         <label className="flex items-center gap-2 text-xs">Fecha<input aria-label="Fecha de la pre-cotización" type="date" value={c.fecha} onChange={e => set({ fecha: e.target.value })} className={campo} /></label>
         <label className="flex items-center gap-2 text-xs">Validez (días)<input aria-label="Validez en días" type="number" min={1} max={90} value={c.validezDias} onChange={e => set({ validezDias: Math.max(1, Math.min(90, Number(e.target.value) || 15)) })} className={`${campo} w-20`} /></label>
       </div>
@@ -205,7 +211,7 @@ function Editor({ inicial, cerrar }: { inicial: Precotizacion; cerrar: () => voi
         <table className="w-full text-xs min-w-[900px]" aria-label="Ítems de la pre-cotización">
           <thead className="bg-[#1f3a68] text-white uppercase text-[10px]"><tr>
             <th className="p-2">N°</th><th className="p-2 text-left">Concepto</th><th className="p-2">Und.</th><th className="p-2">Cant.</th><th className="p-2">Precio unit. (sin IGV)</th>
-            <th className="p-2">Afectación</th><th className="p-2 text-right">Valor venta</th><th className="p-2 text-right">IGV</th><th className="p-2 text-right">Total</th><th /></tr></thead>
+            {c.conIgv && <><th className="p-2">Afectación</th><th className="p-2 text-right">Valor venta</th><th className="p-2 text-right">IGV</th></>}<th className="p-2 text-right">Total</th><th /></tr></thead>
           <tbody>
             {c.lineas.map((l, i) => {
               const valor = r2(l.cantidad * l.precio);
@@ -217,8 +223,11 @@ function Editor({ inicial, cerrar }: { inicial: Precotizacion; cerrar: () => voi
                   <td className="p-1"><select aria-label={`Unidad ${i + 1}`} value={l.unidad} onChange={e => setLinea(i, { unidad: e.target.value })} className={campo}>{UNIDADES.map(u => <option key={u}>{u}</option>)}</select></td>
                   <td className="p-1"><input aria-label={`Cantidad ${i + 1}`} type="number" min={0} step="any" value={l.cantidad || ''} onChange={e => setLinea(i, { cantidad: Number(e.target.value) || 0 })} className={`${campo} w-20 text-right`} /></td>
                   <td className="p-1"><input aria-label={`Precio ${i + 1}`} type="number" min={0} step="0.01" value={l.precio || ''} onChange={e => setLinea(i, { precio: Number(e.target.value) || 0 })} className={`${campo} w-28 text-right`} /></td>
-                  <td className="p-1"><select aria-label={`Afectación ${i + 1}`} value={l.afectacion} onChange={e => setLinea(i, { afectacion: e.target.value as LineaPrecotizacion['afectacion'] })} className={campo}>{AFECTACIONES.map(a => <option key={a}>{a}</option>)}</select></td>
-                  <td className="p-1 text-right">{soles(valor)}</td><td className="p-1 text-right">{soles(igv)}</td><td className="p-1 text-right font-bold">{soles(valor + igv)}</td>
+                  {c.conIgv && <>
+                    <td className="p-1"><select aria-label={`Afectación ${i + 1}`} value={l.afectacion} onChange={e => setLinea(i, { afectacion: e.target.value as LineaPrecotizacion['afectacion'] })} className={campo}>{AFECTACIONES.map(a => <option key={a}>{a}</option>)}</select></td>
+                    <td className="p-1 text-right">{soles(valor)}</td><td className="p-1 text-right">{soles(igv)}</td>
+                  </>}
+                  <td className="p-1 text-right font-bold">{soles(valor + igv)}</td>
                   <td className="p-1"><button aria-label={`Quitar ítem ${i + 1}`} onClick={() => set({ lineas: c.lineas.length > 1 ? c.lineas.filter((_, j) => j !== i) : [lineaVacia()] })} className="p-1.5 text-error"><Trash2 className="w-4 h-4" /></button></td>
                 </tr>
               );
@@ -238,10 +247,12 @@ function Editor({ inicial, cerrar }: { inicial: Precotizacion; cerrar: () => voi
         </div>
         <table aria-label="Totales de la pre-cotización" className="w-full text-sm border border-crema-300">
           <tbody>
-            <tr><td className="p-2">Op. gravadas</td><td className="p-2 text-right">{soles(calc.opGravadas)}</td></tr>
-            <tr><td className="p-2">Op. exoneradas</td><td className="p-2 text-right">{soles(calc.opExoneradas)}</td></tr>
-            {calc.opInafectas > 0 && <tr><td className="p-2">Op. inafectas</td><td className="p-2 text-right">{soles(calc.opInafectas)}</td></tr>}
-            <tr><td className="p-2">IGV (18%)</td><td className="p-2 text-right">{c.conIgv ? soles(calc.igv) : 'No incluido'}</td></tr>
+            {c.conIgv ? <>
+              <tr><td className="p-2">Op. gravadas</td><td className="p-2 text-right">{soles(calc.opGravadas)}</td></tr>
+              <tr><td className="p-2">Op. exoneradas</td><td className="p-2 text-right">{soles(calc.opExoneradas)}</td></tr>
+              {calc.opInafectas > 0 && <tr><td className="p-2">Op. inafectas</td><td className="p-2 text-right">{soles(calc.opInafectas)}</td></tr>}
+              <tr><td className="p-2">IGV (18%)</td><td className="p-2 text-right">{soles(calc.igv)}</td></tr>
+            </> : <tr><td className="p-2" colSpan={2}>Precios sin IGV · sin comprobante</td></tr>}
             <tr className="bg-[#dbe6f3] font-extrabold"><td className="p-2">TOTAL A PAGAR</td><td className="p-2 text-right">{soles(calc.total)}</td></tr>
           </tbody>
         </table>

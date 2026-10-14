@@ -1653,10 +1653,12 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (doc && !/^(\d{8}|\d{11})$/.test(doc)) return { ok: false, error: 'El documento del cliente es un DNI (8) o un RUC (11 dígitos).' };
         if (!lineas.length) return { ok: false, error: 'Agrega al menos un ítem.' };
         if (lineas.some(l => !(l.cantidad > 0) || !(l.precio >= 0))) return { ok: false, error: 'Revisa cantidades y precios de los ítems.' };
-        const calc = calcularPrecotizacion(lineas, c.conIgv);
+        if (c.comprobante === 'FACTURA' && !/^\d{11}$/.test(doc ?? '')) return { ok: false, error: 'Para factura indica el RUC del cliente (11 dígitos).' };
+        const conIgvCot = c.comprobante !== 'NINGUNO';
+        const calc = calcularPrecotizacion(lineas, conIgvCot);
         if (!(calc.total > 0)) return { ok: false, error: 'El total debe ser mayor a cero.' };
         const datos: Precotizacion = {
-          ...c, lineas: lineas.map(l => ({ ...l, concepto: l.concepto.trim() })), cliente: { ...c.cliente, nombre: c.cliente.nombre.trim(), doc },
+          ...c, conIgv: conIgvCot, lineas: lineas.map(l => ({ ...l, concepto: l.concepto.trim() })), cliente: { ...c.cliente, nombre: c.cliente.nombre.trim(), doc },
           condiciones: c.condiciones.map(x => x.trim()).filter(Boolean),
           opGravadas: calc.opGravadas, opExoneradas: calc.opExoneradas, opInafectas: calc.opInafectas, igv: calc.igv, total: calc.total
         };

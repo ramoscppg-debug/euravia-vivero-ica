@@ -1122,11 +1122,16 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(totales).toContainText('S/ 35.00'); // exoneradas
     await expect(totales).toContainText('S/ 293.40'); // IGV 18% sólo de lo gravado
     await expect(totales).toContainText('S/ 1,958.40');
-    await page.getByText('Considerar IGV').click(); // sin boleta ni factura
-    await expect(totales).toContainText('No incluido');
+    await page.getByRole('radio', { name: 'Sin comprobante · sin IGV' }).click();
+    await expect(totales).toContainText('Precios sin IGV');
     await expect(totales).toContainText('S/ 1,665.00');
+    await expect(page.getByLabel('Afectación 1')).toHaveCount(0); // sin IGV no se muestra gravado/exonerado
     await expect(page.getByLabel('Condiciones')).toHaveValue(/sin IGV/);
-    await page.getByText('Considerar IGV').click();
+    await page.getByRole('radio', { name: 'Factura · con IGV' }).click();
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText('Para factura indica el RUC del cliente (11 dígitos).');
+    await page.getByRole('radio', { name: 'Boleta · con IGV' }).click();
+    await expect(page.getByLabel('Afectación 2')).toHaveValue('EXONERADO');
     await expect(page.getByLabel('Condiciones')).toHaveValue(/Validez de la cotización: 15 días calendario/);
 
     await page.getByRole('button', { name: 'Enviar por WhatsApp' }).click();

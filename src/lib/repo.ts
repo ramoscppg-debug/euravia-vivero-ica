@@ -1167,7 +1167,7 @@ export async function marcarRecordatorio(clave: string, usuario: string) {
 export const precotizacionDesdeFila = (r: Row): Precotizacion => ({
   id: String(r.id), numero: r.numero, token: r.token, fecha: r.fecha, validezDias: r.validez_dias,
   cliente: { nombre: r.cliente_nombre, doc: r.cliente_doc ?? undefined, telefono: r.cliente_telefono ?? undefined, direccion: r.cliente_direccion ?? undefined },
-  conIgv: !!r.con_igv, lineas: (r.lineas ?? []).map((l: Row) => ({ ...l, cantidad: Number(l.cantidad), precio: Number(l.precio) })), condiciones: r.condiciones ?? [], notas: r.notas ?? undefined,
+  comprobante: r.comprobante ?? (r.con_igv ? 'BOLETA' : 'NINGUNO'), conIgv: !!r.con_igv, lineas: (r.lineas ?? []).map((l: Row) => ({ ...l, cantidad: Number(l.cantidad), precio: Number(l.precio) })), condiciones: r.condiciones ?? [], notas: r.notas ?? undefined,
   opGravadas: num(r.op_gravadas), opExoneradas: num(r.op_exoneradas), opInafectas: num(r.op_inafectas), igv: num(r.igv), total: num(r.total),
   estado: r.estado, pagos: (r.pagos ?? []).map((p: Row) => ({ fecha: p.fecha, monto: Number(p.monto), medio: p.medio, operacion: p.operacion ?? undefined })),
   comprobantes: (r.comprobantes ?? []).map((x: Row) => ({ tipo: x.tipo, numero: x.numero, fecha: x.fecha, url: x.url, enviadoAt: x.enviado_at ?? undefined }))
@@ -1189,7 +1189,7 @@ export async function guardarPrecotizacion(c: Precotizacion, usuario: string): P
   const sb = await db();
   const fila = {
     fecha: c.fecha, validez_dias: c.validezDias, cliente_nombre: c.cliente.nombre, cliente_doc: c.cliente.doc || null, cliente_telefono: c.cliente.telefono || null,
-    cliente_direccion: c.cliente.direccion || null, con_igv: c.conIgv, lineas: c.lineas, condiciones: c.condiciones, notas: c.notas || null,
+    cliente_direccion: c.cliente.direccion || null, comprobante: c.comprobante, con_igv: c.comprobante !== 'NINGUNO', lineas: c.lineas, condiciones: c.condiciones, notas: c.notas || null,
     op_gravadas: c.opGravadas, op_exoneradas: c.opExoneradas, op_inafectas: c.opInafectas, igv: c.igv, total: c.total, estado: c.estado, updated_at: new Date().toISOString()
   };
   const r = c.id.startsWith('nueva')
