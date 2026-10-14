@@ -65,6 +65,18 @@ export function calcularPrecotizacion(lineas: LineaPrecotizacion[], conIgv: bool
   return { filas, opGravadas, opExoneradas, opInafectas, igv, valor: r2(opGravadas + opExoneradas + opInafectas), total: r2(opGravadas + opExoneradas + opInafectas + igv) };
 }
 
+/** Las no aceptadas (sin pagos) se eliminan a los 20 días de su fecha; la base lo hace cada noche. */
+export const DIAS_ELIMINACION = 20;
+export const seEliminaEl = (c: Pick<Precotizacion, 'estado' | 'pagos' | 'fecha'>): string | null =>
+  (c.estado === 'BORRADOR' || c.estado === 'ENVIADA' || c.estado === 'RECHAZADA') && !c.pagos.length
+    ? new Date(Date.parse(c.fecha) + (DIAS_ELIMINACION + 1) * 86_400_000).toISOString().slice(0, 10)
+    : null;
+/** Igual regla para las cotizaciones del carrito (enviadas o rechazadas). */
+export const cotizacionSeEliminaEl = (c: { estado: string; fecha: string; comprobanteId?: string }): string | null =>
+  (c.estado === 'ENVIADA' || c.estado === 'RECHAZADA') && !c.comprobanteId
+    ? new Date(Date.parse(c.fecha) + (DIAS_ELIMINACION + 1) * 86_400_000).toISOString().slice(0, 10)
+    : null;
+
 export const pagado = (c: Pick<Precotizacion, 'pagos'>) => r2(c.pagos.reduce((a, p) => a + p.monto, 0));
 export const saldo = (c: Pick<Precotizacion, 'pagos' | 'total'>) => r2(c.total - pagado(c));
 

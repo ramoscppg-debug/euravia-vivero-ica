@@ -1193,6 +1193,28 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('53. Pre-cotización no aceptada: avisa la fecha y se elimina a los 20 días', async ({ page }) => {
+    await ir(page, 'precotizaciones');
+    await page.getByRole('button', { name: 'Nueva pre-cotización' }).click();
+    await page.getByLabel('Cliente de la pre-cotización').fill('Cliente Indeciso');
+    await page.getByLabel('Concepto 1').fill('Poda de árboles');
+    await page.getByLabel('Precio 1').fill('200');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    const tarjeta = page.getByRole('article').filter({ hasText: 'Cliente Indeciso' });
+    await expect(tarjeta).toContainText('Si no se acepta, se elimina el 2026-10-11'); // fecha 20/09 + 20 días
+
+    await page.clock.setFixedTime(new Date('2026-10-10T10:00:00-05:00'));
+    await page.reload();
+    await ir(page, 'precotizaciones');
+    await expect(page.getByRole('article').filter({ hasText: 'Cliente Indeciso' })).toHaveCount(1); // día 20: sigue
+
+    await page.clock.setFixedTime(new Date('2026-10-11T10:00:00-05:00'));
+    await page.reload();
+    await ir(page, 'precotizaciones');
+    await expect(page.getByRole('article').filter({ hasText: 'Cliente Indeciso' })).toHaveCount(0);
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

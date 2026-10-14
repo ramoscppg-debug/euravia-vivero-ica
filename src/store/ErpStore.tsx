@@ -69,7 +69,7 @@ import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
 import { conPreciosVigentes } from '../lib/ofertas';
 import { resumenTexto } from '../lib/oficina';
-import { calcularPrecotizacion, saldo as saldoPrecotizacion, type ComprobantePrecotizacion, type Precotizacion } from '../lib/precotizacion';
+import { calcularPrecotizacion, cotizacionSeEliminaEl, seEliminaEl, saldo as saldoPrecotizacion, type ComprobantePrecotizacion, type Precotizacion } from '../lib/precotizacion';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
@@ -697,7 +697,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             repo.cargarVencimientos().catch(() => []), // sólo el dueño
             repo.cargarPrecotizaciones().catch(() => [])
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos, precotizaciones });
+          commit(sinCotizacionesVencidas({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos, precotizaciones }, today()));
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -2427,8 +2427,18 @@ interface ErpValue {
 
 const ErpContext = createContext<ErpValue | null>(null);
 
+/** Quita las cotizaciones no aceptadas con más de 20 días (en la nube la base las borra cada noche). */
+function sinCotizacionesVencidas(s: ErpState, hoy: string): ErpState {
+  const vigente = (fecha: string | null) => !fecha || fecha > hoy;
+  return {
+    ...s,
+    precotizaciones: s.precotizaciones.filter(c => vigente(seEliminaEl(c))),
+    cotizaciones: s.cotizaciones.filter(c => vigente(cotizacionSeEliminaEl(c)))
+  };
+}
+
 export function ErpProvider({ children, nube = false, usuario = '' }: { children: ReactNode; nube?: boolean; usuario?: string }) {
-  const [state, setState] = useState<ErpState>(() => (nube ? nubeVacia() : cargarEstadoDemo()));
+  const [state, setState] = useState<ErpState>(() => (nube ? nubeVacia() : sinCotizacionesVencidas(cargarEstadoDemo(), hoyLocal())));
   const [cargando, setCargando] = useState(nube);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const stateRef = useRef(state);

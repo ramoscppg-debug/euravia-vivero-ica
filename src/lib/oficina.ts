@@ -6,6 +6,7 @@
 import type { ErpState } from '../store/ErpStore';
 import type { ComprobanteSunat } from '../types/sunat';
 import type { TabId } from '../layout/navigation';
+import { seEliminaEl } from './precotizacion';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const esVenta = (i: ComprobanteSunat) => i.tipoComprobante === '01' || i.tipoComprobante === '03' || i.tipoComprobante === '07';
@@ -72,6 +73,8 @@ export function pendientesDelDia(s: ErpState, hoy: string, dias = 3): Pendiente[
   if (cot) p.push({ clave: 'COT', icono: '📝', texto: `${cot} cotización(es) esperando respuesta`, tab: 'cotizaciones' });
   const porPagar = s.gastos.filter(g => !g.medioPago);
   if (porPagar.length) p.push({ clave: 'CXP', icono: '💳', texto: `${porPagar.length} cuenta(s) por pagar: ${soles(porPagar.reduce((a, g) => a + g.total - (g.retencion ?? 0), 0))}`, tab: 'finanzas' });
+  const porVencer = s.precotizaciones.filter(c => { const f = seEliminaEl(c); return c.estado === 'ENVIADA' && f && f <= sumar(hoy, dias); }).length;
+  if (porVencer) p.push({ clave: 'PCZ-VENCE', icono: '⏳', texto: `${porVencer} cotización(es) sin respuesta se eliminan en ${dias} día(s) o menos: haz seguimiento`, tab: 'precotizaciones' });
   const sinCpe = s.precotizaciones.filter(c => (c.estado === 'PAGADA' || c.estado === 'ACEPTADA') && !c.comprobantes.length).length;
   if (sinCpe) p.push({ clave: 'PCZ', icono: '🧾', texto: `${sinCpe} cotización(es) aceptada(s) sin comprobante registrado`, tab: 'precotizaciones' });
   const sinEnviar = s.precotizaciones.flatMap(c => c.comprobantes.filter(x => !x.enviadoAt)).length;

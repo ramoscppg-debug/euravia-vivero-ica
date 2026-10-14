@@ -11,7 +11,7 @@ import { imprimirHtml } from '../../lib/documentos';
 import { hoyLocal } from '../../lib/fechas';
 import { soles } from '../../lib/formato';
 import {
-  AFECTACIONES, calcularPrecotizacion, condicionesBase, empresaDoc, ESTILO_PRECOTIZACION, htmlPrecotizacion, mensajeComprobante, mensajePrecotizacion, NOMBRE_CPE, pagado, saldo, UNIDADES,
+  AFECTACIONES, calcularPrecotizacion, condicionesBase, empresaDoc, ESTILO_PRECOTIZACION, htmlPrecotizacion, mensajeComprobante, mensajePrecotizacion, NOMBRE_CPE, pagado, saldo, seEliminaEl, UNIDADES,
   type ComprobantePrecotizacion, type LineaPrecotizacion, type Precotizacion
 } from '../../lib/precotizacion';
 import { useErp } from '../../store/ErpStore';
@@ -34,7 +34,7 @@ export default function Precotizaciones() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-tinta-suave max-w-2xl">Arma la cotización con el detalle por ítem (unidad, afectación, valor de venta e IGV), envíala por WhatsApp con un enlace para que el cliente la vea y descargue, y cuando la apruebe regístrala con su adelanto.</p>
+        <p className="text-sm text-tinta-suave max-w-2xl">Arma la cotización con el detalle por ítem (unidad, afectación, valor de venta e IGV), envíala por WhatsApp con un enlace para que el cliente la vea y descargue, y cuando la apruebe regístrala con su adelanto. Las que no se aceptan se eliminan a los 20 días.</p>
         <Boton onClick={() => setEditando(nueva())}><Plus className="w-4 h-4" aria-hidden /> Nueva pre-cotización</Boton>
       </div>
       {state.precotizaciones.length
@@ -102,6 +102,7 @@ function Tarjeta_({ c, editar }: { c: Precotizacion; editar: () => void }) {
         <span><b className="text-tinta">{c.numero}</b> · {c.cliente.nombre}<span className="block text-xs text-tinta-suave">{c.fecha} · {c.lineas.length} ítem(s) · {c.conIgv ? 'con IGV' : 'sin IGV'}</span></span>
         <Insignia tono={TONO[c.estado]}>{c.estado}</Insignia>
       </div>
+      {seEliminaEl(c) && <p className="text-[11px] text-aviso font-bold">Si no se acepta, se elimina el {seEliminaEl(c)}</p>}
       <p className="flex flex-wrap gap-x-4"><span>Total <b>{soles(c.total)}</b></span>{pag > 0 && <span>Pagado <b className="text-exito">{soles(pag)}</b></span>}{pag > 0 && pendiente > 0 && <span>Saldo <b className="text-error">{soles(pendiente)}</b></span>}</p>
       <div className="flex flex-wrap gap-2">
         {(c.estado === 'BORRADOR' || c.estado === 'ENVIADA') && <Boton tamano="sm" variante="secundario" onClick={editar}>Editar</Boton>}
