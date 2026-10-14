@@ -121,8 +121,6 @@ export const ESTILO_PRECOTIZACION = `
   .pc .res tr:last-child td{background:#dbe6f3;font-weight:800;font-size:15px}
   .pc .ex{font-weight:800}
   .pc .formal{font-size:13px;line-height:1.6;margin:0 0 12px}
-  .pc .firma{margin-top:36px;text-align:center;font-size:13px;line-height:1.5}
-  .pc .firma .linea{width:260px;margin:0 auto 6px;border-top:1px solid #334155}
 `;
 
 export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: EmpresaDoc): string {
@@ -168,9 +166,6 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
       </tbody></table>
     </div>
     <p class="formal" style="margin-top:20px">Quedamos atentos a cualquier consulta adicional.<br>Atentamente,</p>
-    <div class="firma"><div class="linea"></div>
-      ${e.firmanteNombre ? `<b>${esc(e.firmanteNombre)}</b><br>` : ''}${e.firmanteCargo ? `${esc(e.firmanteCargo)}<br>` : ''}
-      <b>${esc([e.razonSocial, nombre].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' — '))}</b></div>
     ${c.comprobantes?.length ? `<p style="margin-top:14px"><b>Comprobantes emitidos:</b> ${c.comprobantes.map(x => `${NOMBRE_CPE[x.tipo]} ${esc(x.numero)}`).join(' · ')}</p>` : ''}
     <p style="margin-top:22px;text-align:center;color:#64748b;font-size:10px">Este documento no es un comprobante de pago · ${esc(nombre)}</p>
   </div>`;
