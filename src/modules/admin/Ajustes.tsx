@@ -73,6 +73,7 @@ export default function Ajustes() {
             </div>
             <div>
               <label className="font-bold block mb-1 text-tinta">Nombre Comercial de la Marca</label>
+              <span className="text-[10px] text-tinta-suave block -mt-1 mb-1">La marca (ej. AUREVIA); la razón social es la empresa legal y también sale en la cotización.</span>
               <input type="text" value={company.nombreComercial} onChange={(e) => set({ nombreComercial: e.target.value })} className="w-full p-2.5 bg-crema border border-crema-300 rounded-xl font-bold text-xs text-tinta" />
             </div>
           </div>
@@ -104,6 +105,21 @@ export default function Ajustes() {
               <span className="text-[10px] text-tinta-suave">Sobre el precio del servicio sin IGV</span>
             </div>
           </div>
+        </div>
+
+        {/* Formas de pago (cotizaciones) */}
+        <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-3 text-xs">
+          <p className="font-bold text-tinta text-sm">Formas de pago</p>
+          <p className="text-tinta-suave">Aparecen en las cotizaciones (PDF y enlace del cliente). Ej.: BCP · Cta. 193-1234567-0-12 · CCI 002-193-001234567012-11, o Yape · 987 654 321 (Rosa Ramos).</p>
+          {(company.formasPago ?? []).map((f, i) => (
+            <div key={i} className="grid grid-cols-[160px_1fr_auto] gap-2">
+              <input aria-label={`Medio de pago ${i + 1}`} list="medios-pago-empresa" value={f.medio} onChange={(e) => set({ formasPago: (company.formasPago ?? []).map((x, j) => (j === i ? { ...x, medio: e.target.value } : x)) })} placeholder="BCP, Yape…" className="p-2.5 bg-crema border border-crema-300 rounded-xl font-bold" />
+              <input aria-label={`Detalle del medio de pago ${i + 1}`} value={f.detalle} onChange={(e) => set({ formasPago: (company.formasPago ?? []).map((x, j) => (j === i ? { ...x, detalle: e.target.value } : x)) })} placeholder="N° de cuenta, CCI, celular y titular" className="p-2.5 bg-crema border border-crema-300 rounded-xl" />
+              <button type="button" aria-label={`Quitar medio de pago ${i + 1}`} onClick={() => set({ formasPago: (company.formasPago ?? []).filter((_, j) => j !== i) })} className="px-3 rounded-xl bg-error-fondo text-error font-bold">✕</button>
+            </div>
+          ))}
+          <datalist id="medios-pago-empresa">{['BCP', 'BBVA', 'Interbank', 'Scotiabank', 'Banco de la Nación', 'Caja Ica', 'Yape', 'Plin', 'Efectivo'].map(m => <option key={m} value={m} />)}</datalist>
+          <button type="button" onClick={() => set({ formasPago: [...(company.formasPago ?? []), { medio: '', detalle: '' }] })} className="px-4 py-2 rounded-xl border border-crema-400 font-bold">+ Agregar forma de pago</button>
         </div>
 
         {/* Contabilidad simple o completa */}

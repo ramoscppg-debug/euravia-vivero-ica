@@ -1104,6 +1104,13 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
   test('52. Pre-cotización: estructura del modelo, IGV opcional, WhatsApp con enlace para el cliente, adelanto y pago final', async ({ page }) => {
     // window.open se registra (no se abre WhatsApp de verdad)
     await page.evaluate(() => { (window as unknown as { abiertos: string[] }).abiertos = []; window.open = (u?: string | URL) => { (window as unknown as { abiertos: string[] }).abiertos.push(String(u)); return null; }; });
+    page.on('dialog', d => void d.accept());
+    // Formas de pago de la empresa (salen en la cotización)
+    await ir(page, 'configuracion');
+    await page.getByRole('button', { name: '+ Agregar forma de pago' }).click();
+    await page.getByLabel('Medio de pago 1', { exact: true }).fill('Yape');
+    await page.getByLabel('Detalle del medio de pago 1').fill('987 654 321 (Rosa Ramos)');
+    await page.getByRole('button', { name: 'Guardar Todos los Cambios de la Empresa' }).click();
     await ir(page, 'precotizaciones');
     await page.getByRole('button', { name: 'Nueva pre-cotización' }).click();
     await page.getByLabel('Cliente de la pre-cotización').fill('Condominio Los Pinos');
@@ -1151,6 +1158,9 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(doc).toContainText('EXONERADO');
     await expect(doc).toContainText('S/ 1,958.40');
     await expect(doc).toContainText('De nuestra consideración');
+    await expect(doc).toContainText('AUREVIA BOTANICAL S.A.C. (AUREVIA) tiene el agrado'); // razón social y marca
+    await expect(doc).toContainText('Formas de pago:');
+    await expect(doc).toContainText('Yape: 987 654 321 (Rosa Ramos)');
     await expect(doc).toContainText('Quedamos atentos a cualquier consulta adicional');
     await expect(doc).not.toContainText('Titular - Gerente'); // sin bloque de firma
     await expect(doc.locator('img[src$="/logo.jpg"]')).toHaveCount(1);

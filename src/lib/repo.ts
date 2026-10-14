@@ -196,7 +196,8 @@ function empresaDesdeFila(r: Row | null): EmpresaConfig {
     comisionJardineroPct: r.comision_jardinero_pct != null ? num(r.comision_jardinero_pct) : undefined,
     contabilidadCompleta: !!r.contabilidad_completa,
     firmanteNombre: r.firmante_nombre ?? undefined,
-    firmanteCargo: r.firmante_cargo ?? undefined
+    firmanteCargo: r.firmante_cargo ?? undefined,
+    formasPago: Array.isArray(r.formas_pago) ? r.formas_pago : []
   };
 }
 
@@ -794,6 +795,7 @@ export async function guardarEmpresa(c: EmpresaConfig, regimen: RegimenTributari
     contabilidad_completa: !!c.contabilidadCompleta,
     firmante_nombre: c.firmanteNombre?.trim() || null,
     firmante_cargo: c.firmanteCargo?.trim() || null,
+    formas_pago: (c.formasPago ?? []).map(f => ({ medio: f.medio.trim(), detalle: f.detalle.trim() })).filter(f => f.medio && f.detalle),
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' }));
   // La fila se identifica por el RUC: si el RUC cambió, se retira la anterior para no tener dos empresas

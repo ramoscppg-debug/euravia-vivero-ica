@@ -43,6 +43,8 @@ export interface EmpresaConfig extends EmisorSunat {
   /** Firma de las cotizaciones (texto formal). */
   firmanteNombre?: string;
   firmanteCargo?: string;
+  /** Formas de pago que se muestran en las cotizaciones (banco y cuenta, Yape, Plin…). */
+  formasPago?: { medio: string; detalle: string }[];
 }
 
 // ---------- Catálogo & Kardex ----------

@@ -103,10 +103,11 @@ const ddmmaaaa = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(0,
 export interface EmpresaDoc {
   ruc?: string; razonSocial?: string; nombreComercial?: string; direccion?: string; cuentaBcp?: string; whatsapp?: string; email?: string;
   firmanteNombre?: string; firmanteCargo?: string;
+  formasPago?: { medio: string; detalle: string }[];
 }
 export const empresaDoc = (e: EmpresaConfig, contacto: { whatsapp?: string; email?: string }): EmpresaDoc =>
   ({ ruc: e.ruc, razonSocial: e.razonSocial, nombreComercial: e.nombreComercial, direccion: e.direccion, cuentaBcp: e.cuentaBcpSoles, whatsapp: contacto.whatsapp, email: contacto.email || e.email,
-     firmanteNombre: e.firmanteNombre, firmanteCargo: e.firmanteCargo });
+     firmanteNombre: e.firmanteNombre, firmanteCargo: e.firmanteCargo, formasPago: e.formasPago });
 
 /** Estilos del documento (los usa el PDF y la página del cliente). */
 export const ESTILO_PRECOTIZACION = `
@@ -136,7 +137,7 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
       <div style="display:flex;gap:14px;align-items:center">
         <img src="${typeof window !== 'undefined' ? window.location.origin : ''}/logo.jpg" alt="${esc(nombre)}" style="width:72px;height:72px;border-radius:14px;object-fit:cover">
         <div><div style="font-size:22px;font-weight:800;letter-spacing:.12em;color:#15803d">${esc(nombre.toUpperCase())}</div>
-        ${e.razonSocial ? `<div>${esc(e.razonSocial)}</div>` : ''}${e.direccion ? `<div style="color:#475569">${esc(e.direccion)}</div>` : ''}
+        ${e.razonSocial && e.razonSocial !== nombre ? `<div style="font-weight:700">${esc(e.razonSocial)}</div>` : ''}${e.direccion ? `<div style="color:#475569">${esc(e.direccion)}</div>` : ''}
         <div style="color:#475569">${[e.whatsapp && `WhatsApp ${esc(e.whatsapp)}`, e.email && esc(e.email)].filter(Boolean).join(' · ')}</div></div>
       </div>
       <div style="border:2px solid #1f3a68;border-radius:12px;padding:10px 16px;text-align:center;min-width:210px">
@@ -147,7 +148,7 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
       <td style="width:60%;background:#f8fafc;padding:10px 12px;border-radius:10px"><b>Cliente:</b> ${esc(c.cliente.nombre)}${c.cliente.doc ? ` · ${c.cliente.doc.length === 11 ? 'RUC' : 'DNI'} ${esc(c.cliente.doc)}` : ''}${c.cliente.direccion ? `<br>${esc(c.cliente.direccion)}` : ''}</td>
       <td style="background:#f8fafc;padding:10px 12px;border-radius:10px">Fecha: <b>${ddmmaaaa(c.fecha)}</b><br>Válida hasta: <b>${ddmmaaaa(venceEl(c.fecha, c.validezDias))}</b><br>Comprobante: <b>${COMPROBANTE_SOLICITADO[c.comprobante ?? (c.conIgv ? 'BOLETA' : 'NINGUNO')]}</b></td>
     </tr></table>
-    <p class="formal">De nuestra consideración:<br>Por medio de la presente, ${esc(nombre)} tiene el agrado de alcanzarle la siguiente cotización de acuerdo a lo solicitado:</p>
+    <p class="formal">De nuestra consideración:<br>Por medio de la presente, ${esc(e.razonSocial && e.razonSocial !== nombre ? `${e.razonSocial} (${nombre})` : nombre)} tiene el agrado de alcanzarle la siguiente cotización de acuerdo a lo solicitado:</p>
     <table class="det"><thead><tr><th>N°</th><th>Concepto</th><th>Und.</th><th>Cant.</th><th>Precio unit.${c.conIgv ? '' : ' (sin IGV)'}</th>${c.conIgv ? '<th>Afectación</th><th>Valor venta</th><th>IGV (18%)</th>' : ''}<th>Total</th></tr></thead>
       <tbody>${filas}</tbody>
       <tfoot class="tot"><tr><td colspan="${c.conIgv ? 6 : 5}" class="d" style="text-align:center">TOTALES</td>${c.conIgv ? `<td class="d">${dinero(calc.valor)}</td><td class="d">${dinero(calc.igv)}</td>` : ''}<td class="d">${dinero(calc.total)}</td></tr></tfoot></table>
@@ -155,7 +156,9 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
       <div style="flex:1"><div style="font-weight:800;font-size:14px;margin-bottom:6px">Condiciones:</div>
         <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">${c.condiciones.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
         ${c.notas ? `<p style="margin-top:10px"><b>Observaciones:</b> ${esc(c.notas)}</p>` : ''}
-        ${e.cuentaBcp ? `<p style="margin-top:10px"><b>Cuenta BCP:</b> ${esc(e.cuentaBcp)}</p>` : ''}</div>
+        ${e.formasPago?.length
+          ? `<div style="margin-top:12px"><div style="font-weight:800;font-size:14px;margin-bottom:4px">Formas de pago:</div><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">${e.formasPago.map(f => `<li><b>${esc(f.medio)}:</b> ${esc(f.detalle)}</li>`).join('')}</ul></div>`
+          : e.cuentaBcp ? `<p style="margin-top:10px"><b>Cuenta BCP:</b> ${esc(e.cuentaBcp)}</p>` : ''}</div>
       <table class="res" style="width:380px"><tbody>
         ${c.conIgv ? `<tr><td>Op. gravadas</td><td class="d">${dinero(calc.opGravadas)}</td></tr>
         ${calc.opExoneradas ? `<tr><td>Op. exoneradas${exon.length ? ` (${esc(exon.join(', '))})` : ''}</td><td class="d">${dinero(calc.opExoneradas)}</td></tr>` : ''}
@@ -167,7 +170,7 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
     </div>
     <p class="formal" style="margin-top:20px">Quedamos atentos a cualquier consulta adicional.<br>Atentamente,</p>
     ${c.comprobantes?.length ? `<p style="margin-top:14px"><b>Comprobantes emitidos:</b> ${c.comprobantes.map(x => `${NOMBRE_CPE[x.tipo]} ${esc(x.numero)}`).join(' · ')}</p>` : ''}
-    <p style="margin-top:22px;text-align:center;color:#64748b;font-size:10px">Este documento no es un comprobante de pago · ${esc(nombre)}</p>
+    <p style="margin-top:22px;text-align:center;color:#64748b;font-size:10px">Este documento no es un comprobante de pago · ${esc([e.razonSocial, e.ruc && `RUC ${e.ruc}`].filter(Boolean).join(' · ') || nombre)}</p>
   </div>`;
 }
 
