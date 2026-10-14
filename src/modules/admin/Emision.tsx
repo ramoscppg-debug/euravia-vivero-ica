@@ -52,7 +52,7 @@ export function AccionesEmision({ inv }: { inv: ComprobanteSunat }) {
   const digitos = telefono.replace(/\D/g, '');
   const conPais = digitos.length === 9 ? `51${digitos}` : digitos;
   const empresa = state.company.nombreComercial.split(' - ')[0] || state.company.razonSocial;
-  const mensaje = `Hola ${inv.cliente.nombreRazonSocial.split(' ')[0]}, te enviamos tu ${(TIPOS_CPE[inv.tipoComprobante] ?? 'comprobante').toLowerCase()} N° ${inv.numeroSunat ?? inv.id} por S/ ${inv.montoTotal.toFixed(2)}${empresa ? ` de ${empresa}` : ''}. Te adjuntamos el PDF. ¡Gracias por tu compra! 🌿`;
+  const mensaje = `Hola ${inv.cliente.nombreRazonSocial.split(' ')[0]}, te enviamos tu ${(TIPOS_CPE[inv.tipoComprobante] ?? 'comprobante').toLowerCase()} N° ${inv.numeroSunat ?? inv.id} por S/ ${inv.montoTotal.toFixed(2)}${empresa ? ` de ${empresa}` : ''}. Te adjuntamos el PDF. ¡Gracias por tu compra! ☘️`;
   const wa = conPais.length >= 10 ? `https://wa.me/${conPais}?text=${encodeURIComponent(mensaje)}` : null;
 
   return (

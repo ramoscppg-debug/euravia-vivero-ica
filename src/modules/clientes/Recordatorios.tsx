@@ -30,7 +30,7 @@ export function recordatoriosDelDia(s: ErpState, hoy: string, tienda: string): R
   for (const c of s.cotizaciones) {
     if (c.estado !== 'ENVIADA' || !c.cliente.telefono || dias(c.fecha, hoy) < 2) continue;
     lista.push({ clave: `COT:${c.id}`, tipo: 'COTIZACION', nombre: c.cliente.nombre, telefono: c.cliente.telefono, motivo: `Cotización ${c.id} de ${soles(c.total)} enviada hace ${dias(c.fecha, hoy)} días`,
-      mensaje: `Hola ${primerNombre(c.cliente.nombre)}, te saluda ${empresa} 🌿. ¿Pudiste revisar tu cotización ${c.id} por ${soles(c.total)}? Si quieres la confirmamos hoy y coordinamos la entrega.` });
+      mensaje: `Hola ${primerNombre(c.cliente.nombre)}, te saluda ${empresa} ☘️. ¿Pudiste revisar tu cotización ${c.id} por ${soles(c.total)}? Si quieres la confirmamos hoy y coordinamos la entrega.` });
   }
   for (const w of s.solicitudes) {
     if ((w.estado !== 'NUEVA' && w.estado !== 'EN_PROCESO') || dias(w.createdAt, hoy) < 1) continue;
@@ -41,12 +41,12 @@ export function recordatoriosDelDia(s: ErpState, hoy: string, tienda: string): R
     const d = p.fechaEntrega ? dias(p.fechaEntrega, hoy) : -1;
     if (p.estado !== 'entregado' || !p.cliente.telefono || d < 5 || d > 20) continue;
     lista.push({ clave: `CUIDADO:${p.id}`, tipo: 'CUIDADO', nombre: p.cliente.nombre, telefono: p.cliente.telefono, motivo: `Pedido ${p.id} entregado hace ${d} días`,
-      mensaje: `Hola ${primerNombre(p.cliente.nombre)}, ¿cómo están tus plantas? 🌱 Si tienes dudas de riego o luz, escríbenos. Y si te gustó, nos ayudaría mucho tu opinión aquí: ${tienda}` });
+      mensaje: `Hola ${primerNombre(p.cliente.nombre)}, ¿cómo están tus plantas? ☘️ Si tienes dudas de riego o luz, escríbenos. Y si te gustó, nos ayudaría mucho tu opinión aquí: ${tienda}` });
   }
   for (const c of s.crmClients) {
     if (c.urgency !== 'ALTA' || !c.phone || !c.recommendedAction) continue;
     lista.push({ clave: `CLI:${c.id}:${hoy.slice(0, 7)}`, tipo: 'SEGUIMIENTO', nombre: c.name, telefono: c.phone, motivo: c.recommendedAction,
-      mensaje: `Hola ${primerNombre(c.name)}, te saluda ${empresa} 🌿. ${c.recommendedAction}. ¿Te ayudamos a coordinarlo?` });
+      mensaje: `Hola ${primerNombre(c.name)}, te saluda ${empresa} ☘️. ${c.recommendedAction}. ¿Te ayudamos a coordinarlo?` });
   }
   return lista.filter(r => !s.recordatoriosEnviados[r.clave]);
 }

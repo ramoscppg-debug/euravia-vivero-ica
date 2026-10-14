@@ -161,35 +161,37 @@ export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: Emp
   </div>`;
 }
 
-/** Mensaje con el comprobante (enlace de Drive) para el cliente. */
+// Íconos del plano básico de Unicode (☘ ✿ ❀ ⏳ ➡): se ven bien en WhatsApp de celular, web y escritorio.
+// Los de 4 bytes (🌿 📄) a veces llegan como "�" cuando el mensaje entra por un enlace wa.me.
+const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+const primerNombre = (n: string) => capital(n.trim().split(/\s+/)[0]?.toLowerCase() ?? '');
+const MAX_ITEMS = 5;
+
+/** Mensaje corto con el comprobante (enlace de Drive) para el cliente. */
 export function mensajeComprobante(c: Precotizacion, cp: ComprobantePrecotizacion, empresa: string): string {
   const pag = pagado(c);
   return [
-    `Hola ${c.cliente.nombre.split(' ')[0]}, te saluda ${empresa} 🌿`,
-    `Te enviamos tu ${NOMBRE_CPE[cp.tipo].toLowerCase()} *${cp.numero}* de la cotización N° ${c.numero}.`,
-    `Total: ${dinero(c.total)}${pag ? ` · Pagado: ${dinero(pag)}` : ''}${saldo(c) > 0 ? ` · Saldo: ${dinero(saldo(c))}` : ''}`,
-    '',
-    `Descárgala aquí: ${cp.url}`,
-    '¡Gracias por tu compra!'
+    `☘️ *${empresa}* · Tu ${NOMBRE_CPE[cp.tipo].toLowerCase()} *${cp.numero}*`,
+    `Hola ${primerNombre(c.cliente.nombre)}, aquí está el comprobante de tu cotización N° ${c.numero}.`,
+    `*Total: ${dinero(c.total)}*${pag ? ` · Pagado: ${dinero(pag)}` : ''}${saldo(c) > 0 ? ` · Saldo: ${dinero(saldo(c))}` : ''}`,
+    `➡ Descárgala: ${cp.url}`,
+    '¡Gracias por tu compra! ✿'
   ].join('\n');
 }
 
-/** Mensaje de WhatsApp para el cliente, con el enlace a su cotización. */
+/** Mensaje corto de WhatsApp para el cliente: lo principal y el enlace con el detalle completo. */
 export function mensajePrecotizacion(c: Precotizacion, empresa: string, enlace: string): string {
   const calc = calcularPrecotizacion(c.lineas, c.conIgv);
+  const comprobante = c.comprobante ?? (c.conIgv ? 'BOLETA' : 'NINGUNO');
+  const nota = comprobante === 'NINGUNO' ? 'sin IGV' : `IGV incluido · ${COMPROBANTE_SOLICITADO[comprobante].toLowerCase()}`;
   return [
-    `Hola ${c.cliente.nombre.split(' ')[0]}, te saluda ${empresa} 🌿`,
-    `Te enviamos tu cotización *N° ${c.numero}* (${COMPROBANTE_SOLICITADO[c.comprobante ?? (c.conIgv ? 'BOLETA' : 'NINGUNO')].toLowerCase()}):`,
-    ...calc.filas.slice(0, 12).map(f => `• ${f.cantidad} ${f.unidad} ${f.concepto} — ${dinero(f.total)}`),
-    ...(calc.filas.length > 12 ? [`• … y ${calc.filas.length - 12} ítem(s) más`] : []),
-    '',
-    ...(c.conIgv
-      ? [`Op. gravadas: ${dinero(calc.opGravadas)}`, ...(calc.opExoneradas ? [`Op. exoneradas: ${dinero(calc.opExoneradas)}`] : []), `IGV (18%): ${dinero(calc.igv)}`]
-      : ['Precios sin IGV (si requieres boleta o factura se agrega el 18%).']),
-    `*Total: ${dinero(calc.total)}*`,
-    `Válida hasta el ${ddmmaaaa(venceEl(c.fecha, c.validezDias))}.`,
-    '',
-    `Ver y descargar la cotización: ${enlace}`,
-    'Si estás de acuerdo, respóndenos por aquí y coordinamos el adelanto. ¡Gracias!'
+    `☘️ *${empresa}* · Cotización *N° ${c.numero}*`,
+    `Hola ${primerNombre(c.cliente.nombre)}, gracias por escribirnos ✿`,
+    ...calc.filas.slice(0, MAX_ITEMS).map(x => `❀ ${x.cantidad} ${x.unidad} ${capital(x.concepto)} — ${dinero(x.total)}`),
+    ...(calc.filas.length > MAX_ITEMS ? [`❀ y ${calc.filas.length - MAX_ITEMS} ítem(s) más en el detalle`] : []),
+    `*Total: ${dinero(calc.total)}* (${nota})`,
+    `⏳ Válida hasta el ${ddmmaaaa(venceEl(c.fecha, c.validezDias))}`,
+    `➡ Ver y descargar: ${enlace}`,
+    '¿La aprobamos? Responde aquí y coordinamos el adelanto ☘️'
   ].join('\n');
 }

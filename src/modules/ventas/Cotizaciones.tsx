@@ -29,7 +29,7 @@ export default function Cotizaciones() {
   const texto = (c: Cotizacion) => {
     const carrito = calcularCarrito(c.lineas, products, c.descuentoGlobal);
     const lineas = carrito.lineas.map(l => `• ${l.qty}× ${l.name}: S/ ${l.neto.toFixed(2)}`).join('\n');
-    return `Hola ${c.cliente.nombre.split(' ')[0]}, te compartimos la cotización ${c.id} de ${company.nombreComercial.split(' - ')[0]} 🌿\n${lineas}\n${carrito.descuentoTotal > 0 ? `Descuento: − S/ ${carrito.descuentoTotal.toFixed(2)}\n` : ''}Total: S/ ${carrito.total.toFixed(2)} (IGV incluido)\nVálida hasta el ${c.vence}.`;
+    return `Hola ${c.cliente.nombre.split(' ')[0]}, te compartimos la cotización ${c.id} de ${company.nombreComercial.split(' - ')[0]} ☘️\n${lineas}\n${carrito.descuentoTotal > 0 ? `Descuento: − S/ ${carrito.descuentoTotal.toFixed(2)}\n` : ''}Total: S/ ${carrito.total.toFixed(2)} (IGV incluido)\nVálida hasta el ${c.vence}.`;
   };
 
   const imprimir = (c: Cotizacion) => imprimirDocumento(docDeCotizacion(state, c));

@@ -140,9 +140,9 @@ export function plantasDelCliente(c: CrmClient, invoices: ComprobanteSunat[], pr
 /** Mensaje de WhatsApp con los cuidados de las plantas que compró. */
 export function mensajeCuidados(c: CrmClient, plantas: PlantaCliente[]): string {
   const nombre = c.name.split(' ')[0];
-  if (!plantas.length) return `Hola ${nombre}, te saludamos de AUREVIA Botanical 🌿. ${c.seasonalAlert}`;
+  if (!plantas.length) return `Hola ${nombre}, te saludamos de AUREVIA Botanical ☘️. ${c.seasonalAlert}`;
   const tips = plantas.map(p => `• ${p.nombre}: ${[p.riego, p.luz].filter(Boolean).join(' · ')}`).join('\n');
-  return `Hola ${nombre}, te saludamos de AUREVIA Botanical 🌿. Recordatorio de cuidados para tus plantas:\n${tips}\n¿Te ayudamos con fertilizante o una visita de mantenimiento?`;
+  return `Hola ${nombre}, te saludamos de AUREVIA Botanical ☘️. Recordatorio de cuidados para tus plantas:\n${tips}\n¿Te ayudamos con fertilizante o una visita de mantenimiento?`;
 }
 
 // ---------------- CSV ----------------

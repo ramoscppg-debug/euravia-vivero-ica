@@ -23,7 +23,7 @@ const hoy = () => hoyLocal();
 
 /** Mensaje de WhatsApp listo según el estado del pedido. */
 function mensajeWhatsapp(p: Pedido): string {
-  const saludo = `Hola ${p.cliente.nombre.split(' ')[0]}, te escribimos de AUREVIA 🌿.`;
+  const saludo = `Hola ${p.cliente.nombre.split(' ')[0]}, te escribimos de AUREVIA ☘️.`;
   switch (p.estado) {
     case 'pendiente': return `${saludo} Tu pedido ${p.id} suma S/ ${p.total.toFixed(2)}. Puedes pagar por Yape o Plin y te enviamos el comprobante.`;
     case 'pagado':
