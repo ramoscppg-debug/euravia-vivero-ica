@@ -1,0 +1,158 @@
+// ==========================================
+// PRE-COTIZACIÓN (puro)
+// Línea: concepto, unidad, cantidad, precio unitario SIN IGV y afectación.
+// Valor venta = cantidad × precio; IGV 18% sólo en lo gravado y sólo si "con IGV" (boleta o factura).
+// El mismo HTML sirve para imprimir/PDF y para la página que ve el cliente con su enlace.
+// ==========================================
+import type { EmpresaConfig } from '../domain/types';
+import { esc } from './documentos';
+
+export type Afectacion = 'GRAVADO' | 'EXONERADO' | 'INAFECTO';
+export const AFECTACIONES: Afectacion[] = ['GRAVADO', 'EXONERADO', 'INAFECTO'];
+export const UNIDADES = ['UND', 'M2', 'ML', 'M3', 'KG', 'SACO', 'PAQ', 'GLB', 'SERV.', 'HORA'];
+
+export interface LineaPrecotizacion {
+  concepto: string;
+  unidad: string;
+  cantidad: number;
+  precio: number; // valor unitario sin IGV
+  afectacion: Afectacion;
+  sku?: string; // si viene del catálogo
+}
+
+export interface PagoPrecotizacion { fecha: string; monto: number; medio: string; operacion?: string }
+
+export interface Precotizacion {
+  id: string;
+  numero: string;
+  token: string;
+  fecha: string;
+  validezDias: number;
+  cliente: { nombre: string; doc?: string; telefono?: string; direccion?: string };
+  conIgv: boolean;
+  lineas: LineaPrecotizacion[];
+  condiciones: string[];
+  notas?: string;
+  opGravadas: number;
+  opExoneradas: number;
+  opInafectas: number;
+  igv: number;
+  total: number;
+  estado: 'BORRADOR' | 'ENVIADA' | 'ACEPTADA' | 'PAGADA' | 'RECHAZADA';
+  pagos: PagoPrecotizacion[];
+}
+
+export const TASA = 0.18;
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Valor, IGV y total de cada línea y de la cotización (como la tabla del modelo). */
+export function calcularPrecotizacion(lineas: LineaPrecotizacion[], conIgv: boolean) {
+  const filas = lineas.map(l => {
+    const valor = r2(l.cantidad * l.precio);
+    const igv = conIgv && l.afectacion === 'GRAVADO' ? r2(valor * TASA) : 0;
+    return { ...l, valor, igv, total: r2(valor + igv) };
+  });
+  const suma = (af: Afectacion) => r2(filas.filter(f => f.afectacion === af).reduce((a, f) => a + f.valor, 0));
+  const opGravadas = suma('GRAVADO');
+  const opExoneradas = suma('EXONERADO');
+  const opInafectas = suma('INAFECTO');
+  const igv = r2(filas.reduce((a, f) => a + f.igv, 0));
+  return { filas, opGravadas, opExoneradas, opInafectas, igv, valor: r2(opGravadas + opExoneradas + opInafectas), total: r2(opGravadas + opExoneradas + opInafectas + igv) };
+}
+
+export const pagado = (c: Pick<Precotizacion, 'pagos'>) => r2(c.pagos.reduce((a, p) => a + p.monto, 0));
+export const saldo = (c: Pick<Precotizacion, 'pagos' | 'total'>) => r2(c.total - pagado(c));
+
+/** Condiciones del modelo; la primera cambia según se considere el IGV. */
+export function condicionesBase(conIgv: boolean, validezDias = 15, hayExonerados = false): string[] {
+  return [
+    conIgv ? 'Precios expresados en Soles (S/). El IGV (18%) se detalla por ítem.' : 'Precios expresados en Soles (S/), sin IGV. Si requiere boleta o factura se agrega el IGV (18%) a lo gravado.',
+    ...(hayExonerados ? ['Los ítems exonerados no llevan IGV; el resto de ítems está gravado.'] : []),
+    `Validez de la cotización: ${validezDias} días calendario.`,
+    'Forma de pago: a coordinar (50% adelanto / 50% contra entrega).',
+    'Tiempo de entrega/instalación: a coordinar según disponibilidad.'
+  ];
+}
+
+const dinero = (n: number) => `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const venceEl = (fecha: string, dias: number) => new Date(Date.parse(fecha) + dias * 86_400_000).toISOString().slice(0, 10);
+const ddmmaaaa = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(0, 4)}`;
+
+export interface EmpresaDoc { ruc?: string; razonSocial?: string; nombreComercial?: string; direccion?: string; cuentaBcp?: string; whatsapp?: string; email?: string }
+export const empresaDoc = (e: EmpresaConfig, contacto: { whatsapp?: string; email?: string }): EmpresaDoc =>
+  ({ ruc: e.ruc, razonSocial: e.razonSocial, nombreComercial: e.nombreComercial, direccion: e.direccion, cuentaBcp: e.cuentaBcpSoles, whatsapp: contacto.whatsapp, email: contacto.email || e.email });
+
+/** Estilos del documento (los usa el PDF y la página del cliente). */
+export const ESTILO_PRECOTIZACION = `
+  .pc{max-width:900px;margin:0 auto;padding:28px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#0f172a;font-size:12px}
+  .pc table{width:100%;border-collapse:collapse}
+  .pc .det th{background:#1f3a68;color:#fff;font-size:10px;text-transform:uppercase;padding:9px 8px;border:1px solid #1f3a68;text-align:center}
+  .pc .det td{border:1px solid #334155;padding:8px;vertical-align:middle}
+  .pc .det tr:nth-child(even) td{background:#f1f5f9}
+  .pc .d{text-align:right;white-space:nowrap} .pc .c{text-align:center}
+  .pc .tot td{background:#dbe6f3;font-weight:800;border:1px solid #334155;padding:8px}
+  .pc .res td{border:1px solid #334155;padding:9px 12px;font-size:13px}
+  .pc .res tr:last-child td{background:#dbe6f3;font-weight:800;font-size:15px}
+  .pc .ex{font-weight:800}
+`;
+
+export function htmlPrecotizacion(c: Omit<Precotizacion, 'id' | 'token'>, e: EmpresaDoc): string {
+  const calc = calcularPrecotizacion(c.lineas, c.conIgv);
+  const nombre = e.nombreComercial?.split(' - ')[0] || e.razonSocial || 'AUREVIA';
+  const filas = calc.filas.map((f, i) => `<tr><td class="c">${i + 1}</td><td>${esc(f.concepto.toUpperCase())}</td><td class="c">${esc(f.unidad)}</td><td class="c">${f.cantidad}</td>
+    <td class="d">${dinero(f.precio)}</td><td class="c ${f.afectacion !== 'GRAVADO' ? 'ex' : ''}">${f.afectacion}</td><td class="d">${dinero(f.valor)}</td><td class="d">${dinero(f.igv)}</td><td class="d">${dinero(f.total)}</td></tr>`).join('');
+  const exon = calc.filas.filter(f => f.afectacion === 'EXONERADO').map(f => f.concepto.toLowerCase());
+  const pag = pagado(c);
+  return `<div class="pc">
+    <header style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:16px">
+      <div><div style="font-size:22px;font-weight:800;letter-spacing:.12em;color:#15803d">${esc(nombre.toUpperCase())}</div>
+        ${e.razonSocial ? `<div>${esc(e.razonSocial)}</div>` : ''}${e.direccion ? `<div style="color:#475569">${esc(e.direccion)}</div>` : ''}
+        <div style="color:#475569">${[e.whatsapp && `WhatsApp ${esc(e.whatsapp)}`, e.email && esc(e.email)].filter(Boolean).join(' · ')}</div></div>
+      <div style="border:2px solid #1f3a68;border-radius:12px;padding:10px 16px;text-align:center;min-width:210px">
+        ${e.ruc ? `<div style="font-weight:700">RUC ${esc(e.ruc)}</div>` : ''}
+        <div style="font-size:15px;font-weight:800;color:#1f3a68">PRE-COTIZACIÓN</div><div style="font-weight:700">N° ${esc(c.numero)}</div></div>
+    </header>
+    <table style="margin-bottom:14px"><tr>
+      <td style="width:60%;background:#f8fafc;padding:10px 12px;border-radius:10px"><b>Cliente:</b> ${esc(c.cliente.nombre)}${c.cliente.doc ? ` · ${c.cliente.doc.length === 11 ? 'RUC' : 'DNI'} ${esc(c.cliente.doc)}` : ''}${c.cliente.direccion ? `<br>${esc(c.cliente.direccion)}` : ''}</td>
+      <td style="background:#f8fafc;padding:10px 12px;border-radius:10px">Fecha: <b>${ddmmaaaa(c.fecha)}</b><br>Válida hasta: <b>${ddmmaaaa(venceEl(c.fecha, c.validezDias))}</b></td>
+    </tr></table>
+    <table class="det"><thead><tr><th>N°</th><th>Concepto</th><th>Und.</th><th>Cant.</th><th>Precio unit.</th><th>Afectación</th><th>Valor venta</th><th>IGV (18%)</th><th>Total</th></tr></thead>
+      <tbody>${filas}</tbody>
+      <tfoot class="tot"><tr><td colspan="6" class="d" style="text-align:center">TOTALES</td><td class="d">${dinero(calc.valor)}</td><td class="d">${dinero(calc.igv)}</td><td class="d">${dinero(calc.total)}</td></tr></tfoot></table>
+    <div style="display:flex;justify-content:space-between;gap:24px;margin-top:18px;align-items:flex-start">
+      <div style="flex:1"><div style="font-weight:800;font-size:14px;margin-bottom:6px">Condiciones:</div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">${c.condiciones.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        ${c.notas ? `<p style="margin-top:10px"><b>Observaciones:</b> ${esc(c.notas)}</p>` : ''}
+        ${e.cuentaBcp ? `<p style="margin-top:10px"><b>Cuenta BCP:</b> ${esc(e.cuentaBcp)}</p>` : ''}</div>
+      <table class="res" style="width:380px"><tbody>
+        <tr><td>Op. gravadas</td><td class="d">${dinero(calc.opGravadas)}</td></tr>
+        ${calc.opExoneradas ? `<tr><td>Op. exoneradas${exon.length ? ` (${esc(exon.join(', '))})` : ''}</td><td class="d">${dinero(calc.opExoneradas)}</td></tr>` : ''}
+        ${calc.opInafectas ? `<tr><td>Op. inafectas</td><td class="d">${dinero(calc.opInafectas)}</td></tr>` : ''}
+        <tr><td>IGV (18%) sobre op. gravadas</td><td class="d">${c.conIgv ? dinero(calc.igv) : 'No incluido'}</td></tr>
+        ${pag ? `<tr><td>Adelanto recibido</td><td class="d">− ${dinero(pag)}</td></tr>` : ''}
+        <tr><td>${pag ? 'SALDO A PAGAR' : 'TOTAL A PAGAR'}</td><td class="d">${dinero(pag ? calc.total - pag : calc.total)}</td></tr>
+      </tbody></table>
+    </div>
+    <p style="margin-top:22px;text-align:center;color:#64748b;font-size:10px">Este documento no es un comprobante de pago · ${esc(nombre)}</p>
+  </div>`;
+}
+
+/** Mensaje de WhatsApp para el cliente, con el enlace a su cotización. */
+export function mensajePrecotizacion(c: Precotizacion, empresa: string, enlace: string): string {
+  const calc = calcularPrecotizacion(c.lineas, c.conIgv);
+  return [
+    `Hola ${c.cliente.nombre.split(' ')[0]}, te saluda ${empresa} 🌿`,
+    `Te enviamos tu cotización *N° ${c.numero}*:`,
+    ...calc.filas.slice(0, 12).map(f => `• ${f.cantidad} ${f.unidad} ${f.concepto} — ${dinero(f.total)}`),
+    ...(calc.filas.length > 12 ? [`• … y ${calc.filas.length - 12} ítem(s) más`] : []),
+    '',
+    `Op. gravadas: ${dinero(calc.opGravadas)}`,
+    ...(calc.opExoneradas ? [`Op. exoneradas: ${dinero(calc.opExoneradas)}`] : []),
+    c.conIgv ? `IGV (18%): ${dinero(calc.igv)}` : 'Precios sin IGV (si requieres boleta o factura se agrega el 18%).',
+    `*Total: ${dinero(calc.total)}*`,
+    `Válida hasta el ${ddmmaaaa(venceEl(c.fecha, c.validezDias))}.`,
+    '',
+    `Ver y descargar la cotización: ${enlace}`,
+    'Si estás de acuerdo, respóndenos por aquí y coordinamos el adelanto. ¡Gracias!'
+  ].join('\n');
+}

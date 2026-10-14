@@ -106,6 +106,15 @@ export default function Ajustes() {
           </div>
         </div>
 
+        {/* Contabilidad simple o completa */}
+        <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-2 text-xs">
+          <label className="flex items-start gap-2 font-bold text-tinta text-sm">
+            <input type="checkbox" className="mt-1" checked={!!company.contabilidadCompleta} onChange={(e) => set({ contabilidadCompleta: e.target.checked })} />
+            Mostrar la contabilidad completa (libro diario PCGE, detracciones, planilla y cierre del ejercicio)
+          </label>
+          <p className="text-tinta-suave">Apagado, el menú de Contabilidad muestra sólo lo del negocio: ingresos y egresos, registro de ventas, registro de compras y ventas (SIRE). El Kardex y el control de inventario están en Catálogo y almacén. Lo demás se sigue registrando por detrás y puedes volver a mostrarlo cuando quieras.</p>
+        </div>
+
         {/* Emisión de comprobantes: series y dónde se quedó la numeración */}
         <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-[#f0eae1]">

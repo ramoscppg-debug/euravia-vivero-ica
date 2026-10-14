@@ -1101,6 +1101,74 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
   });
 
+  test('52. Pre-cotización: estructura del modelo, IGV opcional, WhatsApp con enlace para el cliente, adelanto y pago final', async ({ page }) => {
+    // window.open se registra (no se abre WhatsApp de verdad)
+    await page.evaluate(() => { (window as unknown as { abiertos: string[] }).abiertos = []; window.open = (u?: string | URL) => { (window as unknown as { abiertos: string[] }).abiertos.push(String(u)); return null; }; });
+    await ir(page, 'precotizaciones');
+    await page.getByRole('button', { name: 'Nueva pre-cotización' }).click();
+    await page.getByLabel('Cliente de la pre-cotización').fill('Condominio Los Pinos');
+    await page.getByLabel('WhatsApp del cliente').fill('987654321');
+    await page.getByLabel('Concepto 1').fill('Grass americano');
+    await page.getByLabel('Unidad 1').selectOption('M2');
+    await page.getByLabel('Cantidad 1').fill('163');
+    await page.getByLabel('Precio 1').fill('10');
+    await page.getByRole('button', { name: 'Agregar ítem' }).click();
+    await page.getByLabel('Concepto 2').fill('Humus de lombriz');
+    await page.getByLabel('Unidad 2').selectOption('SACO');
+    await page.getByLabel('Precio 2').fill('35');
+    await page.getByLabel('Afectación 2').selectOption('EXONERADO');
+    const totales = page.getByRole('table', { name: 'Totales de la pre-cotización' });
+    await expect(totales).toContainText('S/ 1,630.00'); // op. gravadas
+    await expect(totales).toContainText('S/ 35.00'); // exoneradas
+    await expect(totales).toContainText('S/ 293.40'); // IGV 18% sólo de lo gravado
+    await expect(totales).toContainText('S/ 1,958.40');
+    await page.getByText('Considerar IGV').click(); // sin boleta ni factura
+    await expect(totales).toContainText('No incluido');
+    await expect(totales).toContainText('S/ 1,665.00');
+    await expect(page.getByLabel('Condiciones')).toHaveValue(/sin IGV/);
+    await page.getByText('Considerar IGV').click();
+    await expect(page.getByLabel('Condiciones')).toHaveValue(/Validez de la cotización: 15 días calendario/);
+
+    await page.getByRole('button', { name: 'Enviar por WhatsApp' }).click();
+    const tarjeta = page.getByRole('article').filter({ hasText: 'Condominio Los Pinos' });
+    await expect(tarjeta).toContainText('ENVIADA');
+    const abiertos = await page.evaluate(() => (window as unknown as { abiertos: string[] }).abiertos);
+    expect(abiertos[0]).toContain('wa.me/51987654321');
+    const texto = decodeURIComponent(abiertos[0].split('text=')[1]);
+    expect(texto).toContain('Total: S/ 1,958.40');
+    const enlace = texto.match(/https?:\/\/\S+\/tienda\/cotizacion\/\S+/)![0];
+
+    // El cliente abre su enlace
+    await page.goto(enlace);
+    const doc = page.getByLabel('Cotización', { exact: true });
+    await expect(doc).toContainText('PRE-COTIZACIÓN');
+    await expect(doc).toContainText('GRASS AMERICANO');
+    await expect(doc).toContainText('EXONERADO');
+    await expect(doc).toContainText('S/ 1,958.40');
+    await expect(page.getByRole('button', { name: 'Descargar PDF' })).toBeVisible();
+
+    // Aprobada: adelanto del 50% y luego el saldo
+    await page.goto('/#precotizaciones');
+    await tarjeta.getByRole('button', { name: 'Aceptar con adelanto' }).click();
+    await expect(tarjeta.getByLabel(/Monto del pago/)).toHaveValue('979.2');
+    await tarjeta.getByLabel(/Operación del pago/).fill('445566');
+    await tarjeta.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(tarjeta).toContainText('ACEPTADA');
+    await expect(tarjeta).toContainText('Saldo S/ 979.20');
+    await tarjeta.getByRole('button', { name: 'Registrar pago' }).click();
+    await tarjeta.getByLabel(/Medio del pago/).selectOption('Efectivo');
+    await tarjeta.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(tarjeta).toContainText('PAGADA');
+
+    // Contabilidad simple: el libro diario se oculta del menú hasta activarlo en Ajustes
+    await expect(page.getByRole('button', { name: 'Libro diario PCGE' })).toHaveCount(0);
+    await ir(page, 'configuracion');
+    await page.getByText('Mostrar la contabilidad completa').click();
+    await page.getByRole('button', { name: /^Contabilidad/ }).first().click();
+    await expect(page.getByRole('button', { name: 'Libro diario PCGE' }).first()).toBeVisible();
+    expect(consoleErrors.filter(e => !e.includes('favicon'))).toHaveLength(0);
+  });
+
   test('34. A las 8:30 p. m. en Lima el comprobante sale con la fecha de hoy (no la de UTC)', async ({ browser }) => {
     const ctx = await browser.newContext({ timezoneId: 'America/Lima', baseURL: 'http://localhost:5199' });
     const page = await ctx.newPage();

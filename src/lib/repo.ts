@@ -46,6 +46,7 @@ import { emisorDe } from '../domain/types';
 import { EMPRESA_VACIA } from '../data/seed';
 import type { Rol } from '../domain/types';
 import { round2 } from './peru';
+import type { Precotizacion } from './precotizacion';
 import { getSupabase } from './supabase';
 import type { Asiento, Cuenta, CuentasExistencia, LineaAsiento } from './contabilidad';
 import { hoyLocal } from './fechas';
@@ -192,7 +193,8 @@ function empresaDesdeFila(r: Row | null): EmpresaConfig {
     ultimosNumeros: r.ultimos_numeros ?? {},
     serieNcBoleta: r.serie_nc_boleta ?? base.serieNcBoleta,
     serieNcFactura: r.serie_nc_factura ?? base.serieNcFactura,
-    comisionJardineroPct: r.comision_jardinero_pct != null ? num(r.comision_jardinero_pct) : undefined
+    comisionJardineroPct: r.comision_jardinero_pct != null ? num(r.comision_jardinero_pct) : undefined,
+    contabilidadCompleta: !!r.contabilidad_completa
   };
 }
 
@@ -787,6 +789,7 @@ export async function guardarEmpresa(c: EmpresaConfig, regimen: RegimenTributari
     serie_nc_boleta: c.serieNcBoleta,
     serie_nc_factura: c.serieNcFactura,
     comision_jardinero_pct: c.comisionJardineroPct ?? null,
+    contabilidad_completa: !!c.contabilidadCompleta,
     updated_at: new Date().toISOString()
   }, { onConflict: 'id' }));
   // La fila se identifica por el RUC: si el RUC cambió, se retira la anterior para no tener dos empresas
@@ -1158,6 +1161,45 @@ export async function cargarRecordatoriosEnviados(): Promise<Record<string, stri
 export async function marcarRecordatorio(clave: string, usuario: string) {
   const sb = await db();
   ok(await sb.from('recordatorios_enviados').upsert({ clave, enviado_at: new Date().toISOString(), usuario }, { onConflict: 'clave' }));
+}
+
+// ---------------- PRE-COTIZACIONES ----------------
+export const precotizacionDesdeFila = (r: Row): Precotizacion => ({
+  id: String(r.id), numero: r.numero, token: r.token, fecha: r.fecha, validezDias: r.validez_dias,
+  cliente: { nombre: r.cliente_nombre, doc: r.cliente_doc ?? undefined, telefono: r.cliente_telefono ?? undefined, direccion: r.cliente_direccion ?? undefined },
+  conIgv: !!r.con_igv, lineas: (r.lineas ?? []).map((l: Row) => ({ ...l, cantidad: Number(l.cantidad), precio: Number(l.precio) })), condiciones: r.condiciones ?? [], notas: r.notas ?? undefined,
+  opGravadas: num(r.op_gravadas), opExoneradas: num(r.op_exoneradas), opInafectas: num(r.op_inafectas), igv: num(r.igv), total: num(r.total),
+  estado: r.estado, pagos: (r.pagos ?? []).map((p: Row) => ({ fecha: p.fecha, monto: Number(p.monto), medio: p.medio, operacion: p.operacion ?? undefined }))
+});
+
+export async function cargarPrecotizaciones(): Promise<Precotizacion[]> {
+  const sb = await db();
+  return ok<Row[]>(await sb.from('precotizaciones').select('*').order('id', { ascending: false }).limit(300)).map(precotizacionDesdeFila);
+}
+
+export async function guardarPrecotizacion(c: Precotizacion, usuario: string): Promise<Precotizacion> {
+  const sb = await db();
+  const fila = {
+    fecha: c.fecha, validez_dias: c.validezDias, cliente_nombre: c.cliente.nombre, cliente_doc: c.cliente.doc || null, cliente_telefono: c.cliente.telefono || null,
+    cliente_direccion: c.cliente.direccion || null, con_igv: c.conIgv, lineas: c.lineas, condiciones: c.condiciones, notas: c.notas || null,
+    op_gravadas: c.opGravadas, op_exoneradas: c.opExoneradas, op_inafectas: c.opInafectas, igv: c.igv, total: c.total, estado: c.estado, updated_at: new Date().toISOString()
+  };
+  const r = c.id.startsWith('nueva')
+    ? ok<Row>(await sb.from('precotizaciones').insert({ ...fila, creado_por: usuario }).select('*').single())
+    : ok<Row>(await sb.from('precotizaciones').update(fila).eq('id', Number(c.id)).select('*').single());
+  return precotizacionDesdeFila(r);
+}
+
+export async function registrarPagoPrecotizacion(p: { id: string; monto: number; medio: string; operacion?: string; usuario: string }) {
+  const sb = await db();
+  ok(await sb.rpc('registrar_pago_precotizacion', { p: { id: Number(p.id), monto: p.monto, medio: p.medio, operacion: p.operacion, usuario: p.usuario } }));
+}
+
+export async function precotizacionPublica(token: string): Promise<Row | null> {
+  const { getSupabase } = await import('./supabase');
+  const sb = await getSupabase();
+  if (!sb) return null;
+  return ok<Row | null>(await sb.rpc('precotizacion_publica', { p_token: token }));
 }
 
 // ---------------- OFICINA VIRTUAL ----------------

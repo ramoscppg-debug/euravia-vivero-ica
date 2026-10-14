@@ -69,6 +69,7 @@ import { descuentoCupon, puntosPorCompra, VALOR_PUNTO } from '../lib/fidelidad';
 import { calcularCarrito, resumirPagos } from '../lib/pos';
 import { conPreciosVigentes } from '../lib/ofertas';
 import { resumenTexto } from '../lib/oficina';
+import { calcularPrecotizacion, saldo as saldoPrecotizacion, type Precotizacion } from '../lib/precotizacion';
 import * as repo from '../lib/repo';
 import { SunatBillingService } from '../services/sunatService';
 import { sunatClient } from '../lib/sunatClient';
@@ -114,6 +115,7 @@ export interface ErpState {
   recordatoriosEnviados: Record<string, string>; // clave → fecha en que se envió
   metasVenta: Record<string, number>; // periodo AAAA-MM → meta en soles
   vencimientos: Vencimiento[];
+  precotizaciones: Precotizacion[];
 }
 
 export type JardineroInput = Omit<Jardinero, 'id'> & { id?: string };
@@ -312,7 +314,8 @@ function nubeVacia(): ErpState {
     resenas: [],
     recordatoriosEnviados: {},
     metasVenta: {},
-    vencimientos: []
+    vencimientos: [],
+    precotizaciones: []
   };
 }
 
@@ -680,7 +683,7 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
         if (!nube) return { ok: true };
         try {
           const datos = await repo.cargarTodo();
-          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos] = await Promise.all([
+          const [partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos, precotizaciones] = await Promise.all([
             repo.cargarPartesProduccion().catch(() => []), // sólo dueño y jardinero
             repo.cargarGastos().catch(() => []),
             repo.cargarJardineros().catch(() => []), // dueño y ventas
@@ -691,9 +694,10 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
             repo.cargarRecordatoriosEnviados().catch(() => ({})),
             repo.cargarEventos().catch(() => []),
             repo.cargarMetas().catch(() => ({})),
-            repo.cargarVencimientos().catch(() => []) // sólo el dueño
+            repo.cargarVencimientos().catch(() => []), // sólo el dueño
+            repo.cargarPrecotizaciones().catch(() => [])
           ]);
-          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos });
+          commit({ ...get(), ...datos, partesProduccion, gastos, jardineros, serviciosJardinero, ejercicios, combos, resenas, recordatoriosEnviados, eventos, metasVenta, vencimientos, precotizaciones });
           return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
@@ -1635,6 +1639,62 @@ function useErpActions(get: () => ErpState, commit: (next: ErpState) => void, nu
           const cur = get();
           commit({ ...cur, gastos, serviciosJardinero: cur.serviciosJardinero.map(x => (x.id === id ? { ...x, rxhSerie: serieN, rxhNumero: numeroN, gastoId } : x)) });
           return { ok: true, retencion };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      // ---------------- PRE-COTIZACIONES ----------------
+      /** Guarda la pre-cotización con sus totales recalculados (borrador o enviada). */
+      async guardarPrecotizacion(c: Precotizacion): Promise<Result<{ precotizacion: Precotizacion }>> {
+        const lineas = c.lineas.filter(l => l.concepto.trim());
+        const doc = c.cliente.doc?.replace(/\D/g, '') || undefined;
+        if (c.cliente.nombre.trim().length < 2) return { ok: false, error: 'Indica el nombre del cliente.' };
+        if (doc && !/^(\d{8}|\d{11})$/.test(doc)) return { ok: false, error: 'El documento del cliente es un DNI (8) o un RUC (11 dígitos).' };
+        if (!lineas.length) return { ok: false, error: 'Agrega al menos un ítem.' };
+        if (lineas.some(l => !(l.cantidad > 0) || !(l.precio >= 0))) return { ok: false, error: 'Revisa cantidades y precios de los ítems.' };
+        const calc = calcularPrecotizacion(lineas, c.conIgv);
+        if (!(calc.total > 0)) return { ok: false, error: 'El total debe ser mayor a cero.' };
+        const datos: Precotizacion = {
+          ...c, lineas: lineas.map(l => ({ ...l, concepto: l.concepto.trim() })), cliente: { ...c.cliente, nombre: c.cliente.nombre.trim(), doc },
+          condiciones: c.condiciones.map(x => x.trim()).filter(Boolean),
+          opGravadas: calc.opGravadas, opExoneradas: calc.opExoneradas, opInafectas: calc.opInafectas, igv: calc.igv, total: calc.total
+        };
+        try {
+          const cur0 = get();
+          const guardada = nube ? await repo.guardarPrecotizacion(datos, usuario)
+            : c.id.startsWith('nueva')
+              ? { ...datos, id: idDemo('PCZ'), numero: `PC-${String(cur0.precotizaciones.length + 1).padStart(5, '0')}`, token: crypto.randomUUID() }
+              : datos;
+          const cur = get();
+          commit({ ...cur, precotizaciones: [guardada, ...cur.precotizaciones.filter(x => x.id !== c.id)] });
+          return { ok: true, precotizacion: guardada };
+        } catch (e) {
+          return { ok: false, error: errorNube(e) };
+        }
+      },
+
+      /** Adelanto o pago del cliente: entra a caja y deja el saldo (con saldo cero, PAGADA). */
+      async registrarPagoPrecotizacion(id: string, monto: number, medio: MedioPago, operacion?: string): Promise<Result> {
+        const s = get();
+        const c = s.precotizaciones.find(x => x.id === id);
+        if (!c) return { ok: false, error: 'Cotización no encontrada.' };
+        if (c.estado === 'RECHAZADA' || c.estado === 'PAGADA') return { ok: false, error: `La cotización ${c.numero} está ${c.estado.toLowerCase()}.` };
+        const pendiente = saldoPrecotizacion(c);
+        const m = round2(monto);
+        if (!(m > 0) || m > pendiente) return { ok: false, error: `El monto debe estar entre S/ 0.01 y el saldo (S/ ${pendiente.toFixed(2)}).` };
+        if (medio !== 'Efectivo' && !operacion?.trim()) return { ok: false, error: 'Indica el N° de operación.' };
+        try {
+          if (nube) await repo.registrarPagoPrecotizacion({ id, monto: m, medio, operacion: operacion?.trim(), usuario });
+          const cur = get();
+          const pago = { fecha: today(), monto: m, medio, operacion: operacion?.trim() || undefined };
+          const concepto = `${c.pagos.length ? 'Pago' : 'Adelanto'} ${c.numero} · ${c.cliente.nombre}`;
+          commit({
+            ...cur,
+            cashRegister: aplicarCaja(cur.cashRegister, [{ tipo: 'INGRESO', medioPago: medio, monto: m, concepto }], responsable('Caja Principal')),
+            precotizaciones: cur.precotizaciones.map(x => (x.id === id ? { ...x, pagos: [...x.pagos, pago], estado: round2(pendiente - m) === 0 ? 'PAGADA' : 'ACEPTADA' } : x))
+          });
+          return { ok: true };
         } catch (e) {
           return { ok: false, error: errorNube(e) };
         }

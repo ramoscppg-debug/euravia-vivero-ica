@@ -22,6 +22,7 @@ import TableroDia from '../modules/oficina/TableroDia';
 import AvisosAgenda from '../modules/oficina/AvisosAgenda';
 import MetasVenta from '../modules/oficina/MetasVenta';
 import Combos from '../modules/ventas/Combos';
+import Precotizaciones from '../modules/ventas/Precotizaciones';
 import OfertasEventos from '../modules/ventas/OfertasEventos';
 import Recordatorios from '../modules/clientes/Recordatorios';
 import ResenasPanel from '../modules/clientes/ResenasPanel';
@@ -61,6 +62,7 @@ const SCREENS: Record<TabId, ComponentType> = {
   agenda: AvisosAgenda,
   metas: MetasVenta,
   combos: Combos,
+  precotizaciones: Precotizaciones,
   ofertas: OfertasEventos,
   recordatorios: Recordatorios,
   resenas: ResenasPanel,

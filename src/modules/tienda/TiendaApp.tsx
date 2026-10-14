@@ -15,6 +15,7 @@ import Producto from './paginas/Producto';
 import { ServicioDetalle, Servicios } from './paginas/Servicios';
 import Contacto from './paginas/Contacto';
 import Ofertas from './paginas/Ofertas';
+import CotizacionCliente from './paginas/CotizacionCliente';
 import Cotizar from './paginas/Cotizar';
 import NoEncontrado from './paginas/NoEncontrado';
 
@@ -253,6 +254,7 @@ function Rutas() {
   if (partes[0] === 'servicios' && partes[1]) return <ServicioDetalle slug={decodeURIComponent(partes[1])} />;
   if (partes[0] === 'contacto') return <Contacto />;
   if (partes[0] === 'ofertas') return <Ofertas />;
+  if (partes[0] === 'cotizacion' && partes[1]) return <CotizacionCliente token={decodeURIComponent(partes[1])} />;
   if (partes[0] === 'cotizar' || partes[0] === 'pedido') return <Cotizar />;
   return <NoEncontrado />;
 }

@@ -53,6 +53,7 @@ export type TabId =
   | 'pedidos'
   | 'solicitudes'
   | 'cotizaciones'
+  | 'precotizaciones'
   | 'documentos'
   | 'catalogo'
   | 'servicios-tienda'
@@ -121,6 +122,7 @@ export const NAV_BLOCKS: NavBlock[] = [
       { id: 'caja', label: 'Caja y POS', icon: Wallet },
       { id: 'solicitudes', label: 'Pedidos web', icon: Inbox, badge: s => cuenta(s.solicitudes.filter(x => x.estado === 'NUEVA').length) },
       { id: 'pedidos', label: 'Pedidos y delivery', icon: ClipboardList, badge: s => cuenta(s.pedidos.filter(p => p.estado !== 'entregado' && p.estado !== 'cancelado').length) },
+      { id: 'precotizaciones', label: 'Pre-cotizaciones', icon: FileText, badge: s => cuenta(s.precotizaciones.filter(c => c.estado === 'ENVIADA').length) },
       { id: 'cotizaciones', label: 'Cotizaciones y cupones', icon: FileText, badge: s => cuenta(s.cotizaciones.filter(c => c.estado === 'ENVIADA').length) },
       { id: 'documentos', label: 'Documentos y brochure', icon: FileText }
     ]
@@ -174,9 +176,9 @@ export const NAV_BLOCKS: NavBlock[] = [
     items: [
       { id: 'finanzas', label: 'Ingresos, egresos y por emitir', icon: Wallet, badge: s => cuenta(s.pedidos.filter(p => p.estado === 'pendiente').length) },
       { id: 'libro-diario', label: 'Libro diario PCGE', icon: BookOpenCheck },
-      { id: 'sunat', label: 'Comprobantes SUNAT', icon: Receipt },
+      { id: 'sunat', label: 'Registro de ventas (comprobantes)', icon: Receipt },
       { id: 'detracciones', label: 'Detracciones', icon: Landmark, badge: s => cuenta(s.detracciones.filter(d => d.estado === 'PENDIENTE').length) },
-      { id: 'contabilidad', label: 'Impuestos y SIRE', icon: Calculator },
+      { id: 'contabilidad', label: 'Registro de compras y ventas (SIRE)', icon: Calculator },
       { id: 'planilla', label: 'Planilla', icon: Users },
       { id: 'cierre', label: 'Cierre del ejercicio', icon: Lock }
     ]
@@ -216,6 +218,7 @@ const PERMISOS: Record<TabId, Rol[]> = {
   pedidos: VENTAS,
   solicitudes: VENTAS,
   cotizaciones: VENTAS,
+  precotizaciones: VENTAS,
   documentos: VENTAS,
   catalogo: VENTAS,
   'servicios-tienda': DUENO,
@@ -257,8 +260,12 @@ export function tabInicial(rol: Rol): TabId {
   return ALL_TABS.find(t => puedeVer(rol, t)) ?? 'jardineria';
 }
 
-export function bloquesPara(rol: Rol): NavBlock[] {
-  return NAV_BLOCKS.map(b => ({ ...b, items: b.items.filter(i => puedeVer(rol, i.id)) })).filter(b => b.items.length > 0);
+/** Contabilidad completa: se muestran sólo si el dueño la activa en Ajustes (por detrás siempre se registra). */
+export const TABS_CONTABILIDAD_COMPLETA: TabId[] = ['libro-diario', 'detracciones', 'planilla', 'cierre'];
+export const enMenu = (tab: TabId, contabilidadCompleta = false) => contabilidadCompleta || !TABS_CONTABILIDAD_COMPLETA.includes(tab);
+
+export function bloquesPara(rol: Rol, contabilidadCompleta = false): NavBlock[] {
+  return NAV_BLOCKS.map(b => ({ ...b, items: b.items.filter(i => puedeVer(rol, i.id) && enMenu(i.id, contabilidadCompleta)) })).filter(b => b.items.length > 0);
 }
 
 export function blockOf(tab: TabId): NavBlock | undefined {

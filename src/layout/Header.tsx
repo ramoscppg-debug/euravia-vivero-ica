@@ -2,7 +2,7 @@ import { AlertTriangle, Menu, PackagePlus, PlusCircle } from 'lucide-react';
 import { useAuth } from '../store/AuthStore';
 import { useErp } from '../store/ErpStore';
 import { useUi } from '../store/UiStore';
-import { blockOf, itemOf, puedeVer } from './navigation';
+import { blockOf, enMenu, itemOf, puedeVer } from './navigation';
 
 /** Barra superior: dónde estoy, las secciones del área (conectadas entre sí) y las acciones rápidas. */
 export default function Header() {
@@ -11,7 +11,7 @@ export default function Header() {
   const rol = useAuth().perfil?.rol ?? 'dueno';
   const vende = puedeVer(rol, 'caja');
   const area = blockOf(tab);
-  const secciones = area?.items.filter(i => puedeVer(rol, i.id)) ?? [];
+  const secciones = area?.items.filter(i => puedeVer(rol, i.id) && enMenu(i.id, !!state.company.contabilidadCompleta)) ?? [];
   const sinEmpresa = !state.company.ruc;
 
   return (

@@ -71,6 +71,7 @@ export function seedState(): ErpState {
     eventos: [],
     metasVenta: {},
     vencimientos: [],
+    precotizaciones: [],
     resenas: [],
     recordatoriosEnviados: {},
     gastosCaja: INITIAL_CASH_REGISTER.egresos.map(e => ({ id: `${hoyLocal()}-${e.id}`, fecha: hoyLocal(), motivo: e.motivo, monto: e.monto, responsable: e.responsable }))

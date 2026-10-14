@@ -36,7 +36,7 @@ export default function Sidebar() {
             </button>
           )}
 
-          {bloquesPara(rol).map(block => {
+          {bloquesPara(rol, !!company.contabilidadCompleta).map(block => {
             const abierta = activa === block.id;
             const pendientes = block.items.reduce((a, i) => a + Number(i.badge?.(state) ?? 0), 0);
             return (

@@ -38,6 +38,8 @@ export interface EmpresaConfig extends EmisorSunat {
   serieNcFactura: string;
   /** % que la empresa cobra al jardinero por cada servicio (sin configurar no se registran servicios). */
   comisionJardineroPct?: number;
+  /** Muestra en el menú el libro diario, detracciones, planilla y cierre (siempre se registran por detrás). */
+  contabilidadCompleta?: boolean;
 }
 
 // ---------- Catálogo & Kardex ----------
