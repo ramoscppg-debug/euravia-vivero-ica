@@ -34,7 +34,7 @@ async function cargar(token: string): Promise<Datos | null> {
       pagos: pagado ? [{ fecha: r.fecha, monto: pagado, medio: '' }] : [],
       comprobantes: (r.comprobantes ?? []).map((x: Record<string, string>) => ({ tipo: x.tipo, numero: x.numero, url: x.url, fecha: '' }))
     } as Omit<Precotizacion, 'id' | 'token'>,
-    e: { ruc: r.empresa?.ruc, razonSocial: r.empresa?.razon_social, nombreComercial: r.empresa?.nombre_comercial, direccion: r.empresa?.direccion, cuentaBcp: r.empresa?.cuenta_bcp, whatsapp: r.contacto?.whatsapp ?? undefined, email: r.contacto?.email ?? undefined }
+    e: { ruc: r.empresa?.ruc, razonSocial: r.empresa?.razon_social, nombreComercial: r.empresa?.nombre_comercial, direccion: r.empresa?.direccion, cuentaBcp: r.empresa?.cuenta_bcp, firmanteNombre: r.empresa?.firmante_nombre ?? undefined, firmanteCargo: r.empresa?.firmante_cargo ?? undefined, whatsapp: r.contacto?.whatsapp ?? undefined, email: r.contacto?.email ?? undefined }
   };
 }
 

@@ -106,6 +106,20 @@ export default function Ajustes() {
           </div>
         </div>
 
+        {/* Firma de las cotizaciones */}
+        <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-2 text-xs">
+          <p className="font-bold text-tinta text-sm">Firma de las cotizaciones</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="font-bold block text-tinta">Nombre de quien firma
+              <input aria-label="Nombre de quien firma" value={company.firmanteNombre ?? ''} onChange={(e) => set({ firmanteNombre: e.target.value })} className="mt-1 w-full p-2.5 bg-crema border border-crema-300 rounded-xl text-xs" />
+            </label>
+            <label className="font-bold block text-tinta">Cargo
+              <input aria-label="Cargo de quien firma" value={company.firmanteCargo ?? ''} onChange={(e) => set({ firmanteCargo: e.target.value })} placeholder="Ej. Titular - Gerente" className="mt-1 w-full p-2.5 bg-crema border border-crema-300 rounded-xl text-xs" />
+            </label>
+          </div>
+          <p className="text-tinta-suave">Debajo de la firma va la razón social y el nombre comercial (datos de la empresa de arriba).</p>
+        </div>
+
         {/* Contabilidad simple o completa */}
         <div className="bg-white rounded-3xl border border-crema-300 p-6 shadow-sm space-y-2 text-xs">
           <label className="flex items-start gap-2 font-bold text-tinta text-sm">

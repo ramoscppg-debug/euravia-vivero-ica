@@ -1150,6 +1150,11 @@ test.describe('AUREVIA ERP Vivero 360° - Comprehensive E2E Tests', () => {
     await expect(doc).toContainText('GRASS AMERICANO');
     await expect(doc).toContainText('EXONERADO');
     await expect(doc).toContainText('S/ 1,958.40');
+    await expect(doc).toContainText('De nuestra consideración');
+    await expect(doc).toContainText('Quedamos atentos a cualquier consulta adicional');
+    await expect(doc).toContainText('Rosa Elvira Ramos Misaico');
+    await expect(doc).toContainText('Titular - Gerente');
+    await expect(doc.locator('img[src$="/logo.jpg"]')).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Descargar PDF' })).toBeVisible();
 
     // Aprobada: adelanto del 50% y luego el saldo

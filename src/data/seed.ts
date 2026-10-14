@@ -60,7 +60,9 @@ export const INITIAL_COMPANY_CONFIG: EmpresaConfig = {
   modoEmision: 'EXTERNA',
   ultimosNumeros: {},
   serieNcBoleta: 'BC01',
-  serieNcFactura: 'FC01'
+  serieNcFactura: 'FC01',
+  firmanteNombre: 'Rosa Elvira Ramos Misaico',
+  firmanteCargo: 'Titular - Gerente'
 };
 
 /** Empresa en la nube antes de que el dueño la configure: sin datos inventados (RUC, cuentas, dirección). */

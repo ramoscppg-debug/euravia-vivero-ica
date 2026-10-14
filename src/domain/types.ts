@@ -40,6 +40,9 @@ export interface EmpresaConfig extends EmisorSunat {
   comisionJardineroPct?: number;
   /** Muestra en el menú el libro diario, detracciones, planilla y cierre (siempre se registran por detrás). */
   contabilidadCompleta?: boolean;
+  /** Firma de las cotizaciones (texto formal). */
+  firmanteNombre?: string;
+  firmanteCargo?: string;
 }
 
 // ---------- Catálogo & Kardex ----------
